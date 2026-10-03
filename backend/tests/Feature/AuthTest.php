@@ -6,6 +6,7 @@ use App\Enums\Feature;
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
@@ -29,6 +30,24 @@ class AuthTest extends TestCase
         $this->assertSame('T2', $response->json('device.code'));
         $this->assertNotEmpty($response->json('token'));
         $this->api('GET', '/api/v1/auth/staff', $response->json('token'))->assertOk();
+    }
+
+    public function test_registering_twice_with_same_device_id_does_not_duplicate_tablet(): void
+    {
+        $payload = [
+            'email' => $this->shop->owner->email,
+            'password' => self::OWNER_PASSWORD,
+            'device_name' => 'Tablet Bar',
+            'device_id' => (string) Str::uuid(),
+        ];
+
+        $first = $this->api('POST', '/api/v1/devices/register', null, $payload)->assertCreated();
+        $second = $this->api('POST', '/api/v1/devices/register', null, $payload)->assertCreated();
+
+        $this->assertSame($first->json('device.id'), $second->json('device.id'));
+        $this->assertSame('T2', $second->json('device.code'));
+        $this->api('GET', '/api/v1/auth/staff', $first->json('token'))->assertUnauthorized(); // token lama diganti
+        $this->api('GET', '/api/v1/auth/staff', $second->json('token'))->assertOk();
     }
 
     public function test_device_registration_rejects_wrong_password_and_cashiers(): void

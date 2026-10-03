@@ -37,6 +37,7 @@ class OrderTest extends TestCase
         parent::setUp();
         $this->shop = $this->makeShop('BerryBrew');
         $this->token = $this->pinLogin($this->shop);
+        $this->api('POST', '/api/v1/shifts/open', $this->token, ['opening_cash' => 200000])->assertCreated();
 
         $this->inShop(function () {
             $kopi = Category::create(['name' => 'Kopi']);
@@ -159,6 +160,15 @@ class OrderTest extends TestCase
         $this->payOrder($id, [$this->cash(20000)], 20000)->assertOk();
 
         $this->saveOrder($id, [$this->item($this->americano, [$this->hot])], 13000)->assertStatus(409);
+    }
+
+    public function test_payment_requires_open_shift(): void
+    {
+        $id = (string) Str::uuid();
+        $this->saveOrder($id, [$this->item($this->latte)], 20000)->assertOk();
+        $this->api('POST', '/api/v1/shifts/close', $this->token, ['counted_cash' => 200000])->assertOk();
+
+        $this->payOrder($id, [$this->cash(20000)], 20000)->assertUnprocessable()->assertJsonValidationErrors('shift');
     }
 
     // ─────────────── harga dihitung server ───────────────
