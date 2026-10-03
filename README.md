@@ -6,7 +6,7 @@ dengan fondasi multi-tenant agar bisa dipakai kedai lain.
 | Folder | Isi |
 |---|---|
 | `backend/` | Laravel 12 API (Sanctum, PostgreSQL + Row-Level Security) |
-| `app/` | App Flutter kasir & owner (menyusul, M3) |
+| `app/` | App Flutter kasir & owner (Riverpod, Dio, secure storage) |
 | `spikes/printer/` | App uji cetak struk Bluetooth 58mm (M1) |
 | `docs/` | ADR, panduan uji, dokumentasi API |
 | `PROJECT-SCOPE.md` | Ledger kompetensi & cek keamanan — wajib hijau sebelum go-live |
@@ -41,6 +41,20 @@ docker compose exec api ./vendor/bin/pint
 ## Menjalankan Flutter
 
 Flutter SDK ada di `C:\src\flutter` (tambahkan `C:\src\flutter\bin` ke PATH).
+
+App POS (`app/`):
+
+```bash
+cd app && flutter test && flutter run
+```
+
+Saat pertama dibuka, app meminta **alamat server** dan login owner untuk mendaftarkan tablet:
+- Tablet asli di Wi-Fi yang sama: `http://<IP-laptop>:8000`
+- Emulator Android: `http://10.0.2.2:8000` (alamat laptop dari dalam emulator)
+
+HTTP biasa hanya diizinkan di build debug; build release harus memakai `https://`.
+
+App uji printer (`spikes/printer/`):
 
 ```bash
 cd spikes/printer && flutter test && flutter build apk --release --split-per-abi

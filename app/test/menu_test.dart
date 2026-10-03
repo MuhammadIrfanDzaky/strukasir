@@ -1,0 +1,109 @@
+import 'package:berrybrew_pos/core/money.dart';
+import 'package:berrybrew_pos/features/menu/menu_models.dart';
+import 'package:berrybrew_pos/features/menu/modifier_selection.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// Bentuk JSON sama persis dengan respons `GET /api/v1/menu`.
+final menuJson = <String, dynamic>{
+  'version': 'abc123',
+  'categories': [
+    {'id': 'c1', 'name': 'Kopi', 'sort': 0, 'active': true},
+    {'id': 'c2', 'name': 'Arsip', 'sort': 1, 'active': false},
+  ],
+  'products': [
+    {
+      'id': 'p1', 'category_id': 'c1', 'name': 'Americano', 'price': 13000,
+      'active': true, 'sold_out': false, 'sort': 0, 'modifier_group_ids': ['g1', 'g3'],
+    },
+    {
+      'id': 'p2', 'category_id': 'c1', 'name': 'Lama', 'price': 10000,
+      'active': false, 'sold_out': false, 'sort': 1, 'modifier_group_ids': [],
+    },
+  ],
+  'modifier_groups': [
+    {
+      'id': 'g1', 'name': 'Suhu', 'min_select': 1, 'max_select': 1, 'sort': 0,
+      'modifiers': [
+        {'id': 'hot', 'name': 'Hot', 'price_delta': 0, 'active': true, 'sort': 0},
+        {'id': 'cold', 'name': 'Cold', 'price_delta': 2000, 'active': true, 'sort': 1},
+      ],
+    },
+    {
+      'id': 'g3', 'name': 'Tambahan', 'min_select': 0, 'max_select': 2, 'sort': 2,
+      'modifiers': [
+        {'id': 'shot', 'name': 'Extra shot', 'price_delta': 5000, 'active': true, 'sort': 0},
+        {'id': 'oat', 'name': 'Oat milk', 'price_delta': 6000, 'active': true, 'sort': 1},
+        {'id': 'syrup', 'name': 'Sirup', 'price_delta': 3000, 'active': true, 'sort': 2},
+        {'id': 'old', 'name': 'Lama', 'price_delta': 1000, 'active': false, 'sort': 3},
+      ],
+    },
+  ],
+};
+
+void main() {
+  final menu = Menu.fromJson(menuJson);
+  final americano = menu.products.first;
+
+  ModifierSelection select() => ModifierSelection(americano, menu.groupsFor(americano));
+  MenuModifierGroup grp(String id) => menu.modifierGroups.firstWhere((g) => g.id == id);
+  MenuModifier mod(String groupId, String id) => grp(groupId).modifiers.firstWhere((m) => m.id == id);
+
+  group('Menu.fromJson', () {
+    test('memfilter kategori & produk nonaktif untuk kasir', () {
+      expect(menu.activeCategories.map((c) => c.name), ['Kopi']);
+      expect(menu.productsIn('c1').map((p) => p.name), ['Americano']);
+      expect(menu.productsIn('c1', includeInactive: true), hasLength(2));
+    });
+
+    test('grup modifier mengikuti urutan produk', () {
+      expect(menu.groupsFor(americano).map((g) => g.name), ['Suhu', 'Tambahan']);
+    });
+  });
+
+  group('ModifierSelection', () {
+    test('grup wajib pilih-1 otomatis terisi pilihan pertama', () {
+      final s = select();
+      expect(s.chosen.map((m) => m.name), ['Hot']);
+      expect(s.isValid, isTrue);
+      expect(s.unitPrice, 13000);
+    });
+
+    test('grup wajib tidak bisa dikosongkan, hanya diganti', () {
+      final s = select()
+        ..toggle(grp('g1'), mod('g1', 'hot'))
+        ..toggle(grp('g1'), mod('g1', 'cold'));
+      expect(s.chosen.map((m) => m.name), ['Cold']);
+      expect(s.unitPrice, 15000); // Americano Cold = 15.000, sama seperti di Kloa
+    });
+
+    test('grup maks 2 menolak pilihan ketiga', () {
+      final s = select()
+        ..toggle(grp('g3'), mod('g3', 'shot'))
+        ..toggle(grp('g3'), mod('g3', 'oat'))
+        ..toggle(grp('g3'), mod('g3', 'syrup'));
+      expect(s.selectedIn(grp('g3')), ['shot', 'oat']);
+      expect(s.unitPrice, 13000 + 5000 + 6000);
+    });
+
+    test('pilihan nonaktif tidak bisa dipilih', () {
+      final s = select()..toggle(grp('g3'), mod('g3', 'old'));
+      expect(s.selectedIn(grp('g3')), isEmpty);
+    });
+
+    test('grup wajib tanpa pilihan aktif membuat seleksi tidak valid', () {
+      final g = MenuModifierGroup(id: 'gx', name: 'Ukuran', minSelect: 1, maxSelect: 1, modifiers: const []);
+      final s = ModifierSelection(americano, [g]);
+      expect(s.isValid, isFalse);
+      expect(s.errorFor(g), 'Ukuran: wajib pilih 1');
+    });
+  });
+
+  group('money', () {
+    test('format & parse rupiah', () {
+      expect(rupiah(1250000), '1.250.000');
+      expect(rp(13000), 'Rp 13.000');
+      expect(parseRupiah('Rp 13.000'), 13000);
+      expect(parseRupiah('abc'), isNull);
+    });
+  });
+}
