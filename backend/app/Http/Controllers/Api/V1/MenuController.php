@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\Feature;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Modifier;
 use App\Models\ModifierGroup;
 use App\Models\Product;
+use App\Models\TenantSetting;
+use App\Support\Pricing\PricingSettings;
+use App\Support\Tenancy\FeatureGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -16,14 +20,25 @@ use Illuminate\Support\Facades\DB;
  */
 class MenuController extends Controller
 {
-    public function show(): JsonResponse
+    public function show(FeatureGate $gate): JsonResponse
     {
         $groups = ModifierGroup::query()->with('modifiers')->orderBy('sort')->orderBy('name')->get();
         $products = Product::query()->orderBy('sort')->orderBy('name')->get();
         $productGroups = DB::table('product_modifier_groups')->orderBy('sort')->get()->groupBy('product_id');
+        $settings = TenantSetting::query()->firstOrFail();
+        $features = $gate->forTenant($settings->tenant_id);
+        $pricing = PricingSettings::fromTenant($settings, $features[Feature::TaxService->value] ?? false);
 
         return response()->json([
             'version' => $this->version(),
+            // Untuk menghitung total di tablet; server tetap menghitung ulang (PricingService).
+            'pricing' => [
+                'service_bp' => $pricing->serviceBp,
+                'tax_bp' => $pricing->taxBp,
+                'rounding_unit' => $pricing->roundingUnit,
+                'cashier_discount_limit_bp' => $settings->cashier_discount_limit_bp,
+            ],
+            'features' => $features,
             'categories' => Category::query()->orderBy('sort')->orderBy('name')->get()
                 ->map(fn (Category $c) => [
                     'id' => $c->id, 'name' => $c->name, 'sort' => $c->sort, 'active' => $c->active,
@@ -54,7 +69,7 @@ class MenuController extends Controller
 
     private function version(): string
     {
-        $stamps = collect(['categories', 'products', 'modifier_groups', 'modifiers'])
+        $stamps = collect(['categories', 'products', 'modifier_groups', 'modifiers', 'tenant_settings', 'tenant_features'])
             ->map(fn (string $table) => DB::table($table)->selectRaw('count(*) as n, max(updated_at) as t')->first())
             ->map(fn ($row) => $row->n.'@'.$row->t)
             ->implode('|');

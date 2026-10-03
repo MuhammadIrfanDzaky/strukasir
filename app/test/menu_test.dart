@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// Bentuk JSON sama persis dengan respons `GET /api/v1/menu`.
 final menuJson = <String, dynamic>{
   'version': 'abc123',
+  'pricing': {'service_bp': 0, 'tax_bp': 0, 'rounding_unit': 0, 'cashier_discount_limit_bp': 1000},
+  'features': {'modifiers': true, 'discounts': true, 'split_payment': true, 'open_bill': true},
   'categories': [
     {'id': 'c1', 'name': 'Kopi', 'sort': 0, 'active': true},
     {'id': 'c2', 'name': 'Arsip', 'sort': 1, 'active': false},

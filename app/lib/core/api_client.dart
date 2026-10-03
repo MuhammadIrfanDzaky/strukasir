@@ -25,7 +25,8 @@ class ApiClient {
             Dio(BaseOptions(
               baseUrl: '${baseUrl.replaceAll(RegExp(r'/+$'), '')}/api/v1',
               connectTimeout: const Duration(seconds: 8),
-              receiveTimeout: const Duration(seconds: 15),
+              // Longgar untuk koneksi kedai yang lambat; request order/bayar aman dikirim ulang.
+              receiveTimeout: const Duration(seconds: 30),
               headers: {'Accept': 'application/json'},
             ));
 

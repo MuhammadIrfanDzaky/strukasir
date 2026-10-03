@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/money.dart';
+import '../cart/cart_controller.dart';
+import '../cart/cart_panel.dart';
 import '../menu/menu_controller.dart';
 import '../menu/menu_models.dart';
 import '../menu/modifier_selection.dart';
 
 /// Layar kasir: kategori + grid produk. Ketuk produk → pilih modifier.
-/// Keranjang & pembayaran dibangun di M4; untuk sekarang panel kanan menampilkan pilihan terakhir.
 class PosScreen extends ConsumerStatefulWidget {
   const PosScreen({super.key});
 
@@ -17,7 +18,6 @@ class PosScreen extends ConsumerStatefulWidget {
 
 class _PosScreenState extends ConsumerState<PosScreen> {
   String? _categoryId;
-  ModifierSelection? _last;
 
   Future<void> _pick(Menu menu, MenuProduct product) async {
     final selection = ModifierSelection(product, menu.groupsFor(product));
@@ -27,7 +27,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               builder: (_) => ModifierDialog(selection: selection),
             ) ??
             false);
-    if (ok) setState(() => _last = selection);
+    if (ok) ref.read(cartProvider.notifier).add(selection);
   }
 
   @override
@@ -107,30 +107,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               ),
             ),
             const VerticalDivider(width: 1),
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Keranjang', style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 8),
-                    const Text('Keranjang & pembayaran menyusul di M4.'),
-                    if (_last != null) ...[
-                      const Divider(height: 32),
-                      Text('Pilihan terakhir', style: Theme.of(context).textTheme.labelLarge),
-                      const SizedBox(height: 4),
-                      Text(_last!.product.name, style: Theme.of(context).textTheme.titleMedium),
-                      for (final m in _last!.chosen)
-                        Text('+ ${m.name}${m.priceDelta > 0 ? ' (${rupiah(m.priceDelta)})' : ''}'),
-                      const SizedBox(height: 4),
-                      Text(rp(_last!.unitPrice), style: Theme.of(context).textTheme.titleMedium),
-                    ],
-                  ],
-                ),
-              ),
-            ),
+            const Expanded(flex: 2, child: CartPanel()),
           ],
         );
       },

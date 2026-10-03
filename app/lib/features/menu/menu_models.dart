@@ -1,6 +1,8 @@
 /// Model menu dari `GET /menu`. Kelas Dart biasa (tanpa code generation) supaya mudah dibaca.
 library;
 
+import '../cart/pricing.dart';
+
 class MenuCategory {
   const MenuCategory({required this.id, required this.name, required this.sort, required this.active});
 
@@ -114,6 +116,9 @@ class MenuProduct {
 class Menu {
   const Menu({
     required this.version,
+    required this.pricing,
+    required this.cashierDiscountLimitBp,
+    required this.features,
     required this.categories,
     required this.products,
     required this.modifierGroups,
@@ -121,6 +126,9 @@ class Menu {
 
   factory Menu.fromJson(Map<String, dynamic> j) => Menu(
         version: j['version'] as String,
+        pricing: PricingSettings.fromJson(j['pricing'] as Map<String, dynamic>),
+        cashierDiscountLimitBp: (j['pricing'] as Map<String, dynamic>)['cashier_discount_limit_bp'] as int,
+        features: (j['features'] as Map<String, dynamic>).map((k, v) => MapEntry(k, v as bool)),
         categories: (j['categories'] as List)
             .cast<Map<String, dynamic>>()
             .map(MenuCategory.fromJson)
@@ -136,7 +144,14 @@ class Menu {
       );
 
   final String version;
+  final PricingSettings pricing;
+  final int cashierDiscountLimitBp;
+  final Map<String, bool> features;
   final List<MenuCategory> categories;
+
+  bool feature(String key) => features[key] ?? false;
+
+  MenuProduct? product(String id) => products.where((p) => p.id == id).firstOrNull;
   final List<MenuProduct> products;
   final List<MenuModifierGroup> modifierGroups;
 

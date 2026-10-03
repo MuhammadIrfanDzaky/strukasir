@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'features/cart/cart_controller.dart';
 import 'features/menu/menu_controller.dart';
 import 'features/session/login_screen.dart';
 import 'features/session/session_controller.dart';
@@ -43,6 +44,8 @@ class SessionGate extends ConsumerWidget {
     // Sesi user berganti (login/logout) → menu dimuat ulang untuk user tersebut.
     ref.listen(sessionProvider, (prev, next) {
       if (prev?.value is! LoggedIn && next.value is LoggedIn) ref.invalidate(menuProvider);
+      // Kasir keluar → keranjang yang belum selesai tidak diwariskan ke kasir berikutnya.
+      if (prev?.value is LoggedIn && next.value is! LoggedIn) ref.invalidate(cartProvider);
     });
 
     return ref.watch(sessionProvider).when(

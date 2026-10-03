@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/menu/menu_controller.dart';
 import 'features/menu_admin/menu_admin_screen.dart';
 import 'features/pos/pos_screen.dart';
+import 'features/printing/printer_settings_screen.dart';
 import 'features/session/session_controller.dart';
 
 /// Kerangka setelah login. Item navigasi mengikuti izin user; server tetap memeriksa ulang.
@@ -33,6 +34,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final destinations = [
       _Destination('Kasir', Icons.point_of_sale, (_) => const PosScreen()),
       if (user.can('menu.manage')) _Destination('Kelola Menu', Icons.restaurant_menu, (_) => const MenuAdminScreen()),
+      _Destination('Printer', Icons.print, (_) => const PrinterSettingsScreen()),
     ];
     final index = _index.clamp(0, destinations.length - 1);
 

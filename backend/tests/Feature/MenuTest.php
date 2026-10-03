@@ -53,7 +53,10 @@ class MenuTest extends TestCase
             ->assertJsonPath('products.0.price', 13000)
             ->assertJsonPath('products.0.modifier_group_ids', [$ids['group']])
             ->assertJsonPath('modifier_groups.0.modifiers.1.name', 'Cold')
-            ->assertJsonPath('modifier_groups.0.modifiers.1.price_delta', 2000);
+            ->assertJsonPath('modifier_groups.0.modifiers.1.price_delta', 2000)
+            ->assertJsonPath('pricing.cashier_discount_limit_bp', 1000)
+            ->assertJsonPath('pricing.tax_bp', 0)
+            ->assertJsonPath('features.split_payment', true);
         $this->assertNotEmpty($menu->json('version'));
     }
 

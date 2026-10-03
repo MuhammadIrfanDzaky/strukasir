@@ -6,9 +6,9 @@
   Reopen saat QRIS dinamis / gateway apa pun ditambahkan.)
 - **Classified:** 2026-10-03
 - **Last audit:** 2026-10-03
-- **Gates open:** 15 kompetensi blocking + 13 security check blocking
-  (11 critical/high berstatus FAIL + SEC-19 & SEC-35 yang medium tapi menyentuh money/admin)
-- **Checkpoint terakhir:** M3 menu (endpoint publik baru: SEC-01, 03, 20, 26 dicek) — 2026-10-03. M1 printer: menunggu printer tersedia di lokasi.
+- **Gates open:** 15 kompetensi blocking + 11 security check blocking
+  (9 critical/high berstatus FAIL + SEC-19 & SEC-35 yang medium tapi menyentuh money/admin)
+- **Checkpoint terakhir:** M4 uang (SEC-21, 22 dicek; 23 n/a tanpa gateway) — 2026-10-03. M1 printer: menunggu printer tersedia di lokasi.
 
 Konteks: POS Android (Flutter) + Laravel 12 API + PostgreSQL untuk kedai kopi BerryBrew, dengan fondasi
 multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` (menyusul) dan catatan plan.
@@ -22,7 +22,7 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | 16 | Data Modeling | applied | `tenant_id` NOT NULL + index + bagian unique di semua tabel bisnis; FK komposit `(tenant_id, id)`; constraint & CHECK di DB (`backend/database/migrations/`); entitas di `docs/adr/0001-fondasi-arsitektur.md` |
 | 18 | Data Validation | deferred | Laravel FormRequest per endpoint + constraint DB |
 | 19 | Data Lifecycle | deferred | Progres: `audit_logs` append-only; audit login/gagal/logout/registrasi tablet + perubahan kategori/produk/grup modifier (before/after); `payments` append-only; modifier dinonaktifkan bukan dihapus. Belum: audit void/refund/diskon (M4–M5), ekspor & hapus per tenant |
-| 20 | Idempotency & Concurrency | deferred | Progres: PK `orders.id`/`payments.id` = UUID dari tablet; partial unique 1 shift terbuka/tablet; `lockForUpdate` saat registrasi tablet. Belum: endpoint order/bayar idempotent (M4) |
+| 20 | Idempotency & Concurrency | deferred | Order (PUT) & pembayaran idempotent per UUID + lock, diuji. Sisa: registrasi tablet belum idempotent (timeout lalu kirim ulang → tablet ganda) |
 | 24 | Multi-tenancy & Data Isolation | applied | `BelongsToTenant` fail-closed + RLS FORCE + role DB non-superuser + FK komposit; test lintas tenant `TenantIsolationTest`, `MenuTest::test_cannot_touch_another_tenants_menu`; berjalan di CI (`.github/workflows/ci.yml`, role non-superuser) — run 37121641161 hijau |
 | 25 | Authentication & Authorization | deferred | Progres: token perangkat + PIN (`AuthController`, `DeviceRegistrationController`), token user 16 jam terikat tablet, lockout. Belum: kebijakan password owner (SEC-10), cabut sesi saat ganti PIN (SEC-16) |
 | 26 | Permissions & Access Control | deferred | Progres: `Role`→`Permission` ∩ `FeatureGate`; route menu dijaga `can:menu.manage` (`MenuTest::test_cashier_cannot_manage_menu`). Dinilai ulang setelah endpoint order/void (M4–M5) |
@@ -98,8 +98,8 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | SEC-17 | Password reset flow | critical | 25 | n/a | Tidak ada reset mandiri di v1 (tanpa email); reset owner via artisan command oleh developer, tercatat di audit log. Reopen jika ada reset via email/WA |
 | SEC-19 | MFA & re-authentication | medium | 25 | FAIL | Aksi destruktif (void, refund, diskon > limit, ubah harga) wajib PIN owner ulang. MFA owner: deferred |
 | SEC-20 | Broken access control / IDOR | critical | 26 | PASS | Semua route `{id}` (categories, products, modifier-groups) di-resolve setelah tenant ditetapkan → ID kedai lain 404; referensi lintas tenant ditolak (`MenuTest::test_cannot_touch_another_tenants_menu`, `TenantIsolationTest`). Dinilai ulang tiap endpoint baru |
-| SEC-21 | Business logic flaws | critical | 14 | FAIL | PricingService menghitung ulang di server dari harga server; tolak qty/nominal negatif/nol |
-| SEC-22 | Race conditions | critical | 20 | FAIL | Progres: unique & partial unique index, UUID dari tablet, lock saat registrasi tablet. Belum: transaksi + lock pada bayar/void & penomoran order (M4) |
+| SEC-21 | Business logic flaws | critical | 14 | PASS | `PricingService` menghitung ulang dari harga server; klien hanya kirim produk/qty/modifier; qty 1–999, diskon dibatasi, total bayar harus pas (`OrderTest`) |
+| SEC-22 | Race conditions | critical | 20 | PASS | Bayar: `lockForUpdate` + cek status di transaksi; nomor order dari `order_counters` terkunci; PK UUID order/pembayaran dari tablet = idempotency key (`OrderTest::test_resending_*`, `test_paying_twice_*`) |
 | SEC-23 | Webhook verification | critical | 31 | n/a | Tag `webhook` di-drop: tidak ada gateway di v1. Reopen saat QRIS dinamis |
 | SEC-24 | Secrets management | critical | 29 | FAIL | `.env` di-gitignore; keystore APK & kredensial R2 tidak masuk repo |
 | SEC-25 | Verbose errors | high | 46 | FAIL | `APP_DEBUG=false` di produksi; error JSON generik |
