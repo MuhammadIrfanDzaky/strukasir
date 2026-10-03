@@ -56,11 +56,24 @@ class DeviceRegistrationController extends Controller
             [$device, $token] = DB::transaction(function () use ($tenant, $request) {
                 // Kunci baris tenant agar kode perangkat (T1, T2, ...) tidak bentrok.
                 Tenant::query()->whereKey($tenant->id)->lockForUpdate()->first();
-                $next = Device::query()->count() + 1;
 
-                $device = new Device(['name' => (string) $request->input('device_name')]);
-                $device->code = 'T'.$next;
-                $device->save();
+                $clientId = $request->input('device_id');
+                $device = $clientId ? Device::query()->find($clientId) : null;
+
+                if ($device?->isRevoked()) {
+                    abort(409, 'Tablet ini sudah dicabut. Hapus data aplikasi lalu daftarkan sebagai tablet baru.');
+                }
+
+                if ($device) {
+                    $device->tokens()->delete(); // kiriman ulang: tablet sama, token lama diganti
+                } else {
+                    $device = new Device(['name' => (string) $request->input('device_name')]);
+                    if ($clientId) {
+                        $device->id = $clientId;
+                    }
+                    $device->code = 'T'.(Device::query()->count() + 1);
+                    $device->save();
+                }
 
                 return [$device, $device->createToken('device:'.$device->code, ['device'])];
             });

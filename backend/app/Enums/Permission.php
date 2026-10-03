@@ -20,6 +20,7 @@ enum Permission: string
     {
         return match ($this) {
             self::DiscountWithinLimit, self::DiscountOverLimit => Feature::Discounts->value,
+            self::ReportsView => Feature::Reports->value,
             default => null,
         };
     }

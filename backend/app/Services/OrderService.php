@@ -144,7 +144,7 @@ class OrderService
 
             $this->validatePayments($payments, $order->grand_total);
 
-            $shiftId = Shift::query()->where('device_id', $device->id)->whereNull('closed_at')->value('id');
+            $shiftId = app(ShiftService::class)->requireOpen($device)->id; // uang hanya bergerak di shift terbuka
             $now = now();
             $change = 0;
 
@@ -180,6 +180,62 @@ class OrderService
                 'grand_total' => $order->grand_total,
                 'methods' => array_column($payments, 'method'),
             ], user: $cashier, device: $device);
+
+            return $order;
+        });
+    }
+
+    /**
+     * Batalkan order. Terbuka → void saja. Lunas → void + refund (baris pembayaran baru kind=refund,
+     * metode sama) di shift yang sedang terbuka, karena di situlah uang keluar dari laci/rekening.
+     * Kasir butuh persetujuan PIN owner; alasan selalu wajib. Kiriman ulang aman.
+     *
+     * @param  array{user_id?: string, pin?: string}|null  $approval
+     */
+    public function void(string $orderId, string $reason, ?array $approval, User $user, Device $device): Order
+    {
+        $approver = Gate::forUser($user)->allows(Permission::OrderVoid->value)
+            ? $user
+            : Approval::verify($approval, Permission::OrderVoid); // di luar transaksi: PIN salah tetap tercatat
+
+        return DB::transaction(function () use ($orderId, $reason, $user, $device, $approver) {
+            $order = Order::query()->lockForUpdate()->findOrFail($orderId);
+            if ($order->status === 'void') {
+                return $order;
+            }
+
+            $refunded = 0;
+            if ($order->status === 'paid') {
+                $shiftId = app(ShiftService::class)->requireOpen($device)->id;
+                foreach ($order->payments()->where('kind', 'payment')->get() as $p) {
+                    (new Payment)->forceFill([
+                        'order_id' => $order->id,
+                        'shift_id' => $shiftId,
+                        'kind' => 'refund',
+                        'method' => $p->method,
+                        'amount' => $p->amount,
+                        'reference' => 'refund:'.$p->id,
+                        'confirmed_by' => $user->id,
+                        'confirmed_at' => now(),
+                    ])->save();
+                    $refunded += $p->amount;
+                }
+            }
+
+            $before = $order->status;
+            $order->forceFill([
+                'status' => 'void',
+                'voided_at' => now(),
+                'voided_by' => $approver->id,
+                'void_reason' => $reason,
+            ])->save();
+
+            Audit::record('order.voided', $order, ['status' => $before], [
+                'number' => $order->number,
+                'reason' => $reason,
+                'approver_id' => $approver->id,
+                'refunded' => $refunded,
+            ], user: $user, device: $device);
 
             return $order;
         });

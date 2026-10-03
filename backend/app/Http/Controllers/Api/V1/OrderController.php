@@ -22,6 +22,8 @@ class OrderController extends Controller
     {
         $validated = $request->validate([
             'status' => ['nullable', 'in:open,paid,void'],
+            'date' => ['nullable', 'date_format:Y-m-d'], // hari bisnis
+            'q' => ['nullable', 'string', 'max:30'], // cari nomor order / nama pelanggan
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
 
@@ -31,6 +33,10 @@ class OrderController extends Controller
 
         $orders = Order::query()
             ->when($validated['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($validated['date'] ?? null, fn ($q, $date) => $q->where('business_date', $date))
+            ->when($validated['q'] ?? null, fn ($q, $term) => $q->where(fn ($w) => $w
+                ->where('number', 'ilike', '%'.addcslashes($term, '%_\\').'%')
+                ->orWhere('customer_label', 'ilike', '%'.addcslashes($term, '%_\\').'%')))
             ->latest()
             ->paginate($validated['per_page'] ?? 20);
 
@@ -60,6 +66,24 @@ class OrderController extends Controller
             $this->uuid($order),
             $request->validated('payments'),
             (int) $request->validated('expected_total'),
+            $request->user(),
+            $request->attributes->get('device'),
+        ));
+    }
+
+    public function void(Request $request, string $order, OrderService $orders): OrderResource
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:255'],
+            'approval' => ['nullable', 'array:user_id,pin'],
+            'approval.user_id' => ['required_with:approval', 'uuid'],
+            'approval.pin' => ['required_with:approval', 'string', 'regex:/^\d{4,6}$/'],
+        ]);
+
+        return new OrderResource($orders->void(
+            $this->uuid($order),
+            $data['reason'],
+            $data['approval'] ?? null,
             $request->user(),
             $request->attributes->get('device'),
         ));
