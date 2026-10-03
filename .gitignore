@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+key.properties
+.DS_Store
+.idea/
+.vscode/

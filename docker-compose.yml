@@ -1,0 +1,32 @@
+# Lingkungan development lokal. Jalankan: docker compose up -d
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres         # superuser hanya untuk administrasi
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"   # 5433 agar tidak bentrok dengan PostgreSQL lokal di 5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d berrybrew"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./docker/php
+    working_dir: /app
+    command: php artisan serve --host=0.0.0.0 --port=8000
+    stop_grace_period: 2s
+    ports:
+      - "8000:8000"   # tablet di jaringan yang sama bisa akses http://<ip-laptop>:8000
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
