@@ -24,6 +24,7 @@ services:
       - "8000:8000"   # tablet di jaringan yang sama bisa akses http://<ip-laptop>:8000
     volumes:
       - ./backend:/app
+      - ./docs:/docs:ro   # fixture harga bersama (docs/pricing-fixtures.json)
     depends_on:
       db:
         condition: service_healthy

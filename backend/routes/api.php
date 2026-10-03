@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\DeviceRegistrationController;
 use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\ModifierGroupController;
+use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProductController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,6 +26,13 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
 
         Route::get('menu', [MenuController::class, 'show']);
+
+        Route::middleware('can:'.Permission::OrderCreate->value)->group(function () {
+            Route::get('orders', [OrderController::class, 'index']);
+            Route::get('orders/{order}', [OrderController::class, 'show']);
+            Route::put('orders/{order}', [OrderController::class, 'upsert']); // ID = UUID dari tablet
+            Route::post('orders/{order}/pay', [OrderController::class, 'pay']);
+        });
 
         Route::middleware('can:'.Permission::MenuManage->value)->group(function () {
             Route::apiResource('categories', CategoryController::class)->only(['store', 'update', 'destroy']);
