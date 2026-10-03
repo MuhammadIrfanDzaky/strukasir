@@ -15,13 +15,18 @@ class FeatureGate
     /** @var array<string, array<string, bool>> */
     private array $cache = [];
 
-    public function __construct(private readonly TenantContext $context) {}
+    // Konteks diambil saat dipakai (bukan disimpan di constructor), supaya objek yang hidup lama —
+    // mis. controller yang di-cache route atau worker Octane — tidak memegang tenant request lain.
+    private function context(): TenantContext
+    {
+        return app(TenantContext::class);
+    }
 
     public function enabled(Feature|string $feature, ?string $tenantId = null): bool
     {
         $key = $feature instanceof Feature ? $feature->value : $feature;
 
-        return $this->forTenant($tenantId ?? $this->context->id())[$key] ?? false;
+        return $this->forTenant($tenantId ?? $this->context()->id())[$key] ?? false;
     }
 
     /** @return array<string, bool> */
@@ -50,7 +55,7 @@ class FeatureGate
             ->mapWithKeys(fn (string $key) => [$key => true])
             ->all();
 
-        $overrides = $this->context->run($tenantId, fn () => DB::table('tenant_features')
+        $overrides = $this->context()->run($tenantId, fn () => DB::table('tenant_features')
             ->where('tenant_id', $tenantId)
             ->pluck('enabled', 'feature_key')
             ->all());

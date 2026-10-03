@@ -1,0 +1,96 @@
+{
+  "_rules": [
+    "Semua nominal integer rupiah. bp = basis poin (1000 = 10%).",
+    "Baris: gross = unit_price x qty; diskon item persen = floor(gross x bp / 10000); diskon nominal <= gross.",
+    "subtotal = jumlah net baris (setelah diskon item).",
+    "Diskon order persen = floor(subtotal x bp / 10000); nominal <= subtotal. base = subtotal - diskon order.",
+    "service = half-up(base x service_bp / 10000); tax = half-up((base + service) x tax_bp / 10000).",
+    "Pembulatan ke rounding_unit terdekat (half-up); rounding = grand_total - (base + service + tax).",
+    "Dipakai oleh backend (Tests\\Unit\\PricingServiceTest) DAN app Flutter (test/pricing_test.dart)."
+  ],
+  "cases": [
+    {
+      "name": "dua item tanpa pajak (Americano Hot + Cold, seperti di Kloa)",
+      "settings": {"service_bp": 0, "tax_bp": 0, "rounding_unit": 0},
+      "items": [{"unit_price": 13000, "qty": 1}, {"unit_price": 15000, "qty": 1}],
+      "order_discount": null,
+      "expected": {"lines": [13000, 15000], "subtotal": 28000, "item_discount_total": 0, "order_discount": 0,
+        "discount_total": 0, "service_total": 0, "tax_total": 0, "rounding": 0, "grand_total": 28000}
+    },
+    {
+      "name": "diskon item persen 10% pada qty 2",
+      "settings": {"service_bp": 0, "tax_bp": 0, "rounding_unit": 0},
+      "items": [{"unit_price": 23000, "qty": 2, "discount": {"type": "percent", "value": 1000}}],
+      "order_discount": null,
+      "expected": {"lines": [41400], "subtotal": 41400, "item_discount_total": 4600, "order_discount": 0,
+        "discount_total": 4600, "service_total": 0, "tax_total": 0, "rounding": 0, "grand_total": 41400}
+    },
+    {
+      "name": "diskon order persen dibulatkan ke bawah",
+      "settings": {"service_bp": 0, "tax_bp": 0, "rounding_unit": 0},
+      "items": [{"unit_price": 33333, "qty": 1}],
+      "order_discount": {"type": "percent", "value": 1500},
+      "expected": {"lines": [33333], "subtotal": 33333, "item_discount_total": 0, "order_discount": 4999,
+        "discount_total": 4999, "service_total": 0, "tax_total": 0, "rounding": 0, "grand_total": 28334}
+    },
+    {
+      "name": "service 5% lalu pajak 10% dihitung dari base + service",
+      "settings": {"service_bp": 500, "tax_bp": 1000, "rounding_unit": 0},
+      "items": [{"unit_price": 13000, "qty": 1}, {"unit_price": 15000, "qty": 1}],
+      "order_discount": null,
+      "expected": {"lines": [13000, 15000], "subtotal": 28000, "item_discount_total": 0, "order_discount": 0,
+        "discount_total": 0, "service_total": 1400, "tax_total": 2940, "rounding": 0, "grand_total": 32340}
+    },
+    {
+      "name": "pembulatan ke 500 naik",
+      "settings": {"service_bp": 500, "tax_bp": 1000, "rounding_unit": 500},
+      "items": [{"unit_price": 13000, "qty": 1}, {"unit_price": 15000, "qty": 1}],
+      "order_discount": null,
+      "expected": {"lines": [13000, 15000], "subtotal": 28000, "item_discount_total": 0, "order_discount": 0,
+        "discount_total": 0, "service_total": 1400, "tax_total": 2940, "rounding": 160, "grand_total": 32500}
+    },
+    {
+      "name": "pembulatan ke 100 turun",
+      "settings": {"service_bp": 500, "tax_bp": 1000, "rounding_unit": 100},
+      "items": [{"unit_price": 13000, "qty": 1}, {"unit_price": 15000, "qty": 1}],
+      "order_discount": null,
+      "expected": {"lines": [13000, 15000], "subtotal": 28000, "item_discount_total": 0, "order_discount": 0,
+        "discount_total": 0, "service_total": 1400, "tax_total": 2940, "rounding": -40, "grand_total": 32300}
+    },
+    {
+      "name": "pajak half-up: 1333,3 → 1333",
+      "settings": {"service_bp": 0, "tax_bp": 1000, "rounding_unit": 0},
+      "items": [{"unit_price": 13333, "qty": 1}],
+      "order_discount": null,
+      "expected": {"lines": [13333], "subtotal": 13333, "item_discount_total": 0, "order_discount": 0,
+        "discount_total": 0, "service_total": 0, "tax_total": 1333, "rounding": 0, "grand_total": 14666}
+    },
+    {
+      "name": "pajak half-up: 1333,5 → 1334",
+      "settings": {"service_bp": 0, "tax_bp": 1000, "rounding_unit": 0},
+      "items": [{"unit_price": 13335, "qty": 1}],
+      "order_discount": null,
+      "expected": {"lines": [13335], "subtotal": 13335, "item_discount_total": 0, "order_discount": 0,
+        "discount_total": 0, "service_total": 0, "tax_total": 1334, "rounding": 0, "grand_total": 14669}
+    },
+    {
+      "name": "gabungan: diskon item persen & nominal, diskon order, service, pajak, pembulatan 100",
+      "settings": {"service_bp": 500, "tax_bp": 1000, "rounding_unit": 100},
+      "items": [
+        {"unit_price": 23000, "qty": 2, "discount": {"type": "percent", "value": 1000}},
+        {"unit_price": 15000, "qty": 1, "discount": {"type": "amount", "value": 2000}}
+      ],
+      "order_discount": {"type": "amount", "value": 5000},
+      "expected": {"lines": [41400, 13000], "subtotal": 54400, "item_discount_total": 6600, "order_discount": 5000,
+        "discount_total": 11600, "service_total": 2470, "tax_total": 5187, "rounding": 43, "grand_total": 57100}
+    },
+    {
+      "name": "diskon 100% menghasilkan nol",
+      "settings": {"service_bp": 500, "tax_bp": 1000, "rounding_unit": 500},
+      "items": [{"unit_price": 13000, "qty": 1, "discount": {"type": "percent", "value": 10000}}],
+      "order_discount": null,
+      "expected": {"lines": [0], "subtotal": 0, "item_discount_total": 13000, "order_discount": 0,
+        "discount_total": 13000, "service_total": 0, "tax_total": 0, "rounding": 0, "grand_total": 0}
+    }
+  ]
+}

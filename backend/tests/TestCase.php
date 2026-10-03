@@ -68,6 +68,7 @@ abstract class TestCase extends BaseTestCase
     protected function api(string $method, string $uri, ?string $token = null, array $data = []): TestResponse
     {
         $this->app['auth']->forgetGuards();
+        $this->app->forgetScopedInstances(); // seperti request baru di server: cache FeatureGate dll. direset
         $this->tenancy()->clear();
 
         $headers = ['Accept' => 'application/json'];

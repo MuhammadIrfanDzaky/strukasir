@@ -1,0 +1,407 @@
+<?php
+
+namespace App\Services;
+
+use App\Enums\Feature;
+use App\Enums\Permission;
+use App\Models\Device;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\OrderItemModifier;
+use App\Models\Payment;
+use App\Models\Product;
+use App\Models\Shift;
+use App\Models\Tenant;
+use App\Models\TenantSetting;
+use App\Models\User;
+use App\Support\Approval;
+use App\Support\Audit;
+use App\Support\Pricing\PricingResult;
+use App\Support\Pricing\PricingService;
+use App\Support\Pricing\PricingSettings;
+use App\Support\Tenancy\FeatureGate;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+
+/**
+ * Siklus order: simpan (terbuka) → bayar. Server = sumber kebenaran harga; klien hanya mengirim
+ * produk, qty, modifier, diskon, dan total yang ia harapkan (untuk mendeteksi menu basi).
+ */
+class OrderService
+{
+    public function __construct(
+        private readonly PricingService $pricing,
+        private readonly FeatureGate $features,
+    ) {}
+
+    /**
+     * Buat atau ganti isi order terbuka. Idempotent: PUT ulang dengan isi sama menghasilkan order sama.
+     *
+     * @param  array<string, mixed>  $data  hasil UpsertOrderRequest::validated()
+     */
+    public function upsert(string $orderId, array $data, User $cashier, Device $device, Tenant $tenant): Order
+    {
+        $existing = Order::query()->with('items')->find($orderId);
+        if ($existing && $existing->status !== 'open') {
+            throw new ConflictHttpException('Order ini sudah '.($existing->status === 'paid' ? 'dibayar' : 'dibatalkan').'.');
+        }
+
+        $products = $this->loadProducts($data['items']);
+        $existingItemIds = $existing?->items->pluck('id')->all() ?? [];
+        $lines = $this->buildLines($data['items'], $products, $existingItemIds);
+
+        $this->guardDiscountFeature($data);
+        $result = $this->price($lines, $data['order_discount'] ?? null);
+        $this->guardExpectedTotal($result, (int) $data['expected_total']);
+
+        // Persetujuan diverifikasi SEBELUM transaksi: percobaan PIN gagal harus tetap tercatat.
+        $approver = $this->authorizeDiscount($result, $lines, $cashier, $data['approval'] ?? null);
+
+        $order = DB::transaction(function () use ($orderId, $data, $cashier, $device, $tenant, $lines, $result) {
+            $order = Order::query()->lockForUpdate()->find($orderId);
+
+            if ($order === null) {
+                $businessDate = $this->businessDate($tenant);
+                $order = new Order;
+                $order->id = $orderId;
+                $order->forceFill([
+                    'device_id' => $device->id,
+                    'cashier_id' => $cashier->id,
+                    'business_date' => $businessDate,
+                    'client_created_at' => $data['client_created_at'] ?? null,
+                    'number' => $this->nextNumber($businessDate, $device),
+                ]);
+            } elseif ($order->status !== 'open') {
+                throw new ConflictHttpException('Order ini sudah tidak terbuka.');
+            }
+
+            $order->forceFill([
+                'customer_label' => $data['customer_label'] ?? null,
+                'order_discount_type' => $data['order_discount']['type'] ?? null,
+                'order_discount_value' => $data['order_discount']['value'] ?? 0,
+                'subtotal' => $result->subtotal,
+                'discount_total' => $result->discountTotal(),
+                'service_total' => $result->serviceTotal,
+                'tax_total' => $result->taxTotal,
+                'rounding' => $result->rounding,
+                'grand_total' => $result->grandTotal,
+            ])->save();
+
+            $order->items()->delete(); // modifier item ikut terhapus (cascade); order masih terbuka
+            foreach ($lines as $i => $line) {
+                $this->saveLine($order, $line, $result, $i);
+            }
+
+            return $order->refresh(); // muat nilai default DB (status, currency, ...)
+        });
+
+        if ($approver !== null) {
+            Audit::record('discount.approved', $order, after: [
+                'approver_id' => $approver->id,
+                'discount_total' => $result->discountTotal(),
+                'number' => $order->number,
+            ], user: $cashier);
+        }
+
+        return $order;
+    }
+
+    /**
+     * Bayar order terbuka. Idempotent per ID pembayaran: kirim ulang setelah sukses → order yang sama.
+     *
+     * @param  list<array{id: string, method: string, amount: int, tendered?: int|null, reference?: string|null}>  $payments
+     */
+    public function pay(string $orderId, array $payments, int $expectedTotal, User $cashier, Device $device): Order
+    {
+        if (count($payments) > 1 && ! $this->features->enabled(Feature::SplitPayment)) {
+            throw ValidationException::withMessages(['payments' => 'Split payment tidak aktif untuk kedai ini.']);
+        }
+
+        return DB::transaction(function () use ($orderId, $payments, $expectedTotal, $cashier, $device) {
+            $order = Order::query()->lockForUpdate()->findOrFail($orderId);
+            $requestedIds = collect($payments)->pluck('id')->sort()->values()->all();
+
+            if ($order->status === 'paid') {
+                $paidIds = $order->payments()->pluck('id')->sort()->values()->all();
+                if ($paidIds === $requestedIds) {
+                    return $order; // kiriman ulang dari tablet (mis. koneksi putus setelah sukses)
+                }
+                throw new ConflictHttpException('Order ini sudah dibayar.');
+            }
+            if ($order->status !== 'open') {
+                throw new ConflictHttpException('Order ini sudah dibatalkan.');
+            }
+
+            if ($expectedTotal !== $order->grand_total) {
+                throw ValidationException::withMessages([
+                    'expected_total' => 'Total order berubah ('.$order->grand_total.'). Muat ulang order.',
+                ]);
+            }
+
+            $this->validatePayments($payments, $order->grand_total);
+
+            $shiftId = Shift::query()->where('device_id', $device->id)->whereNull('closed_at')->value('id');
+            $now = now();
+            $change = 0;
+
+            foreach ($payments as $p) {
+                $tendered = $p['method'] === 'cash' ? ($p['tendered'] ?? $p['amount']) : null;
+                $payment = new Payment;
+                $payment->forceFill([
+                    'id' => $p['id'],
+                    'order_id' => $order->id,
+                    'shift_id' => $shiftId,
+                    'kind' => 'payment',
+                    'method' => $p['method'],
+                    'amount' => $p['amount'],
+                    'tendered' => $tendered,
+                    'change' => $tendered === null ? 0 : $tendered - $p['amount'],
+                    'reference' => $p['reference'] ?? null,
+                    'confirmed_by' => $cashier->id,
+                    'confirmed_at' => $now,
+                ])->save();
+                $change += $payment->change;
+            }
+
+            $order->forceFill([
+                'status' => 'paid',
+                'shift_id' => $order->shift_id ?? $shiftId,
+                'paid_total' => array_sum(array_column($payments, 'amount')),
+                'change_total' => $change,
+                'paid_at' => $now,
+            ])->save();
+
+            Audit::record('order.paid', $order, after: [
+                'number' => $order->number,
+                'grand_total' => $order->grand_total,
+                'methods' => array_column($payments, 'method'),
+            ], user: $cashier, device: $device);
+
+            return $order;
+        });
+    }
+
+    // ───────────────────────────── validasi menu ─────────────────────────────
+
+    /** @return Collection<string, Product> */
+    private function loadProducts(array $items): Collection
+    {
+        return Product::query()
+            ->with('modifierGroups.modifiers')
+            ->whereIn('id', array_unique(array_column($items, 'product_id')))
+            ->get()
+            ->keyBy('id');
+    }
+
+    /**
+     * Ubah item request menjadi baris tervalidasi + snapshot. Produk/modifier baru wajib aktif;
+     * item yang sudah ada di order terbuka boleh tetap ada walau produknya kini habis.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function buildLines(array $items, Collection $products, array $existingItemIds): array
+    {
+        $modifiersOn = $this->features->enabled(Feature::Modifiers);
+        $lines = [];
+
+        foreach (array_values($items) as $i => $item) {
+            $field = "items.{$i}";
+            $product = $products->get($item['product_id'])
+                ?? throw ValidationException::withMessages(["{$field}.product_id" => 'Produk tidak ditemukan.']);
+            $isNew = ! in_array($item['id'], $existingItemIds, true);
+
+            if ($isNew && (! $product->active || $product->sold_out)) {
+                throw ValidationException::withMessages(["{$field}.product_id" => "{$product->name} sedang tidak tersedia."]);
+            }
+
+            $chosen = [];
+            if (! $modifiersOn && $item['modifier_ids'] !== []) {
+                throw ValidationException::withMessages(["{$field}.modifier_ids" => 'Fitur modifier tidak aktif.']);
+            }
+
+            if ($modifiersOn) {
+                foreach ($product->modifierGroups as $group) {
+                    $picked = $group->modifiers->whereIn('id', $item['modifier_ids']);
+                    if ($isNew && $picked->contains(fn ($m) => ! $m->active)) {
+                        throw ValidationException::withMessages(["{$field}.modifier_ids" => "Pilihan {$group->name} tidak tersedia."]);
+                    }
+                    if ($picked->count() < $group->min_select || $picked->count() > $group->max_select) {
+                        throw ValidationException::withMessages([
+                            "{$field}.modifier_ids" => "{$product->name}: pilihan {$group->name} harus {$group->min_select}–{$group->max_select}.",
+                        ]);
+                    }
+                    foreach ($picked as $m) {
+                        $chosen[] = ['modifier_id' => $m->id, 'group_name' => $group->name, 'name' => $m->name, 'price_delta' => $m->price_delta];
+                    }
+                }
+
+                if (count($chosen) !== count($item['modifier_ids'])) {
+                    throw ValidationException::withMessages(["{$field}.modifier_ids" => 'Pilihan tidak sesuai dengan produk.']);
+                }
+            }
+
+            $lines[] = [
+                'id' => $item['id'],
+                'product' => $product,
+                'qty' => $item['qty'],
+                'note' => $item['note'] ?? null,
+                'modifiers' => $chosen,
+                'modifiers_total' => array_sum(array_column($chosen, 'price_delta')),
+                'discount' => $item['discount'] ?? null,
+            ];
+        }
+
+        return $lines;
+    }
+
+    // ───────────────────────────── harga & diskon ─────────────────────────────
+
+    private function price(array $lines, ?array $orderDiscount): PricingResult
+    {
+        $settings = TenantSetting::query()->firstOrFail();
+
+        try {
+            return $this->pricing->calculate(
+                array_map(fn (array $l) => [
+                    'unit_price' => $l['product']->price + $l['modifiers_total'],
+                    'qty' => $l['qty'],
+                    'discount' => $l['discount'],
+                ], $lines),
+                $orderDiscount,
+                PricingSettings::fromTenant($settings, $this->features->enabled(Feature::TaxService)),
+            );
+        } catch (InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['discount' => $e->getMessage()]);
+        }
+    }
+
+    private function guardDiscountFeature(array $data): void
+    {
+        $hasDiscount = ! empty($data['order_discount']['value'])
+            || collect($data['items'])->contains(fn ($i) => ! empty($i['discount']['value']));
+
+        if ($hasDiscount && ! $this->features->enabled(Feature::Discounts)) {
+            throw ValidationException::withMessages(['discount' => 'Fitur diskon tidak aktif untuk kedai ini.']);
+        }
+    }
+
+    private function guardExpectedTotal(PricingResult $result, int $expected): void
+    {
+        if ($expected !== $result->grandTotal) {
+            throw ValidationException::withMessages([
+                'expected_total' => 'Harga di tablet berbeda dengan server (server: '.$result->grandTotal.'). Muat ulang menu.',
+            ]);
+        }
+    }
+
+    /**
+     * Diskon sampai batas kedai boleh oleh kasir; di atasnya wajib persetujuan owner.
+     * Persentase dihitung dari total diskon terhadap total kotor seluruh baris.
+     */
+    private function authorizeDiscount(PricingResult $result, array $lines, User $cashier, ?array $approval): ?User
+    {
+        $discount = $result->discountTotal();
+        if ($discount === 0 || Gate::forUser($cashier)->allows(Permission::DiscountOverLimit->value)) {
+            return null;
+        }
+
+        $gross = array_sum(array_map(fn (array $l) => ($l['product']->price + $l['modifiers_total']) * $l['qty'], $lines));
+        $rateBp = $gross > 0 ? intdiv($discount * 10000 + $gross - 1, $gross) : 10000; // dibulatkan ke atas
+        $limitBp = TenantSetting::query()->value('cashier_discount_limit_bp') ?? 0;
+
+        if ($rateBp <= $limitBp && Gate::forUser($cashier)->allows(Permission::DiscountWithinLimit->value)) {
+            return null;
+        }
+
+        return Approval::verify($approval, Permission::DiscountOverLimit);
+    }
+
+    // ───────────────────────────── penyimpanan ─────────────────────────────
+
+    private function saveLine(Order $order, array $line, PricingResult $result, int $i): void
+    {
+        $item = new OrderItem;
+        $item->forceFill([
+            'id' => $line['id'],
+            'order_id' => $order->id,
+            'product_id' => $line['product']->id,
+            'name' => $line['product']->name,
+            'unit_price' => $line['product']->price,
+            'qty' => $line['qty'],
+            'modifiers_total' => $line['modifiers_total'],
+            'discount_type' => $line['discount']['type'] ?? null,
+            'discount_value' => $line['discount']['value'] ?? 0,
+            'discount_total' => $result->lineDiscounts[$i],
+            'line_total' => $result->lines[$i],
+            'note' => $line['note'],
+            'sort' => $i,
+        ])->save();
+
+        foreach ($line['modifiers'] as $m) {
+            (new OrderItemModifier)->forceFill([...$m, 'order_item_id' => $item->id])->save();
+        }
+    }
+
+    private function businessDate(Tenant $tenant): string
+    {
+        return now()->setTimezone($tenant->timezone)->toDateString();
+    }
+
+    /** Nomor order berurutan per kedai per hari bisnis, mis. "T1-0042". Dikunci agar tidak dobel. */
+    private function nextNumber(string $businessDate, Device $device): string
+    {
+        $tenantId = $device->tenant_id;
+        DB::table('order_counters')->insertOrIgnore([
+            'tenant_id' => $tenantId, 'business_date' => $businessDate, 'last_number' => 0,
+        ]);
+
+        $next = DB::table('order_counters')
+            ->where('tenant_id', $tenantId)->where('business_date', $businessDate)
+            ->lockForUpdate()->value('last_number') + 1;
+
+        DB::table('order_counters')
+            ->where('tenant_id', $tenantId)->where('business_date', $businessDate)
+            ->update(['last_number' => $next]);
+
+        return sprintf('%s-%04d', $device->code, $next);
+    }
+
+    /** @param  list<array{id: string, method: string, amount: int, tendered?: int|null}>  $payments */
+    private function validatePayments(array $payments, int $grandTotal): void
+    {
+        if ($grandTotal === 0) {
+            if ($payments !== []) {
+                throw ValidationException::withMessages(['payments' => 'Order bernilai nol tidak perlu pembayaran.']);
+            }
+
+            return;
+        }
+        if ($payments === []) {
+            throw ValidationException::withMessages(['payments' => 'Pilih metode pembayaran.']);
+        }
+
+        if (count(array_filter($payments, fn ($p) => $p['method'] === 'cash')) > 1) {
+            throw ValidationException::withMessages(['payments' => 'Pembayaran tunai cukup satu baris.']);
+        }
+
+        foreach ($payments as $i => $p) {
+            if ($p['method'] !== 'cash' && isset($p['tendered'])) {
+                throw ValidationException::withMessages(["payments.{$i}.tendered" => 'Uang diterima hanya untuk tunai.']);
+            }
+            if ($p['method'] === 'cash' && isset($p['tendered']) && $p['tendered'] < $p['amount']) {
+                throw ValidationException::withMessages(["payments.{$i}.tendered" => 'Uang diterima kurang dari nominal.']);
+            }
+        }
+
+        $sum = array_sum(array_column($payments, 'amount'));
+        if ($sum !== $grandTotal) {
+            throw ValidationException::withMessages([
+                'payments' => "Jumlah pembayaran ({$sum}) harus sama dengan total ({$grandTotal}).",
+            ]);
+        }
+    }
+}
