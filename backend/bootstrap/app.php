@@ -7,6 +7,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,6 +18,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['tenant' => ResolveTenant::class]);
+        // Tenant harus diketahui SEBELUM route model binding, supaya {product} milik kedai lain = 404.
+        $middleware->prependToPriorityList(SubstituteBindings::class, ResolveTenant::class);
         // Global (paling luar) agar respons error seperti 401/429 juga membawa header keamanan.
         $middleware->prepend(SecurityHeaders::class);
         $middleware->throttleApi('api');
