@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USERNAME: berrybrew_app
+      DB_PASSWORD: berrybrew
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sama seperti docker/postgres/init.sql: app memakai role NON-superuser agar RLS benar-benar diuji.
+      - name: Siapkan role & database
+        run: psql -v ON_ERROR_STOP=1 -f ../docker/postgres/init.sql
+        env:
+          PGHOST: 127.0.0.1
+          PGUSER: postgres
+          PGPASSWORD: postgres
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_pgsql, pgsql, bcmath
+          coverage: none
+
+      - run: composer install --no-interaction --no-progress --prefer-dist
+      - run: cp .env.example .env && php artisan key:generate
+      - name: Format (Pint)
+        run: ./vendor/bin/pint --test
+      - name: Audit dependency
+        run: composer audit
+      - name: Test (termasuk isolasi tenant)
+        run: php artisan test
+
+  flutter:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [spikes/printer]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test

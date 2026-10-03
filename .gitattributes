@@ -1,0 +1,7 @@
+# Simpan LF di repo dan di working copy agar file yang dipakai container Linux (PHP, SQL, shell) aman.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.webp binary
+*.jar binary
