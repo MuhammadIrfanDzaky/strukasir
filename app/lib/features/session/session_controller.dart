@@ -113,6 +113,7 @@ class SessionController extends AsyncNotifier<Session> {
       'email': email.trim(),
       'password': password,
       'device_name': deviceName.trim(),
+      'device_id': await _store.installId(),
     });
 
     final device = DeviceInfo.fromJson({

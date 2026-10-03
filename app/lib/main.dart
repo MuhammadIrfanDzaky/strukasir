@@ -7,6 +7,7 @@ import 'features/menu/menu_controller.dart';
 import 'features/session/login_screen.dart';
 import 'features/session/session_controller.dart';
 import 'features/session/setup_screen.dart';
+import 'features/shift/shift_controller.dart';
 import 'home_shell.dart';
 
 Future<void> main() async {
@@ -43,7 +44,10 @@ class SessionGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Sesi user berganti (login/logout) → menu dimuat ulang untuk user tersebut.
     ref.listen(sessionProvider, (prev, next) {
-      if (prev?.value is! LoggedIn && next.value is LoggedIn) ref.invalidate(menuProvider);
+      if (prev?.value is! LoggedIn && next.value is LoggedIn) {
+        ref.invalidate(menuProvider);
+        ref.invalidate(shiftProvider);
+      }
       // Kasir keluar → keranjang yang belum selesai tidak diwariskan ke kasir berikutnya.
       if (prev?.value is LoggedIn && next.value is! LoggedIn) ref.invalidate(cartProvider);
     });

@@ -71,6 +71,29 @@ void main() {
     expect(text, isNot(contains('13.000')));
   });
 
+  test('laporan shift muat 58mm dan menandai kekurangan kas', () {
+    final shift = {
+      'opened_at': '2026-10-03T00:00:00Z',
+      'opened_by': 'Kasir 1',
+      'closed_at': '2026-10-03T10:00:00Z',
+      'closed_by': 'Kasir 1',
+      'expected_cash': 120000,
+      'counted_cash': 118000,
+      'difference': -2000,
+      'note': 'uang receh kurang',
+      'summary': {
+        'opening_cash': 100000, 'cash_in': 20000, 'cash_refund': 0, 'expected_cash': 120000,
+        'by_method': {'cash': 20000, 'debit': 0, 'qris': 20000}, 'paid_orders': 2, 'refunds': 0,
+      },
+    };
+    final lines = shiftReport(shift);
+    for (final l in lines) {
+      expect(l.length, lessThanOrEqualTo(kLineWidth), reason: '"$l"');
+    }
+    expect(lines.join('\n'), contains('KURANG'));
+    expect(lines.join('\n'), contains('2.000'));
+  });
+
   test('saran nominal tunai', () {
     expect(suggestedCash(28000), [28000, 30000, 40000, 50000, 100000]);
     expect(suggestedCash(50000), [50000, 60000, 100000]); // 60.000 = 3 lembar 20 ribu
