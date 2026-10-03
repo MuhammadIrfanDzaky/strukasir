@@ -1,0 +1,159 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/api_client.dart';
+import '../../core/money.dart';
+import '../menu/menu_controller.dart';
+import '../printing/printer_service.dart';
+import '../printing/receipt_format.dart';
+import 'cart_controller.dart';
+import 'dialogs.dart';
+import 'order_api.dart';
+import 'payment_dialog.dart';
+
+/// Alur kasir: simpan → (bayar) → cetak. Prinsip:
+/// - Uang tidak pernah "hilang": ID order & pembayaran dibuat tablet, kirim ulang aman.
+/// - Gagal cetak TIDAK membatalkan transaksi; struk bisa dicetak ulang (perbaikan bug Kloa).
+class CheckoutFlow {
+  CheckoutFlow(this.ref, this.context);
+
+  final WidgetRef ref;
+  final BuildContext context;
+
+  OrderApi get _api => ref.read(orderApiProvider);
+
+  /// Simpan sebagai open bill, cetak bill + checker, kosongkan keranjang.
+  Future<void> holdBill() async {
+    final order = await _save();
+    if (order == null) return;
+    ref.read(cartProvider.notifier).clear();
+    await _print([customerReceipt(order), checker(order)], order);
+    _snack('Order ${order['number']} disimpan sebagai belum dibayar.');
+  }
+
+  /// Cetak checker untuk barista tanpa mengubah status order.
+  Future<void> printChecker() async {
+    final order = await _save();
+    if (order == null) return;
+    await _print([checker(order)], order);
+  }
+
+  /// Simpan → pilih pembayaran → bayar → cetak struk (+ checker untuk order yang baru).
+  Future<void> pay() async {
+    final wasSaved = ref.read(cartProvider).isSaved;
+    final saved = await _save();
+    if (saved == null || !context.mounted) return;
+
+    final total = saved['grand_total'] as int;
+    var payments = <PaymentDraft>[];
+    if (total > 0) {
+      final menu = ref.read(menuProvider).value?.menu;
+      final chosen = await showDialog<List<PaymentDraft>>(
+        context: context,
+        builder: (_) => PaymentDialog(
+          total: total,
+          splitEnabled: menu?.feature('split_payment') ?? false,
+          number: saved['number'] as String,
+        ),
+      );
+      if (chosen == null) return; // dibatalkan; order tetap terbuka & keranjang utuh
+      payments = chosen;
+    }
+
+    OrderJson paid;
+    try {
+      paid = await _api.pay(saved['id'] as String, payments, total);
+    } on ApiException catch (e) {
+      // 409 bisa berarti pembayaran sebelumnya sebenarnya sudah masuk (koneksi putus setelah sukses).
+      final current = e.status == 409 ? await _tryGet(saved['id'] as String) : null;
+      if (current?['status'] != 'paid') {
+        _snack(e.message);
+        return;
+      }
+      paid = current!;
+    }
+
+    ref.read(cartProvider.notifier).clear();
+    await _print([customerReceipt(paid), if (!wasSaved) checker(paid)], paid);
+    if (context.mounted) await _showDone(paid);
+  }
+
+  Future<void> reprint(OrderJson order) => _print([customerReceipt(order)], order);
+
+  // ───────────────────────────── internal ─────────────────────────────
+
+  Future<OrderJson?> _save({Approval? approval}) async {
+    final cart = ref.read(cartProvider);
+    final total = ref.read(cartTotalsProvider).grandTotal;
+    if (cart.isEmpty) return null;
+
+    try {
+      final order = await _api.save(cart, total, approval: approval);
+      ref.read(cartProvider.notifier).markSaved(order['number'] as String);
+      return order;
+    } on ApiException catch (e) {
+      if (e.field('approval') != null && context.mounted) {
+        if (approval != null) _snack(e.field('approval')!);
+        final next = await showDialog<Approval>(
+          context: context,
+          builder: (_) => ApprovalDialog(reason: 'Diskon melebihi batas kasir. ${approval == null ? '' : e.field('approval')!}'),
+        );
+        return next == null ? null : _save(approval: next);
+      }
+      if (e.field('expected_total') != null) {
+        await ref.read(menuProvider.notifier).refresh();
+        _snack('Harga menu berubah. Menu sudah diperbarui — periksa total lalu coba lagi.');
+        return null;
+      }
+      _snack(e.fieldErrors.values.expand((v) => v).firstOrNull ?? e.message);
+      return null;
+    }
+  }
+
+  Future<OrderJson?> _tryGet(String id) async {
+    try {
+      return await _api.get(id);
+    } on ApiException {
+      return null;
+    }
+  }
+
+  Future<void> _print(List<List<String>> documents, OrderJson order) async {
+    try {
+      for (final doc in documents) {
+        await ref.read(printerProvider.notifier).printLines(doc);
+      }
+    } on PrintException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 10),
+        content: Text('Transaksi tersimpan, tapi struk gagal dicetak: ${e.message}'),
+        action: SnackBarAction(label: 'Cetak ulang', onPressed: () => _print(documents, order)),
+      ));
+    }
+  }
+
+  Future<void> _showDone(OrderJson order) => showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text('Lunas · ${order['number']}'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('Total ${rp(order['grand_total'] as int)}'),
+            if ((order['change_total'] as int) > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text('Kembalian ${rp(order['change_total'] as int)}',
+                    style: Theme.of(context).textTheme.headlineMedium),
+              ),
+          ]),
+          actions: [
+            TextButton(onPressed: () => reprint(order), child: const Text('Cetak ulang struk')),
+            FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Order baru')),
+          ],
+        ),
+      );
+
+  void _snack(String message) {
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+}

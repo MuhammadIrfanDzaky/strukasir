@@ -19,6 +19,8 @@ services:
     build: ./docker/php
     working_dir: /app
     command: php artisan serve --host=0.0.0.0 --port=8000
+    environment:
+      PHP_CLI_SERVER_WORKERS: 4   # beberapa request paralel (tablet + test manual)
     stop_grace_period: 2s
     ports:
       - "8000:8000"   # tablet di jaringan yang sama bisa akses http://<ip-laptop>:8000
