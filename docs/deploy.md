@@ -127,3 +127,15 @@ Jumlah baris harus sama dengan produksi pada saat backup dibuat. Menimpa produks
 | Owner lupa password / PIN | `$C exec app php artisan pos:reset-owner-password <email> --pin` |
 | Log aplikasi | `$C logs -f app` |
 | Log backup | `$C logs backup` |
+
+## 8. Retensi & penghapusan data (offboarding kedai)
+
+- **Selama berlangganan**: semua data transaksi disimpan. Backup harian disimpan **30 hari** di R2.
+- **Kedai berhenti berlangganan**:
+  1. Ekspor dan serahkan datanya ke klien:
+     `$C exec app php artisan pos:export-tenant <kode>` (JSON tanpa password/PIN/token,
+     tersimpan di `storage/app/private/exports/` di dalam container). Salin keluar dengan
+     `$C cp app:/app/storage/app/private/exports ./exports`.
+  2. Hapus permanen: `$C exec app php artisan pos:delete-tenant <kode> --confirm=<kode>`.
+     Kedai lain tidak tersentuh, dan jejak penghapusan tercatat di log server.
+  3. Data masih ada di backup lama sampai masa retensi 30 hari habis, lalu hilang sepenuhnya.

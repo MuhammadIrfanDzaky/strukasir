@@ -6,7 +6,7 @@
   Reopen saat QRIS dinamis / gateway apa pun ditambahkan.)
 - **Classified:** 2026-10-03
 - **Last audit:** 2026-10-03
-- **Gates open:** 7 kompetensi blocking (#5, 6, 19, 27, 44, 46, 48) + 2 security check blocking (SEC-38, SEC-19)
+- **Gates open:** 6 kompetensi blocking (#5, 6, 27, 44, 46, 48) + 2 security check blocking (SEC-38, SEC-19)
   — hampir semuanya menunggu server produksi & akun (lihat docs/deploy.md); #6 menunggu keputusan owner
 - **Checkpoint terakhir:** M6 deploy (paket produksi diuji lokal: HTTPS, alur kasir, backup + restore) — 2026-10-03. M1 printer: menunggu printer tersedia di lokasi.
 
@@ -21,7 +21,7 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | 6 | Legal & Compliance | deferred | Wajib: struk sebagai bukti transaksi, kebijakan refund owner tertulis, perlakuan pajak (PB1/service) diputuskan owner |
 | 16 | Data Modeling | applied | `tenant_id` NOT NULL + index + bagian unique di semua tabel bisnis; FK komposit `(tenant_id, id)`; constraint & CHECK di DB (`backend/database/migrations/`); entitas di `docs/adr/0001-fondasi-arsitektur.md` |
 | 18 | Data Validation | applied | FormRequest / `validate()` di semua endpoint tulis; constraint, CHECK, FK komposit & trigger di DB; nominal & qty dibatasi |
-| 19 | Data Lifecycle | deferred | Progres: audit before/after untuk login, harga/menu, diskon disetujui, void+refund, buka/tutup shift; `payments` & `audit_logs` append-only. Belum: ekspor & hapus data per tenant, kebijakan retensi |
+| 19 | Data Lifecycle | applied | Audit before/after untuk login, menu/harga, diskon disetujui, bayar, void+refund, shift; `payments` & `audit_logs` append-only (trigger); modifier dinonaktifkan bukan dihapus; ekspor & hapus per kedai `pos:export-tenant` / `pos:delete-tenant` (`TenantDataTest`); retensi di `docs/deploy.md` §8 |
 | 20 | Idempotency & Concurrency | applied | UUID dari tablet sebagai idempotency key untuk order, pembayaran, void (idempoten), registrasi tablet (`device_id`); `lockForUpdate` di bayar/void/tutup shift/nomor order; diuji di `OrderTest`, `AuthTest`, `ShiftVoidReportTest` |
 | 24 | Multi-tenancy & Data Isolation | applied | `BelongsToTenant` fail-closed + RLS FORCE + role DB non-superuser + FK komposit; test lintas tenant `TenantIsolationTest`, `MenuTest::test_cannot_touch_another_tenants_menu`; berjalan di CI (`.github/workflows/ci.yml`, role non-superuser) — run 37121641161 hijau |
 | 25 | Authentication & Authorization | applied | Token perangkat + PIN (Sanctum, hash bcrypt), token user 16 jam terikat tablet, lockout, cabut tablet = cabut sesi, reset owner via `pos:reset-owner-password` (cabut semua sesi); `AuthTest`, `AdminCommandsTest` |
