@@ -1,0 +1,17 @@
+{
+	frankenphp
+}
+
+{$SERVER_NAME} {
+	root * /app/public
+	encode zstd gzip
+
+	# HTTPS wajib (SEC-30/31). Caddy otomatis menerbitkan sertifikat Let's Encrypt dan
+	# mengalihkan HTTP → HTTPS.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	php_server
+}

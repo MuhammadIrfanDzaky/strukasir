@@ -1,0 +1,15 @@
+.git
+app
+spikes
+docs
+**/node_modules
+backend/vendor
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+deploy/.env
+deploy/.env.*

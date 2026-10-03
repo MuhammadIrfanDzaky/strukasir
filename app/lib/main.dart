@@ -8,6 +8,7 @@ import 'features/session/login_screen.dart';
 import 'features/session/session_controller.dart';
 import 'features/session/setup_screen.dart';
 import 'features/shift/shift_controller.dart';
+import 'features/update/version_gate.dart';
 import 'home_shell.dart';
 
 Future<void> main() async {
@@ -31,7 +32,7 @@ class BerryBrewApp extends StatelessWidget {
         useMaterial3: true,
         visualDensity: VisualDensity.comfortable,
       ),
-      home: const SessionGate(),
+      home: const VersionGate(child: SessionGate()),
     );
   }
 }
