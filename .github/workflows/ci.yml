@@ -28,7 +28,7 @@ jobs:
       DB_USERNAME: berrybrew_app
       DB_PASSWORD: berrybrew
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Sama seperti docker/postgres/init.sql: app memakai role NON-superuser agar RLS benar-benar diuji.
       - name: Siapkan role & database
@@ -62,7 +62,7 @@ jobs:
       run:
         working-directory: ${{ matrix.project }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -75,7 +75,7 @@ jobs:
     # Memastikan image produksi (deploy/Dockerfile) tetap bisa di-build.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -f deploy/Dockerfile -t berrybrew-api:ci .
       - name: Konfigurasi Caddy valid
         run: docker run --rm -e SERVER_NAME=localhost --entrypoint frankenphp berrybrew-api:ci validate --config /etc/caddy/Caddyfile
