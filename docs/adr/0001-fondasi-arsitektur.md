@@ -42,6 +42,16 @@ tidak bisa jadi owner di dua kedai. Tinjau ulang bila ada pemilik multi-kedai.
 ID order dan pembayaran berupa UUID yang dibuat tablet dan sekaligus menjadi idempotency key. Struk dicetak
 dari data lokal, tidak menunggu server. Antrean offline penuh (cash) ditunda ke v1.1.
 
+## 6b. App Flutter: sederhana dulu (diperbarui M3)
+- Navigasi: satu `SessionGate` memilih layar berdasarkan status sesi (belum terdaftar / belum login / login),
+  **tanpa go_router**. Hanya ada sedikit layar, dan developer baru di Flutter, jadi lebih sedikit konsep lebih baik.
+  Tinjau ulang bila butuh deep link atau navigasi bertingkat.
+- State: Riverpod 3 (`AsyncNotifier`). Model ditulis sebagai kelas Dart biasa tanpa code generation.
+- Cache menu: **file JSON per tablet** (`menu_cache_<deviceId>.json`), bukan drift. Snapshot menu cukup
+  disimpan utuh. Drift baru masuk saat antrean order offline (v1.1) butuh query.
+- Token disimpan di `flutter_secure_storage` (Android Keystore).
+- HTTP biasa hanya diizinkan di build **debug** (`android/app/src/debug/AndroidManifest.xml`); release wajib HTTPS.
+
 ## 7. Aturan uang ditegakkan database
 - Nominal integer rupiah, dengan `currency` disimpan eksplisit.
 - `payments` & `audit_logs` **append-only** (trigger). Refund = baris baru `kind=refund`.
