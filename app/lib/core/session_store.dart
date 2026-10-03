@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:uuid/uuid.dart';
 
 /// Penyimpanan sesi di Android Keystore (terenkripsi), bukan SharedPreferences biasa.
 ///
@@ -17,6 +18,17 @@ class SessionStore {
   static const _device = 'device';
   static const _userToken = 'user_token';
   static const _user = 'user';
+  static const _installId = 'install_id';
+
+  /// UUID per instalasi, dikirim saat daftar tablet. Daftar ulang (mis. setelah timeout) tidak
+  /// membuat tablet ganda di server.
+  Future<String> installId() async {
+    final existing = await _storage.read(key: _installId);
+    if (existing != null) return existing;
+    final id = const Uuid().v4();
+    await _storage.write(key: _installId, value: id);
+    return id;
+  }
 
   Future<String?> serverUrl() => _storage.read(key: _serverUrl);
   Future<String?> deviceToken() => _storage.read(key: _deviceToken);

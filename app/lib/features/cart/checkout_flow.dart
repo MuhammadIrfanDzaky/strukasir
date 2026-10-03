@@ -6,6 +6,8 @@ import '../../core/money.dart';
 import '../menu/menu_controller.dart';
 import '../printing/printer_service.dart';
 import '../printing/receipt_format.dart';
+import '../shift/shift_controller.dart';
+import '../shift/shift_dialogs.dart';
 import 'cart_controller.dart';
 import 'dialogs.dart';
 import 'order_api.dart';
@@ -43,6 +45,13 @@ class CheckoutFlow {
     final wasSaved = ref.read(cartProvider).isSaved;
     final saved = await _save();
     if (saved == null || !context.mounted) return;
+
+    // Uang hanya boleh bergerak di shift terbuka (server juga menolaknya).
+    final shift = await ref.read(shiftProvider.future).catchError((_) => null);
+    if (shift == null) {
+      if (!context.mounted || !await showOpenShiftDialog(context, ref)) return;
+    }
+    if (!context.mounted) return;
 
     final total = saved['grand_total'] as int;
     var payments = <PaymentDraft>[];

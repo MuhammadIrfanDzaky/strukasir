@@ -122,6 +122,35 @@ List<String> customerReceipt(Map<String, dynamic> order) {
   return out;
 }
 
+/// Laporan tutup shift (dari respons POST /shifts/close).
+List<String> shiftReport(Map<String, dynamic> shift) {
+  final s = shift['summary'] as Map<String, dynamic>;
+  final byMethod = s['by_method'] as Map<String, dynamic>;
+  final diff = shift['difference'] as int;
+  return [
+    center('LAPORAN SHIFT'),
+    divider(),
+    'Buka : ${_time(shift['opened_at'] as String)}',
+    ...wrap('       ${shift['opened_by'] ?? ''}'),
+    'Tutup: ${_time(shift['closed_at'] as String)}',
+    ...wrap('       ${shift['closed_by'] ?? ''}'),
+    divider(),
+    ...leftRight('Modal awal', rupiah(s['opening_cash'] as int)),
+    ...leftRight('Tunai masuk', rupiah(s['cash_in'] as int)),
+    if ((s['cash_refund'] as int) > 0) ...leftRight('Refund tunai', '-${rupiah(s['cash_refund'] as int)}'),
+    ...leftRight('Kas seharusnya', rupiah(shift['expected_cash'] as int)),
+    ...leftRight('Kas dihitung', rupiah(shift['counted_cash'] as int)),
+    ...leftRight(diff == 0 ? 'Selisih' : (diff > 0 ? 'LEBIH' : 'KURANG'), rupiah(diff.abs())),
+    divider(),
+    ...leftRight('Debit', rupiah(byMethod['debit'] as int)),
+    ...leftRight('QRIS', rupiah(byMethod['qris'] as int)),
+    ...leftRight('Order lunas', '${s['paid_orders']}'),
+    if ((s['refunds'] as int) > 0) ...leftRight('Order di-refund', '${s['refunds']}'),
+    if ((shift['note'] as String?)?.isNotEmpty ?? false) ...wrap('Catatan: ${shift['note']}'),
+    divider(),
+  ];
+}
+
 /// Checker untuk barista: tanpa harga; item, pilihan, dan catatan.
 List<String> checker(Map<String, dynamic> order) {
   final out = <String>[

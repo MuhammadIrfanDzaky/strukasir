@@ -6,9 +6,9 @@
   Reopen saat QRIS dinamis / gateway apa pun ditambahkan.)
 - **Classified:** 2026-10-03
 - **Last audit:** 2026-10-03
-- **Gates open:** 15 kompetensi blocking + 11 security check blocking
-  (9 critical/high berstatus FAIL + SEC-19 & SEC-35 yang medium tapi menyentuh money/admin)
-- **Checkpoint terakhir:** M4 uang (SEC-21, 22 dicek; 23 n/a tanpa gateway) — 2026-10-03. M1 printer: menunggu printer tersedia di lokasi.
+- **Gates open:** 13 kompetensi blocking + 10 security check blocking
+  (9 critical/high berstatus FAIL + SEC-19 yang medium tapi menyentuh admin)
+- **Checkpoint terakhir:** M5 shift/void/laporan — 2026-10-03. M1 printer: menunggu printer tersedia di lokasi.
 
 Konteks: POS Android (Flutter) + Laravel 12 API + PostgreSQL untuk kedai kopi BerryBrew, dengan fondasi
 multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` (menyusul) dan catatan plan.
@@ -21,14 +21,14 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | 6 | Legal & Compliance | deferred | Wajib: struk sebagai bukti transaksi, kebijakan refund owner tertulis, perlakuan pajak (PB1/service) diputuskan owner |
 | 16 | Data Modeling | applied | `tenant_id` NOT NULL + index + bagian unique di semua tabel bisnis; FK komposit `(tenant_id, id)`; constraint & CHECK di DB (`backend/database/migrations/`); entitas di `docs/adr/0001-fondasi-arsitektur.md` |
 | 18 | Data Validation | deferred | Laravel FormRequest per endpoint + constraint DB |
-| 19 | Data Lifecycle | deferred | Progres: `audit_logs` append-only; audit login/gagal/logout/registrasi tablet + perubahan kategori/produk/grup modifier (before/after); `payments` append-only; modifier dinonaktifkan bukan dihapus. Belum: audit void/refund/diskon (M4–M5), ekspor & hapus per tenant |
-| 20 | Idempotency & Concurrency | deferred | Order (PUT) & pembayaran idempotent per UUID + lock, diuji. Sisa: registrasi tablet belum idempotent (timeout lalu kirim ulang → tablet ganda) |
+| 19 | Data Lifecycle | deferred | Progres: audit before/after untuk login, harga/menu, diskon disetujui, void+refund, buka/tutup shift; `payments` & `audit_logs` append-only. Belum: ekspor & hapus data per tenant, kebijakan retensi |
+| 20 | Idempotency & Concurrency | applied | UUID dari tablet sebagai idempotency key untuk order, pembayaran, void (idempoten), registrasi tablet (`device_id`); `lockForUpdate` di bayar/void/tutup shift/nomor order; diuji di `OrderTest`, `AuthTest`, `ShiftVoidReportTest` |
 | 24 | Multi-tenancy & Data Isolation | applied | `BelongsToTenant` fail-closed + RLS FORCE + role DB non-superuser + FK komposit; test lintas tenant `TenantIsolationTest`, `MenuTest::test_cannot_touch_another_tenants_menu`; berjalan di CI (`.github/workflows/ci.yml`, role non-superuser) — run 37121641161 hijau |
 | 25 | Authentication & Authorization | deferred | Progres: token perangkat + PIN (`AuthController`, `DeviceRegistrationController`), token user 16 jam terikat tablet, lockout. Belum: kebijakan password owner (SEC-10), cabut sesi saat ganti PIN (SEC-16) |
 | 26 | Permissions & Access Control | deferred | Progres: `Role`→`Permission` ∩ `FeatureGate`; route menu dijaga `can:menu.manage` (`MenuTest::test_cashier_cannot_manage_menu`). Dinilai ulang setelah endpoint order/void (M4–M5) |
 | 27 | Security & SSL | deferred | HTTPS + HSTS di server produksi; tanpa SQL string concatenation |
 | 29 | Environment Variables & Secrets | deferred | `.env.example`, `.env` di-gitignore; secret produksi hanya di server |
-| 32 | Payments & Billing | deferred | Tanpa gateway di v1. Bar yang berlaku: state machine order open→paid→void (terminal jelas), refund path, payments append-only, rekonsiliasi kas per shift + rekap QRIS harian vs mutasi merchant |
+| 32 | Payments & Billing | applied | Tanpa gateway (QRIS statis). State machine `open→paid→void` ditegakkan trigger DB; refund = baris `kind=refund` append-only (`OrderService::void`); rekonsiliasi: tutup shift (kas seharusnya vs dihitung, `ShiftService`) + laporan per metode untuk dicocokkan dengan mutasi QRIS/EDC (`ReportService`); diuji `OrderTest`, `ShiftVoidReportTest` |
 | 43 | Automated Testing | deferred | Progres: 39 test backend (isolasi, auth, guard DB, menu) + 8 test Flutter, jalan di CI. Belum: jalur order/bayar/void (M4–M5) |
 | 44 | Logging & Monitoring | deferred | Log terstruktur + uptime check dengan alert (mis. UptimeRobot free) sebelum go-live |
 | 46 | Error Handling | deferred | Tidak boleh ada jalur "uang diterima tapi order tidak tercatat": order disimpan lokal dulu, sinkron dengan retry, status sinkron terlihat |
@@ -110,7 +110,7 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | SEC-32 | CORS | high | 27 | PASS | `backend/config/cors.php` `allowed_origins => []` (klien native) |
 | SEC-33 | Web cache poisoning | medium | 38 | PASS | Semua respons `Cache-Control: private, no-store` (`SecurityHeaders`) |
 | SEC-34 | Dependencies | high | 30 | PASS | `composer audit` bersih & dijalankan di CI; lockfile ter-commit; Dependabot aktif (`.github/dependabot.yml`) |
-| SEC-35 | Audit logging | medium | 19 | FAIL | Progres: login, login gagal, logout, registrasi tablet tercatat dengan actor/IP, tanpa PIN (`AuthTest`). Belum: void, refund, ubah role, konfirmasi QRIS, ubah harga |
+| SEC-35 | Audit logging | medium | 19 | PASS | Login/login gagal/logout, PIN penyetuju salah, registrasi tablet, ubah menu/harga, diskon disetujui, order dibayar (metode), void/refund (alasan, penyetuju), buka/tutup shift — dengan actor, tablet, IP, tanpa PIN/token (`AppSupportAudit`). Belum ada endpoint ubah role |
 | SEC-36 | Shadow & zombie endpoints | medium | 14 | FAIL | Inventaris route (`php artisan route:list`) sesuai rencana; tanpa route debug di produksi |
 | SEC-38 | Denial of wallet | high | 5 | FAIL | Budget alert Oracle (akun PAYG) + tetap di kuota Always Free |
 | SEC-39 | Subdomain takeover | medium | 36 | FAIL | Audit DNS saat domain dipasang |
