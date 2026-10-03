@@ -1,0 +1,10 @@
+# HANYA untuk menguji paket produksi di laptop: HTTPS sertifikat lokal Caddy + server S3 lokal
+# (rclone serve s3) sebagai pengganti Cloudflare R2.
+#   docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.local-test.yml --env-file deploy/.env.local-test -p berrybrew-prodtest up -d --build
+services:
+  backup:
+    depends_on:
+      - s3
+  s3:
+    image: rclone/rclone:latest
+    command: serve s3 /data --addr :9000 --auth-key ${R2_ACCESS_KEY_ID},${R2_SECRET_ACCESS_KEY}

@@ -1,0 +1,71 @@
+# Produksi (Oracle VM). Dari root repo:
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
+name: berrybrew
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    env_file: .env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: berrybrew
+      DB_USERNAME: berrybrew_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - caddy_data:/data        # sertifikat TLS — jangan dihapus
+      - caddy_config:/config
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d berrybrew"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+    # Tidak ada port yang dibuka ke internet.
+
+  backup:
+    build: ./backup
+    environment:
+      TZ: Asia/Jakarta
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      R2_BUCKET: ${R2_BUCKET}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_HEARTBEAT_URL: ${BACKUP_HEARTBEAT_URL:-}
+      RCLONE_CONFIG_R2_TYPE: s3
+      RCLONE_CONFIG_R2_PROVIDER: ${R2_PROVIDER:-Cloudflare}
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      RCLONE_CONFIG_R2_ENDPOINT: ${R2_ENDPOINT}
+      RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,2 @@
+# Setiap hari 03:00 (TZ=Asia/Jakarta di docker-compose) — di luar jam operasional kedai.
+0 3 * * * /usr/local/bin/backup.sh > /proc/1/fd/1 2>&1

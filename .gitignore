@@ -7,3 +7,7 @@ key.properties
 .DS_Store
 .idea/
 .vscode/
+
+# Rahasia produksi
+deploy/.env
+deploy/.env.local-test

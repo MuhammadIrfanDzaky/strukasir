@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Permission;
+use App\Http\Controllers\Api\V1\AppVersionController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\DeviceRegistrationController;
@@ -13,6 +14,8 @@ use App\Http\Controllers\Api\V1\ShiftController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    Route::get('app/version', AppVersionController::class);
+
     // Publik: owner mendaftarkan tablet dengan email + password.
     Route::post('devices/register', DeviceRegistrationController::class)->middleware('throttle:auth');
 
