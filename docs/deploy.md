@@ -1,6 +1,7 @@
 # Panduan Deploy Produksi
 
-Target: 1 VM Oracle Cloud **Always Free** (ARM Ampere) + domain `.my.id` + Cloudflare R2 untuk backup.
+Target: **1 VPS Ubuntu 24.04** (penyedia lokal Indonesia, bayar bulanan tanpa kartu kredit) + domain
+`.my.id` + penyimpanan backup di luar server (**Google Drive** atau **Cloudflare R2**).
 Semua yang ditandai **(akun)** harus Anda buat sendiri. Kredensialnya simpan di password manager
 yang juga bisa diakses orang kedua yang dipercaya (bus factor, kompetensi #49).
 
@@ -8,54 +9,69 @@ Paket deploy ada di `deploy/` dan sudah diuji lokal (HTTPS, migrasi, alur kasir,
 
 | File | Isi |
 |---|---|
-| `deploy/docker-compose.prod.yml` | `app` (FrankenPHP + Caddy, HTTPS otomatis), `db` (PostgreSQL 17), `backup` (pg_dump harian → R2) |
+| `deploy/docker-compose.prod.yml` | `app` (FrankenPHP + Caddy, HTTPS otomatis), `db` (PostgreSQL 17), `backup` (pg_dump harian → rclone) |
 | `deploy/Dockerfile` | Image API produksi (tanpa dev dependency, opcache, `APP_DEBUG=false`) |
 | `deploy/Caddyfile` | HTTPS + redirect HTTP→HTTPS + HSTS |
 | `deploy/postgres/init.sh` | Role app **non-superuser** (wajib agar Row-Level Security berlaku) |
 | `deploy/backup/` | `backup.sh` (cron 03:00 WIB), `restore.sh` (pulihkan ke DB terpisah) |
-| `deploy/.env.example` | Semua variabel yang perlu diisi |
+| `deploy/.env.example` | Variabel aplikasi & database |
+| `deploy/backup.env.gdrive.example`, `deploy/backup.env.r2.example` | Tujuan backup (pilih salah satu) |
 
 ---
 
 ## 1. Siapkan akun (sekali)
 
-1. **(akun) Oracle Cloud**: daftar, lalu **upgrade ke Pay As You Go**. Selama tetap di kuota Always Free
-   tagihannya Rp0, dan instance tidak direklaim karena "idle".
-   - Pasang **budget alert** (mis. US$1) di *Billing → Budgets* (SEC-38).
-   - Pilih home region terdekat (Singapore atau Jakarta bila tersedia) — region Always Free tidak bisa diganti setelah daftar.
-2. **(akun) Domain** `.my.id`, mis. `pos-berrybrew.my.id`. Arahkan DNS ke Cloudflare (gratis).
-3. **(akun) Cloudflare R2**: buat bucket `berrybrew-backup` (private), lalu buat API token
-   *Object Read & Write* khusus bucket itu. Catat Account ID, Access Key, dan Secret.
+1. **(akun) VPS** dari penyedia lokal yang menerima transfer bank / virtual account / QRIS / e-wallet
+   (mis. IDCloudHost, Biznet Gio, DomaiNesia, Jagoan Hosting; cek harga & stok terbaru).
+   - Spesifikasi cukup: **1–2 vCPU, RAM 2 GB, disk 20–40 GB SSD, Ubuntu 24.04, IP publik**, lokasi **Jakarta**.
+   - Bayar bulanan dengan harga tetap → tidak ada risiko tagihan membengkak (SEC-38). Biaya masuk ke harga
+     subscription/maintenance klien.
+   - Pilih login **SSH key** (bukan password) bila tersedia.
+2. **(akun) Domain** `.my.id`, mis. `pos-berrybrew.my.id`. Arahkan nameserver ke **Cloudflare** (gratis).
+3. **(akun) Penyimpanan backup**, pilih satu:
+   - **Google Drive** (gratis 15 GB, tanpa kartu). Pakai akun Google khusus bisnis/kedai.
+     Ikuti langkah token di `deploy/backup.env.gdrive.example`.
+   - **Cloudflare R2** (gratis 10 GB, aktivasi butuh kartu/PayPal): bucket `berrybrew-backup` (private) +
+     API token *Object Read & Write* khusus bucket itu.
 4. **(opsional, gratis) healthchecks.io**: satu check harian untuk backup (`BACKUP_HEARTBEAT_URL`).
 5. **(akun) UptimeRobot** (gratis): monitor HTTPS `https://<domain>/up` tiap 5 menit, dengan alert ke email/WA.
 
-## 2. Siapkan VM
+## 2. Siapkan VPS
 
-- Shape `VM.Standard.A1.Flex` (2 OCPU / 12 GB cukup), Ubuntu 24.04.
-- Security list / NSG: buka **TCP 80, 443** (dan UDP 443). SSH 22 hanya dari IP Anda.
-- Di VM:
+Masuk lewat SSH, lalu:
 
 ```bash
-sudo apt update && sudo apt install -y docker.io docker-compose-v2 git
-sudo usermod -aG docker $USER   # login ulang setelah ini
-sudo iptables -I INPUT -p tcp -m multiport --dports 80,443 -j ACCEPT && sudo netfilter-persistent save
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y docker.io docker-compose-v2 git ufw
+sudo usermod -aG docker $USER            # logout & login ulang setelah ini
+sudo ufw allow OpenSSH && sudo ufw allow 80,443/tcp && sudo ufw allow 443/udp && sudo ufw enable
 ```
 
-- DNS: buat record **A** `pos-berrybrew.my.id → <IP publik VM>`. Untuk record ini, matikan proxy
-  Cloudflare (ikon awan abu-abu, *DNS only*), supaya Caddy bisa menerbitkan sertifikat sendiri.
+- Bila panel penyedia punya firewall sendiri, buka juga **TCP 80, 443** (dan UDP 443).
+- DNS di Cloudflare: record **A** `pos-berrybrew.my.id → <IP publik VPS>`, **proxy dimatikan**
+  (ikon awan abu-abu, *DNS only*) supaya Caddy bisa menerbitkan sertifikat sendiri.
+- Repo GitHub **private** → buat *deploy key* read-only di VPS:
+  ```bash
+  ssh-keygen -t ed25519 -f ~/.ssh/berrybrew_deploy -N "" -C "vps-berrybrew"
+  cat ~/.ssh/berrybrew_deploy.pub     # tempel di GitHub → repo → Settings → Deploy keys (tanpa write access)
+  printf 'Host github.com\n  IdentityFile ~/.ssh/berrybrew_deploy\n' >> ~/.ssh/config
+  ```
 
 ## 3. Deploy pertama
 
 ```bash
-git clone https://github.com/MuhammadIrfanDzaky/berrybrew-pos.git && cd berrybrew-pos
+git clone git@github.com:MuhammadIrfanDzaky/berrybrew-pos.git && cd berrybrew-pos
 cp deploy/.env.example deploy/.env && nano deploy/.env
+cp deploy/backup.env.gdrive.example deploy/backup.env && nano deploy/backup.env   # atau backup.env.r2.example
 ```
 
 Isi `deploy/.env`:
 - `SERVER_NAME` dan `APP_URL`: domain Anda.
 - `APP_KEY`: buat dengan `docker run --rm php:8.4-cli php -r "echo 'base64:'.base64_encode(random_bytes(32)), PHP_EOL;"`.
 - `POSTGRES_PASSWORD` dan `APP_DB_PASSWORD`: acak, **hanya huruf & angka** (`openssl rand -base64 24 | tr -dc A-Za-z0-9`).
-- Variabel `R2_*` dan `BACKUP_HEARTBEAT_URL`.
+- `BACKUP_HEARTBEAT_URL` (opsional).
+
+Isi `deploy/backup.env` sesuai pilihan penyimpanan (token Google Drive, atau kunci R2).
 
 ```bash
 C="docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env"
@@ -130,7 +146,7 @@ Jumlah baris harus sama dengan produksi pada saat backup dibuat. Menimpa produks
 
 ## 8. Retensi & penghapusan data (offboarding kedai)
 
-- **Selama berlangganan**: semua data transaksi disimpan. Backup harian disimpan **30 hari** di R2.
+- **Selama berlangganan**: semua data transaksi disimpan. Backup harian disimpan **30 hari** di penyimpanan backup (Google Drive / R2).
 - **Kedai berhenti berlangganan**:
   1. Ekspor dan serahkan datanya ke klien:
      `$C exec app php artisan pos:export-tenant <kode>` (JSON tanpa password/PIN/token,

@@ -1,12 +1,12 @@
 #!/bin/sh
-# Pulihkan backup dari R2 ke database TERPISAH (default berrybrew_restore_test) lalu tampilkan
+# Pulihkan backup dari remote "backup" ke database TERPISAH (default berrybrew_restore_test) lalu tampilkan
 # jumlah baris tabel penting. Menimpa database produksi butuh TARGET=berrybrew CONFIRM=yes.
 #
 #   restore.sh                 → backup terbaru  → berrybrew_restore_test
 #   restore.sh <nama-file>     → file tertentu  → berrybrew_restore_test
 set -eu
 TARGET="${TARGET:-berrybrew_restore_test}"
-SRC="r2:$R2_BUCKET/postgres"
+SRC="backup:$BACKUP_PATH"
 NAME="${1:-$(rclone lsf "$SRC/" | sort | tail -n 1)}"
 [ -n "$NAME" ] || { echo "[restore] Tidak ada backup di $SRC"; exit 1; }
 

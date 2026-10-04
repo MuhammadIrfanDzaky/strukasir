@@ -1,10 +1,11 @@
 #!/bin/sh
-# Backup penuh database ke R2 (rclone remote "r2", dikonfigurasi lewat env RCLONE_CONFIG_R2_*).
+# Backup penuh database ke penyimpanan luar (rclone remote "backup": R2/S3 atau Google Drive,
+# dikonfigurasi lewat deploy/backup.env → RCLONE_CONFIG_BACKUP_*).
 # Memakai superuser: pg_dump oleh role app akan terhalang Row-Level Security (FORCE).
 set -eu
 STAMP=$(date +%Y%m%d-%H%M%S)
 FILE="/tmp/berrybrew-$STAMP.dump"
-DEST="r2:$R2_BUCKET/postgres"
+DEST="backup:$BACKUP_PATH"
 
 PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -h db -U postgres -d berrybrew -Fc -f "$FILE"
 rclone copyto "$FILE" "$DEST/berrybrew-$STAMP.dump"

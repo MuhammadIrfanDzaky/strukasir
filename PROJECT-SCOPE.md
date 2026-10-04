@@ -6,7 +6,7 @@
   Reopen saat QRIS dinamis / gateway apa pun ditambahkan.)
 - **Classified:** 2026-10-03
 - **Last audit:** 2026-10-03
-- **Gates open:** 6 kompetensi blocking (#5, 6, 27, 44, 46, 48) + 2 security check blocking (SEC-38, SEC-19)
+- **Gates open:** 6 kompetensi blocking (#5, 6, 27, 44, 46, 48) + 1 security check blocking (SEC-19)
   — hampir semuanya menunggu server produksi & akun (lihat docs/deploy.md); #6 menunggu keputusan owner
 - **Checkpoint terakhir:** M6 deploy (paket produksi diuji lokal: HTTPS, alur kasir, backup + restore) — 2026-10-03. M1 printer: menunggu printer tersedia di lokasi.
 
@@ -17,7 +17,7 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | # | Competency | Status | Evidence / reason |
 |---|---|---|---|
 | 2 | Documentation & Maintenance | applied | `README.md` (setup dev), `docs/deploy.md` (deploy, update, rollback, rilis APK, administrasi), `docs/runbook-owner.md` (operasional harian & masalah umum), `docs/adr/0001-fondasi-arsitektur.md` |
-| 5 | Cost & FinOps | deferred | Estimasi: Rp0/bln (Oracle Always Free PAYG + R2 free 10GB) + domain .my.id ±Rp25rb/thn. Belum: budget alert Oracle dipasang (`docs/deploy.md` §1) |
+| 5 | Cost & FinOps | deferred | Rencana: VPS lokal harga tetap ±Rp50–150rb/bln (1–2 vCPU, 2 GB) + domain .my.id ±Rp25rb/thn + backup Google Drive/R2 (gratis). Biaya masuk harga ke klien. Jadi `applied` setelah VPS & harga final dicatat |
 | 6 | Legal & Compliance | deferred | Wajib: struk sebagai bukti transaksi, kebijakan refund owner tertulis, perlakuan pajak (PB1/service) diputuskan owner |
 | 16 | Data Modeling | applied | `tenant_id` NOT NULL + index + bagian unique di semua tabel bisnis; FK komposit `(tenant_id, id)`; constraint & CHECK di DB (`backend/database/migrations/`); entitas di `docs/adr/0001-fondasi-arsitektur.md` |
 | 18 | Data Validation | applied | FormRequest / `validate()` di semua endpoint tulis; constraint, CHECK, FK komposit & trigger di DB; nominal & qty dibatasi |
@@ -32,7 +32,7 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | 43 | Automated Testing | applied | 85 test backend (isolasi, auth, menu, order, bayar, shift, void, laporan, command) + 27 test Flutter (harga = fixture server, struk, modifier, versi) — semua di CI. Uji UI di perangkat asli: lihat Preflight |
 | 44 | Logging & Monitoring | deferred | Log JSON ke stderr (`LOG_CHANNEL=stderr`), heartbeat backup (`BACKUP_HEARTBEAT_URL`). Belum: UptimeRobot `/up` + healthchecks.io dipasang (`docs/deploy.md` §1) |
 | 46 | Error Handling | deferred | Tidak ada jalur "uang diterima tapi tidak tercatat": bayar atomik di server, kiriman ulang aman, 409 dicek ulang di app, gagal cetak tidak membatalkan transaksi. Belum: pelacak error (mis. Sentry free) |
-| 48 | Backup & Recovery | deferred | `deploy/backup/` pg_dump harian (superuser, menembus RLS) → R2, retensi 30 hari; **uji restore lokal lolos** (jumlah baris identik, 14 policy RLS + trigger ikut, guard timpa produksi). Belum: uji restore di produksi; restore satu tenant (prosedur manual) |
+| 48 | Backup & Recovery | deferred | `deploy/backup/` pg_dump harian (superuser, menembus RLS) → rclone (Google Drive atau R2, `deploy/backup.env`), retensi 30 hari; **uji restore lokal lolos** (jumlah baris identik, 14 policy RLS + trigger ikut, guard timpa produksi). Belum: uji restore di produksi; restore satu tenant (prosedur manual) |
 
 ## Recommended
 | # | Competency | Status | Evidence / reason |
@@ -51,7 +51,7 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | 28 | Rate Limiting | deferred | Throttle global + ketat di login PIN/password (lihat SEC-12) |
 | 30 | Dependency & Supply Chain | applied | `composer.lock` & `pubspec.lock` ter-commit; `composer audit` di CI; `.github/dependabot.yml` (composer, pub, actions) |
 | 35 | Hosting & Deployment | applied | Deploy reproducible: `deploy/docker-compose.prod.yml` + `deploy/Dockerfile` (di-build di CI); langkah deploy, update & rollback di `docs/deploy.md`; diuji lokal end-to-end |
-| 36 | Cloud & Infrastructure | deferred | Region Oracle dipilih sengaja (Singapore/Jakarta), didokumentasikan |
+| 36 | Cloud & Infrastructure | deferred | VPS penyedia lokal, lokasi Jakarta (latensi & data di Indonesia); pilihan final dicatat di `docs/deploy.md` saat dibeli |
 | 37 | CI/CD & Version Control | deferred | Progres: CI menjalankan Pint, audit, test backend, flutter analyze/test. Belum: proteksi branch `main`, deploy dari pipeline |
 | 40 | Feature Flags & Progressive Rollout | applied | `plan_features` + `tenant_features` + `App\Support\Tenancy\FeatureGate`; `AuthTest::test_disabling_a_feature_removes_dependent_permissions` |
 | 41 | Local Dev Reproducibility | applied | `docker-compose.yml` (opcache dev) + seeder + `.env.example`; langkah di `README.md` |
@@ -112,5 +112,5 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | SEC-34 | Dependencies | high | 30 | PASS | `composer audit` bersih & dijalankan di CI; lockfile ter-commit; Dependabot aktif (`.github/dependabot.yml`) |
 | SEC-35 | Audit logging | medium | 19 | PASS | Login/login gagal/logout, PIN penyetuju salah, registrasi tablet, ubah menu/harga, diskon disetujui, order dibayar (metode), void/refund (alasan, penyetuju), buka/tutup shift — dengan actor, tablet, IP, tanpa PIN/token (`AppSupportAudit`). Belum ada endpoint ubah role |
 | SEC-36 | Shadow & zombie endpoints | medium | 14 | PASS | Hanya `/api/v1/*` + `/up`; halaman welcome Laravel dihapus (`GET /` → 404) |
-| SEC-38 | Denial of wallet | high | 5 | FAIL | Tetap di kuota Always Free; endpoint mahal tidak ada; rate limit aktif. Belum: budget alert Oracle (akun PAYG) |
+| SEC-38 | Denial of wallet | high | 5 | PASS | VPS harga tetap bulanan (tanpa tagihan per pemakaian); tidak ada endpoint mahal (AI/upload/email); rate limit aktif; backup ±100 KB/hari jauh di bawah kuota gratis |
 | SEC-39 | Subdomain takeover | medium | 36 | FAIL | Audit DNS saat domain dipasang |

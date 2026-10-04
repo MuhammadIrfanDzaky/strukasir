@@ -11,3 +11,4 @@ key.properties
 # Rahasia produksi
 deploy/.env
 deploy/.env.local-test
+deploy/backup.env
