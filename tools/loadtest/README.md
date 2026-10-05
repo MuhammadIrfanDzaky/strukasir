@@ -19,10 +19,10 @@ Jalankan di luar jam operasional kedai. Uji ini memakan CPU penuh selama beberap
 
 ```bash
 C="docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env"
-docker compose -p berrybrew cp tools/loadtest/setup.php app:/tmp/setup.php
-docker compose -p berrybrew cp tools/loadtest/cleanup.php app:/tmp/cleanup.php
+docker cp tools/loadtest/setup.php berrybrew-app-1:/tmp/setup.php
+docker cp tools/loadtest/cleanup.php berrybrew-app-1:/tmp/cleanup.php
 $C exec app php /tmp/setup.php 100
-docker compose -p berrybrew cp app:/tmp/tokens.json tools/loadtest/tokens.json
+docker cp berrybrew-app-1:/tmp/tokens.json tools/loadtest/tokens.json
 
 tools/loadtest/run.sh berrybrew pos-berrybrew.my.id 5 10 20
 
@@ -36,7 +36,7 @@ rm tools/loadtest/tokens.json
 L="docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.local-test.yml -f tools/loadtest/limits.yml --env-file deploy/.env.local-test -p berrybrew-load"
 # deploy/.env.local-test: SERVER_NAME="localhost, app.localhost"; deploy/backup.env boleh dummy
 $L up -d --build && $L exec app php artisan migrate --force
-# lalu setup.php seperti di atas (ganti -p berrybrew → -p berrybrew-load), kemudian:
+# lalu setup.php seperti di atas (container berrybrew-load-app-1), kemudian:
 tools/loadtest/run.sh berrybrew-load app.localhost 5 10 20 40
 $L down -v
 ```
