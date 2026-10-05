@@ -1,0 +1,11 @@
+# Simulasi VPS 2 vCPU / 2 GB: app + db berbagi 2 core yang sama, RAM total ±2 GB.
+services:
+  app:
+    cpuset: "0,1"
+    mem_limit: 1024m
+  db:
+    cpuset: "0,1"
+    mem_limit: 768m
+  backup:
+    cpuset: "0,1"
+    mem_limit: 128m

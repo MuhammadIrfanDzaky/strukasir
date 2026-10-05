@@ -1,0 +1,4 @@
+# Berisi token login kedai uji & hasil mentah — jangan di-commit.
+tokens.json
+k6-*.txt
+stats-*.txt
