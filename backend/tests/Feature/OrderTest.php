@@ -239,6 +239,21 @@ class OrderTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('items.0.modifier_ids');
     }
 
+    public function test_same_modifier_on_different_items_is_allowed(): void
+    {
+        // Regresi: dua item dengan pilihan "Cold" yang sama dulu ditolak sebagai duplikat.
+        $this->saveOrder((string) Str::uuid(), [
+            $this->item($this->americano, [$this->cold]),
+            $this->item($this->americano, [$this->cold, $this->shot]),
+        ], 35000)->assertOk()->assertJsonPath('data.grand_total', 35000);
+    }
+
+    public function test_duplicate_modifier_within_one_item_is_rejected(): void
+    {
+        $this->saveOrder((string) Str::uuid(), [$this->item($this->americano, [$this->cold, $this->cold])], 17000)
+            ->assertUnprocessable()->assertJsonValidationErrors('items.0.modifier_ids');
+    }
+
     public function test_modifier_of_another_product_is_rejected(): void
     {
         $this->saveOrder((string) Str::uuid(), [$this->item($this->latte, [$this->shot])], 25000)
