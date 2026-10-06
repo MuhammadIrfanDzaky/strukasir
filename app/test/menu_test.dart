@@ -50,6 +50,27 @@ void main() {
   MenuModifierGroup grp(String id) => menu.modifierGroups.firstWhere((g) => g.id == id);
   MenuModifier mod(String groupId, String id) => grp(groupId).modifiers.firstWhere((m) => m.id == id);
 
+  group('MenuProduct: kode, modal, favorit', () {
+    final p = MenuProduct.fromJson({
+      'id': 'p', 'category_id': 'c', 'name': 'Air Mineral', 'price': 6000, 'active': true, 'sold_out': false,
+      'sort': 0, 'modifier_group_ids': [], 'code': 'BB03', 'cost': 3000, 'favorite': true,
+    });
+
+    test('margin dari modal', () {
+      expect(p.marginPercent, 50);
+      expect(americano.marginPercent, isNull, reason: 'modal tidak dikirim (kasir) / belum diisi');
+      expect(p.favorite, isTrue);
+      expect(americano.favorite, isFalse);
+    });
+
+    test('cari nama atau kode tanpa beda huruf', () {
+      expect(p.matches('mineral'), isTrue);
+      expect(p.matches('bb03'), isTrue);
+      expect(p.matches('  '), isTrue);
+      expect(p.matches('latte'), isFalse);
+    });
+  });
+
   group('Menu.fromJson', () {
     test('memfilter kategori & produk nonaktif untuk kasir', () {
       expect(menu.activeCategories.map((c) => c.name), ['Kopi']);

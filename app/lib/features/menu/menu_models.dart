@@ -88,6 +88,9 @@ class MenuProduct {
     required this.soldOut,
     required this.sort,
     required this.modifierGroupIds,
+    this.code,
+    this.cost,
+    this.favorite = false,
   });
 
   factory MenuProduct.fromJson(Map<String, dynamic> j) => MenuProduct(
@@ -99,6 +102,9 @@ class MenuProduct {
         soldOut: j['sold_out'] as bool,
         sort: j['sort'] as int,
         modifierGroupIds: (j['modifier_group_ids'] as List).cast<String>(),
+        code: j['code'] as String?,
+        cost: j['cost'] as int?,
+        favorite: j['favorite'] as bool? ?? false,
       );
 
   final String id;
@@ -110,12 +116,50 @@ class MenuProduct {
   final int sort;
   final List<String> modifierGroupIds;
 
+  /// Kode produk (SKU) buatan owner, mis. "BB03".
+  final String? code;
+
+  /// Harga modal (HPP). Hanya dikirim server ke user yang boleh mengelola menu; null = belum diisi.
+  final int? cost;
+
+  /// Tampil di filter "Favorit" layar kasir.
+  final bool favorite;
+
   bool get sellable => active && !soldOut;
+
+  /// Margin terhadap harga jual (%), null bila modal belum diisi atau harga 0.
+  double? get marginPercent => cost == null || price == 0 ? null : (price - cost!) * 100 / price;
+
+  /// Cocok dengan kata kunci pencarian (nama atau kode, tanpa beda huruf besar/kecil).
+  bool matches(String query) {
+    final q = query.trim().toLowerCase();
+    return q.isEmpty || name.toLowerCase().contains(q) || (code?.toLowerCase().contains(q) ?? false);
+  }
+}
+
+/// Identitas struk kedai: nama, alamat (header), pesan penutup (footer), logo PNG base64.
+class ReceiptSettings {
+  const ReceiptSettings({this.name = '', this.header, this.footer, this.logoBase64});
+
+  factory ReceiptSettings.fromJson(Map<String, dynamic>? j) => j == null
+      ? const ReceiptSettings()
+      : ReceiptSettings(
+          name: j['name'] as String? ?? '',
+          header: j['header'] as String?,
+          footer: j['footer'] as String?,
+          logoBase64: j['logo'] as String?,
+        );
+
+  final String name;
+  final String? header;
+  final String? footer;
+  final String? logoBase64;
 }
 
 class Menu {
   const Menu({
     required this.version,
+    this.receipt = const ReceiptSettings(),
     required this.pricing,
     required this.cashierDiscountLimitBp,
     required this.features,
@@ -126,6 +170,7 @@ class Menu {
 
   factory Menu.fromJson(Map<String, dynamic> j) => Menu(
         version: j['version'] as String,
+        receipt: ReceiptSettings.fromJson(j['receipt'] as Map<String, dynamic>?),
         pricing: PricingSettings.fromJson(j['pricing'] as Map<String, dynamic>),
         cashierDiscountLimitBp: (j['pricing'] as Map<String, dynamic>)['cashier_discount_limit_bp'] as int,
         features: (j['features'] as Map<String, dynamic>).map((k, v) => MapEntry(k, v as bool)),
@@ -144,6 +189,7 @@ class Menu {
       );
 
   final String version;
+  final ReceiptSettings receipt;
   final PricingSettings pricing;
   final int cashierDiscountLimitBp;
   final Map<String, bool> features;

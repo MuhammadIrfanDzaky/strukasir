@@ -148,7 +148,7 @@ class OpenBillsDialog extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return AlertDialog(
       scrollable: true,
-      title: const Text('Order belum dibayar'),
+      title: const Text('Open Bill (belum dibayar)'),
       content: SizedBox(
         width: 520,
         height: (MediaQuery.sizeOf(context).height * 0.6).clamp(240.0, 420.0),
@@ -168,8 +168,8 @@ class OpenBillsDialog extends ConsumerWidget {
             if (orders.isEmpty) {
               return const AppEmptyState(
                 icon: Icons.receipt_long_rounded,
-                title: 'Tidak ada order terbuka',
-                message: 'Semua order sudah dibayar.',
+                title: 'Tidak ada Open Bill',
+                message: 'Semua order sudah dibayar. Ketuk "Open Bill" di keranjang untuk menyimpan order yang belum dibayar.',
               );
             }
             return ListView.separated(

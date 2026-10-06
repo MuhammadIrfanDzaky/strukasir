@@ -26,25 +26,17 @@ class CheckoutFlow {
 
   OrderApi get _api => ref.read(orderApiProvider);
 
-  /// Simpan sebagai open bill, cetak bill + checker, kosongkan keranjang.
-  Future<void> holdBill() async {
+  /// Open Bill: simpan order sebagai belum dibayar (tanpa cetak) lalu kosongkan keranjang.
+  /// Order bisa dibuka lagi dari daftar Open Bill untuk tambah pesanan atau dibayar (Close Bill).
+  Future<void> openBill() async {
     final order = await _save();
     if (order == null) return;
     ref.read(cartProvider.notifier).clear();
-    await _print([customerReceipt(order), checker(order)], order);
-    _snack('Order ${order['number']} disimpan sebagai belum dibayar.');
+    _snack('Open Bill ${order['number']} disimpan. Buka lagi dari daftar Open Bill.');
   }
 
-  /// Cetak checker untuk barista tanpa mengubah status order.
-  Future<void> printChecker() async {
-    final order = await _save();
-    if (order == null) return;
-    await _print([checker(order)], order);
-  }
-
-  /// Simpan → pilih pembayaran → bayar → cetak struk (+ checker untuk order yang baru).
+  /// Close Bill: simpan → pilih pembayaran → bayar → cetak struk pelanggan.
   Future<void> pay() async {
-    final wasSaved = ref.read(cartProvider).isSaved;
     final saved = await _save();
     if (saved == null || !context.mounted) return;
 
@@ -85,11 +77,11 @@ class CheckoutFlow {
     }
 
     ref.read(cartProvider.notifier).clear();
-    await _print([customerReceipt(paid), if (!wasSaved) checker(paid)], paid);
+    await _print(paid);
     if (context.mounted) await _showDone(paid);
   }
 
-  Future<void> reprint(OrderJson order) => _print([customerReceipt(order)], order);
+  Future<void> reprint(OrderJson order) => _print(order);
 
   // ───────────────────────────── internal ─────────────────────────────
 
@@ -129,17 +121,19 @@ class CheckoutFlow {
     }
   }
 
-  Future<void> _print(List<List<String>> documents, OrderJson order) async {
+  /// Cetak struk pelanggan + logo kedai (dari cache menu, jadi tetap ada saat offline).
+  Future<void> _print(OrderJson order) async {
     try {
-      for (final doc in documents) {
-        await ref.read(printerProvider.notifier).printLines(doc);
-      }
+      await ref.read(printerProvider.notifier).printDocument(
+            customerReceipt(order),
+            logoBase64: ref.read(menuProvider).value?.menu.receipt.logoBase64,
+          );
     } on PrintException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         duration: const Duration(seconds: 10),
         content: Text('Transaksi tersimpan, tapi struk gagal dicetak: ${e.message}'),
-        action: SnackBarAction(label: 'Cetak ulang', onPressed: () => _print(documents, order)),
+        action: SnackBarAction(label: 'Cetak ulang', onPressed: () => _print(order)),
       ));
     }
   }

@@ -387,6 +387,8 @@ class OrderService
             'product_id' => $line['product']->id,
             'name' => $line['product']->name,
             'unit_price' => $line['product']->price,
+            // Salinan modal saat transaksi: laba kotor tidak berubah bila modal diubah belakangan.
+            'unit_cost' => $line['product']->cost,
             'qty' => $line['qty'],
             'modifiers_total' => $line['modifiers_total'],
             'discount_type' => $line['discount']['type'] ?? null,

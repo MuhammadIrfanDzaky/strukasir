@@ -31,12 +31,18 @@ class MenuAdminApi {
     required bool active,
     required bool soldOut,
     required List<String> modifierGroupIds,
+    String? code,
+    int? cost,
+    bool favorite = false,
   }) =>
       _write((api, token) {
         final data = {
           'category_id': categoryId,
+          'code': code?.trim() ?? '',
           'name': name.trim(),
           'price': price,
+          'cost': cost,
+          'favorite': favorite,
           'active': active,
           'sold_out': soldOut,
           'modifier_group_ids': modifierGroupIds,
@@ -62,6 +68,23 @@ class MenuAdminApi {
 
   Future<void> deleteModifierGroup(String id) =>
       _write((api, token) => api.delete('/modifier-groups/$id', token: token));
+
+  /// Import produk dari teks CSV. `dryRun` = hanya periksa & hitung (pratinjau), tidak menyimpan.
+  /// Mengembalikan ringkasan server: created, updated, categories_created, errors[{row, message}].
+  Future<Map<String, dynamic>> importProducts(String csv, {required bool dryRun}) async {
+    try {
+      final res = await _ref.read(sessionProvider.notifier).authed(
+            (api, token) => api.post('/products/import', token: token, data: {'csv': csv, 'dry_run': dryRun}),
+          );
+      if (!dryRun) await _ref.read(menuProvider.notifier).refresh();
+      return res['data'] as Map<String, dynamic>;
+    } on ApiException catch (e) {
+      // 422 dengan daftar kesalahan per baris tetap dikembalikan sebagai hasil pratinjau.
+      final data = e.body?['data'];
+      if (data is Map<String, dynamic>) return data;
+      rethrow;
+    }
+  }
 
   Future<void> _write(Future<Object?> Function(ApiClient api, String token) call) async {
     await _ref.read(sessionProvider.notifier).authed((api, token) => call(api, token));

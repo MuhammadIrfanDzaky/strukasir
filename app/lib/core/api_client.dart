@@ -2,11 +2,14 @@ import 'package:dio/dio.dart';
 
 /// Error dari API dalam bentuk yang siap ditampilkan ke kasir.
 class ApiException implements Exception {
-  ApiException(this.message, {this.status, this.fieldErrors = const {}});
+  ApiException(this.message, {this.status, this.fieldErrors = const {}, this.body});
 
   final String message;
   final int? status;
   final Map<String, List<String>> fieldErrors;
+
+  /// Isi respons JSON (untuk endpoint yang mengirim detail tambahan saat gagal, mis. import).
+  final Map<String, dynamic>? body;
 
   bool get isUnauthorized => status == 401;
 
@@ -85,6 +88,8 @@ class ApiClient {
     }
 
     return ApiException(message,
-        status: response.statusCode, fieldErrors: errors);
+        status: response.statusCode,
+        fieldErrors: errors,
+        body: data is Map<String, dynamic> ? data : null);
   }
 }

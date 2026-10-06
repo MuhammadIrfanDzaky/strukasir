@@ -3,6 +3,7 @@
 // elemen yang meluber (RenderFlex overflow) atau error layout lain.
 //
 // Screenshot untuk dicek mata: SHOT_DIR=<folder> flutter test test/responsive_test.dart
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -16,6 +17,8 @@ import 'package:berrybrew_pos/features/menu/menu_models.dart';
 import 'package:berrybrew_pos/features/menu/modifier_selection.dart';
 import 'package:berrybrew_pos/features/menu_admin/menu_admin_screen.dart';
 import 'package:berrybrew_pos/features/printing/printer_service.dart';
+import 'package:berrybrew_pos/features/printing/receipt_logo.dart';
+import 'package:berrybrew_pos/features/printing/receipt_settings_screen.dart';
 import 'package:berrybrew_pos/features/session/login_screen.dart';
 import 'package:berrybrew_pos/features/session/session_controller.dart';
 import 'package:berrybrew_pos/features/session/setup_screen.dart';
@@ -28,6 +31,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 
 import 'menu_test.dart' show menuJson;
 import 'receipt_format_test.dart' show order;
@@ -71,12 +75,20 @@ final bigMenu = Menu.fromJson({
       {
         'id': 'x$i', 'category_id': 'c1', 'name': name, 'price': 18000 + i * 1500,
         'active': true, 'sold_out': i == 5, 'sort': 10 + i, 'modifier_group_ids': [],
+        'code': 'BB${(i + 1).toString().padLeft(2, '0')}', 'cost': i.isEven ? 9000 + i * 500 : null, 'favorite': i < 3,
       },
   ],
 });
 
+final sampleLogo = () {
+  final image = img.Image(width: 600, height: 300);
+  img.fill(image, color: img.ColorRgb8(10, 10, 10));
+  img.fillCircle(image, x: 300, y: 150, radius: 110, color: img.ColorRgb8(230, 170, 60));
+  return base64Encode(processLogo((img.encodePng(image), const LogoOptions()))!.png);
+}();
+
 final reportJson = {
-  'sales': 12845000, 'orders': 412, 'average': 31177, 'discounts': 215000, 'service': 0, 'tax': 0,
+  'sales': 12845000, 'cost': 6100000, 'gross_profit': 6745000, 'cost_missing_items': 12, 'orders': 412, 'average': 31177, 'discounts': 215000, 'service': 0, 'tax': 0,
   'voids': {'orders': 3, 'refunded': 87000},
   'by_method': {'cash': 7340000, 'debit': 1205000, 'qris': 4300000},
   'by_cashier': [
@@ -84,7 +96,7 @@ final reportJson = {
     {'name': 'Budi Santoso', 'orders': 182, 'sales': 5645000},
   ],
   'top_products': [
-    {'qty': 120, 'name': 'Kopi Susu Gula Aren', 'revenue': 2160000},
+    {'qty': 120, 'name': 'Kopi Susu Gula Aren', 'revenue': 2160000, 'profit': 1080000},
     {'qty': 96, 'name': 'Es Kopi Susu Berry Spesial Ukuran Jumbo', 'revenue': 2208000},
   ],
   'daily': [
@@ -240,6 +252,58 @@ final scenarios = <Scenario>[
     act: null,
   ),
   (name: 'printer', session: loggedIn, home: (s) => home(s, 4), fillCart: false, act: null),
+  (
+    name: 'kasir-cek-pesanan',
+    session: loggedIn,
+    home: home,
+    fillCart: true,
+    act: (t) async {
+      final open = find.text('Lihat pesanan');
+      if (open.evaluate().isNotEmpty) {
+        await t.tap(open);
+        await settle(t);
+      }
+      await t.tap(find.text('Cek pesanan'));
+      await settle(t);
+    },
+  ),
+  (
+    name: 'kasir-cari',
+    session: loggedIn,
+    home: home,
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.byTooltip('Cari produk'));
+      await settle(t);
+      await t.enterText(find.widgetWithText(TextField, 'Cari nama atau kode produk'), 'bb0');
+      await settle(t);
+    },
+  ),
+  (
+    name: 'import-format',
+    session: loggedIn,
+    home: (s) => home(s, 3),
+    fillCart: false,
+    act: (t) async {
+      final button = find.text('Import CSV');
+      await t.tap(button.evaluate().isNotEmpty ? button : find.byTooltip('Import CSV'));
+      await settle(t);
+    },
+  ),
+  (
+    name: 'pengaturan-struk',
+    session: loggedIn,
+    home: (_) => ReceiptSettingsScreen(
+          current: ReceiptSettings(
+            name: 'BERRYBREW KOPI',
+            header: 'Jl Garu 2 A No. 5 C Harjosari 1\nMedan Amplas',
+            footer: 'Terima Kasih atas Kunjungan Anda, dengan senang hati melayani dan menanti kunjungan Anda berikutnya',
+            logoBase64: sampleLogo,
+          ),
+        ),
+    fillCart: false,
+    act: null,
+  ),
 ];
 
 // ───────────────────────────── harness ─────────────────────────────
@@ -273,6 +337,8 @@ void main() {
       await loadFont('MaterialIcons', ['$fonts/materialicons-regular.otf', '$fonts/MaterialIcons-Regular.otf']);
       await loadFont('Roboto', ['$fonts/roboto-regular.ttf', '$fonts/Roboto-Regular.ttf']);
     }
+    // Pratinjau struk memakai font monospace sistem; di Windows pakai Consolas (bila ada).
+    await loadFont('monospace', ['C:/Windows/Fonts/consola.ttf', 'C:/Windows/Fonts/consolab.ttf']);
   });
 
   // Skala font: normal dan terbesar Android (app membatasinya jadi 1.2×).
@@ -304,6 +370,7 @@ void main() {
           for (final p in bigMenu.products.where((p) => p.sellable && p.modifierGroupIds.isEmpty).take(4)) {
             cart.add(ModifierSelection(p, const []));
           }
+          cart.setCustomerLabel('Wahyu');
         }
 
         await t.pumpWidget(UncontrolledProviderScope(
@@ -323,6 +390,9 @@ void main() {
         ));
         await settle(t);
         await sc.act?.call(t);
+        // Image.memory (logo) di-decode secara async sungguhan.
+        await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+        await settle(t);
 
         if (shotDir != null) {
           await t.runAsync(() async {

@@ -8,8 +8,10 @@ import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import '../cart/dialogs.dart';
 import '../cart/order_api.dart';
+import '../menu/menu_controller.dart';
 import '../printing/printer_service.dart';
 import '../printing/receipt_format.dart';
+import '../printing/receipt_preview.dart';
 import '../session/session_controller.dart';
 import '../shift/shift_controller.dart';
 
@@ -224,7 +226,10 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
 
   Future<void> _reprint() async {
     try {
-      await ref.read(printerProvider.notifier).printLines(customerReceipt(widget.order));
+      await ref.read(printerProvider.notifier).printDocument(
+            customerReceipt(widget.order),
+            logoBase64: ref.read(menuProvider).value?.menu.receipt.logoBase64,
+          );
     } on PrintException catch (e) {
       _snack(e.message);
     }
@@ -314,22 +319,10 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
           AppBadge.orderStatus(o['status'] as String),
         ],
       ),
+      // Pratinjau persis seperti struk yang akan dicetak.
       content: SizedBox(
         width: 400,
-        child: Container(
-          padding: const EdgeInsets.all(AppSpace.s4),
-          decoration: BoxDecoration(color: AppColors.surfaceApp, borderRadius: AppRadius.mdAll),
-          // Pratinjau persis seperti struk yang akan dicetak; di HP sempit diperkecil, tidak dibungkus ulang.
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.topLeft,
-            child: Text(
-              lines.join('\n'),
-              softWrap: false,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.35, color: AppColors.ink),
-            ),
-          ),
-        ),
+        child: ReceiptPreview(lines: lines, logoBase64: ref.watch(menuProvider).value?.menu.receipt.logoBase64),
       ),
       actions: [
         if (o['status'] != 'void')

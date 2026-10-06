@@ -1,8 +1,28 @@
+import 'dart:convert';
+
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:image/image.dart' as img;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
+
+import 'receipt_format.dart';
+
+export 'receipt_format.dart' show PrintLine;
+
+/// Logo struk (PNG base64 dari server) → gambar siap cetak, maks. 384 titik (lebar kertas 58 mm).
+/// Null bila tidak ada logo atau datanya rusak.
+img.Image? decodeLogo(String? base64) {
+  if (base64 == null || base64.isEmpty) return null;
+  try {
+    final image = img.decodePng(base64Decode(base64));
+    if (image == null) return null;
+    return image.width > 384 ? img.copyResize(image, width: 384) : image;
+  } catch (_) {
+    return null;
+  }
+}
 
 class PrintException implements Exception {
   PrintException(this.message);
@@ -50,18 +70,25 @@ class PrinterService extends AsyncNotifier<SavedPrinter?> {
     state = AsyncData(SavedPrinter(device.macAdress, device.name));
   }
 
-  /// Cetak baris teks (sudah diformat 32 kolom). Menyambung ulang otomatis bila terputus.
-  Future<void> printLines(List<String> lines, {int copies = 1}) async {
+  /// Cetak baris teks biasa (sudah diformat 32 kolom).
+  Future<void> printLines(List<String> lines, {int copies = 1}) =>
+      printDocument([for (final l in lines) PrintLine(l)], copies: copies);
+
+  /// Cetak dokumen: logo kedai (PNG base64, opsional) di atas, lalu baris teks (sebagian tebal).
+  /// Menyambung ulang otomatis bila terputus. Logo rusak dilewati; struk tetap tercetak.
+  Future<void> printDocument(List<PrintLine> lines, {String? logoBase64, int copies = 1}) async {
     final printer = state.value;
     if (printer == null) throw PrintException('Printer belum dipilih. Buka menu Printer.');
 
     await _ensureConnected(printer.mac);
 
     final gen = Generator(PaperSize.mm58, await CapabilityProfile.load());
+    final logo = decodeLogo(logoBase64);
     final bytes = <int>[...gen.reset()];
     for (var c = 0; c < copies; c++) {
+      if (logo != null) bytes.addAll(gen.imageRaster(logo));
       for (final line in lines) {
-        bytes.addAll(gen.text(line));
+        bytes.addAll(gen.text(line.text, styles: PosStyles(bold: line.bold)));
       }
       bytes
         ..addAll(gen.feed(3))

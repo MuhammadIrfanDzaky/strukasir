@@ -10,18 +10,25 @@ Untuk owner & kasir. Simpan di dekat meja kasir.
 3. Ketuk **Buka shift** di kanan atas, lalu isi uang tunai yang ada di laci (modal awal).
 
 **Melayani pesanan**
-1. Pilih kategori, lalu ketuk produk. Pilih suhu/gula/tambahan, lalu ketuk **Tambah**.
-2. Isi **Nama pelanggan / meja** bila perlu. Ketuk item di keranjang untuk menambah catatan
+1. Pilih kategori (atau **Semua**), lalu ketuk produk. Pilih suhu/gula/tambahan, lalu ketuk **Tambah**.
+2. Isi **Nama pelanggan / meja** (wajib). Ketuk item di keranjang untuk menambah catatan
    ("es dipisah") atau menghapusnya.
-3. Ketuk **Bayar**, lalu pilih metode:
+3. Ketuk **Cek pesanan** untuk membacakan ulang pesanan ke pelanggan (hanya tampil di layar, tidak dicetak).
+4. Ketuk **Bayar**, lalu pilih metode:
    - **Tunai**: ketuk nominal uang dari pelanggan. Kembalian muncul besar di layar.
    - **QRIS**: tunggu **notifikasi dana masuk di aplikasi merchant QRIS**, baru ketuk *Konfirmasi diterima*.
      Nama Anda tercatat sebagai yang mengonfirmasi.
    - **Debit**: konfirmasi setelah mesin EDC menyatakan berhasil.
-4. Struk tercetak otomatis, dan checker untuk barista juga ikut tercetak.
+5. Struk pelanggan tercetak otomatis.
 
-**Bayar nanti (open bill)**: ketuk **Simpan (belum bayar)**. Bill dan checker tercetak. Untuk membayar,
-ketuk **Belum dibayar** di atas keranjang, pilih order-nya, lalu ketuk **Bayar**.
+**Bayar nanti (Open Bill)**: ketuk **Open Bill** di bawah keranjang. Order disimpan tanpa mencetak apa pun.
+Untuk menambah pesanan atau membayar, ketuk **Open Bill** di atas keranjang dan pilih order-nya:
+- pelanggan pesan lagi → tambah produk, lalu ketuk **Simpan Bill**;
+- pelanggan selesai → ketuk **Bayar** (Close Bill), struk tercetak.
+
+**Logo & teks struk (owner)**: menu **Printer** → **Atur struk & logo**. Pilih gambar logo (otomatis diubah
+jadi hitam-putih; ketuk *Balik warna* atau geser *Ketebalan* bila hasilnya kurang pas), isi nama kedai,
+alamat, dan pesan penutup. Pratinjau di layar sama dengan hasil cetak. Ketuk **Simpan**.
 
 **Tutup toko**
 1. Hitung semua uang tunai di laci, termasuk modal awal.
@@ -54,9 +61,23 @@ ketuk **Belum dibayar** di atas keranjang, pilih order-nya, lalu ketuk **Bayar**
 
 ## Laporan (owner)
 
-Menu **Laporan** → *Hari ini / 7 hari / Bulan ini*: penjualan, rata-rata per order, per metode bayar,
-per kasir, produk terlaris, dan void.
+Menu **Laporan** → *Hari ini / 7 hari / Bulan ini*: penjualan, **laba kotor** & HPP, rata-rata per order,
+per metode bayar, per kasir, produk terlaris (dengan laba), dan void.
 **Cocokkan total QRIS** dengan mutasi di aplikasi merchant QRIS minimal seminggu sekali.
+
+- **Laba kotor** = penjualan − pajak − modal (HPP). Modal diambil dari harga modal produk **saat transaksi**,
+  jadi mengubah modal tidak mengubah laporan lama. Bila muncul peringatan "belum punya harga modal",
+  isi modal produk tersebut di Kelola Menu.
+
+## Kelola menu (owner)
+
+- **Kode, modal, favorit**: ketuk produk di **Kelola Menu**. Isi *Kode produk* (mis. BB03), *Modal (HPP)*
+  (margin langsung terlihat), dan nyalakan *Favorit* agar produk muncul di filter **Favorit** layar kasir.
+- **Cari**: kotak cari di Kelola Menu dan ikon cari di layar kasir mencari nama atau kode produk.
+- **Import CSV** (pindah dari POS lain / isi menu banyak sekaligus): **Kelola Menu** → **Import CSV**.
+  Judul kolom minimal *Nama Produk* dan *Harga Jual*; opsional *Kategori*, *Kode Produk*, *Modal*, *Aktif*,
+  *Favorit*. Produk dengan kode/nama yang sama diperbarui, sisanya ditambahkan, dan kategori baru dibuat
+  otomatis. Ringkasan tampil dulu sebelum disimpan; bila ada baris yang salah, tidak ada yang tersimpan.
 
 ## Kontak
 

@@ -6,7 +6,10 @@ import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import 'printer_service.dart';
+import '../menu/menu_controller.dart';
+import '../session/session_controller.dart';
 import 'receipt_format.dart';
+import 'receipt_settings_screen.dart';
 
 class PrinterSettingsScreen extends ConsumerStatefulWidget {
   const PrinterSettingsScreen({super.key});
@@ -42,6 +45,9 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     final service = ref.read(printerProvider.notifier);
 
     final compact = context.isCompact;
+    final user = (ref.watch(sessionProvider).value as LoggedIn?)?.user;
+    final canEditReceipt = user?.can('settings.manage') ?? false;
+    final receipt = ref.watch(menuProvider).value?.menu.receipt;
     final testButton = OutlinedButton(
       onPressed: saved == null || _busy
           ? null
@@ -102,6 +108,31 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                   ),
                 ],
               ),
+              if (canEditReceipt) ...[
+                const SizedBox(height: AppSpace.s4),
+                AppSectionCard(
+                  title: 'Struk',
+                  children: [
+                    Text(
+                      'Logo, nama kedai, alamat, dan pesan penutup yang tercetak di setiap struk.',
+                      style: AppType.body.copyWith(color: AppColors.inkMuted),
+                    ),
+                    const SizedBox(height: AppSpace.s3),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: receipt == null
+                            ? null
+                            : () => Navigator.of(context).push(MaterialPageRoute<void>(
+                                  builder: (_) => ReceiptSettingsScreen(current: receipt),
+                                )),
+                        icon: const Icon(Icons.receipt_long_rounded),
+                        label: const Text('Atur struk & logo'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: AppSpace.s4),
               AppSectionCard(
                 title: 'Printer ter-pair',

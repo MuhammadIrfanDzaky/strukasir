@@ -151,6 +151,27 @@ class ShiftVoidReportTest extends TestCase
 
     // ─────────────── laporan ───────────────
 
+    public function test_gross_profit_uses_cost_at_time_of_sale(): void
+    {
+        $this->tenancy()->run($this->shop->tenant->id, fn () => $this->latte->update(['cost' => 8000]));
+        $this->openShift();
+        $this->sell($this->latte, 2);   // 40.000, HPP 16.000
+        $this->sell($this->tea, 1);     // 10.000, modal belum diisi
+        // Modal diubah setelah transaksi → laporan tetap memakai modal saat transaksi.
+        $this->tenancy()->run($this->shop->tenant->id, fn () => $this->latte->update(['cost' => 15000]));
+
+        $today = now()->setTimezone('Asia/Jakarta')->toDateString();
+        $this->api('GET', "/api/v1/reports/summary?from={$today}&to={$today}", $this->owner)
+            ->assertOk()
+            ->assertJsonPath('data.sales', 50000)
+            ->assertJsonPath('data.cost', 16000)
+            ->assertJsonPath('data.gross_profit', 34000)
+            ->assertJsonPath('data.cost_missing_items', 1)
+            ->assertJsonPath('data.top_products.0.name', 'Latte')
+            ->assertJsonPath('data.top_products.0.profit', 24000)
+            ->assertJsonPath('data.top_products.1.profit', null);
+    }
+
     public function test_sales_report_counts_paid_orders_only(): void
     {
         $this->openShift();

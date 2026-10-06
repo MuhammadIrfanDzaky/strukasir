@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
  */
 class ProductController extends Controller
 {
-    private const AUDITED = ['category_id', 'name', 'price', 'active', 'sold_out'];
+    private const AUDITED = ['category_id', 'code', 'name', 'price', 'cost', 'active', 'sold_out', 'favorite'];
 
     public function store(ProductRequest $request): JsonResponse
     {

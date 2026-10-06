@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\ModifierGroupController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProductController;
+use App\Http\Controllers\Api\V1\ProductImportController;
+use App\Http\Controllers\Api\V1\ReceiptSettingsController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\ShiftController;
 use Illuminate\Support\Facades\Route;
@@ -51,8 +53,12 @@ Route::prefix('v1')->group(function () {
         Route::get('reports/summary', [ReportController::class, 'summary'])
             ->middleware('can:'.Permission::ReportsView->value);
 
+        Route::put('settings/receipt', [ReceiptSettingsController::class, 'update'])
+            ->middleware('can:'.Permission::SettingsManage->value);
+
         Route::middleware('can:'.Permission::MenuManage->value)->group(function () {
             Route::apiResource('categories', CategoryController::class)->only(['store', 'update', 'destroy']);
+            Route::post('products/import', ProductImportController::class);
             Route::apiResource('products', ProductController::class)->only(['store', 'update']);
             Route::apiResource('modifier-groups', ModifierGroupController::class)
                 ->only(['store', 'update', 'destroy'])

@@ -35,12 +35,110 @@ class CartPanel extends ConsumerStatefulWidget {
 class _CartPanelState extends ConsumerState<CartPanel> {
   bool _busy = false;
   final _label = TextEditingController();
+  final _labelFocus = FocusNode();
+
+  /// Kolom nama dipindah antar-susunan (tinggi ↔ pendek) saat keyboard muncul. GlobalKey menjaga
+  /// state & fokusnya tetap sama, sehingga keyboard tidak langsung tertutup lagi.
+  final _labelKey = GlobalKey(debugLabel: 'customer-label');
+  String? _labelError;
 
   @override
   void dispose() {
     _label.dispose();
+    _labelFocus.dispose();
     super.dispose();
   }
+
+  /// Nama pelanggan / meja wajib sebelum Cek pesanan, Open Bill, atau Bayar.
+  bool _requireLabel() {
+    if (ref.read(cartProvider).customerLabel.trim().isNotEmpty) return true;
+    setState(() => _labelError = 'Isi nama pelanggan / meja dulu');
+    _labelFocus.requestFocus();
+    return false;
+  }
+
+  Future<void> _act(Future<void> Function(CheckoutFlow flow) action) async {
+    if (_requireLabel()) await _run(action);
+  }
+
+  /// Rincian pesanan untuk dicek ulang bersama pelanggan sebelum Open Bill / Bayar.
+  /// Hanya tampilan: tidak menyimpan dan tidak mencetak apa pun.
+  Future<void> _reviewOrder() => showDialog<void>(
+    context: context,
+    builder: (context) {
+      final cart = ref.read(cartProvider);
+      final totals = ref.read(cartTotalsProvider);
+      final count = cart.lines.fold<int>(0, (n, l) => n + l.qty);
+      return AlertDialog(
+        scrollable: true,
+        title: Text(cart.isSaved ? 'Cek pesanan · ${cart.number}' : 'Cek pesanan'),
+        content: SizedBox(
+          width: 440,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.person_outline_rounded, size: 20, color: AppColors.inkMuted),
+                  const SizedBox(width: AppSpace.s2),
+                  Expanded(child: Text(cart.customerLabel.trim(), style: AppType.title)),
+                  AppBadge('$count item'),
+                ],
+              ),
+              const SizedBox(height: AppSpace.s3),
+              const Divider(height: 1),
+              for (final (i, l) in cart.lines.indexed) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.s2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(width: 36, child: Text('${l.qty}×', style: AppType.bodyStrong)),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(l.product.name, style: AppType.bodyStrong),
+                            if (l.modifiers.isNotEmpty)
+                              Text(
+                                l.modifiers.map((m) => m.name).join(', '),
+                                style: AppType.caption.copyWith(color: AppColors.inkMuted),
+                              ),
+                            if (l.note != null && l.note!.isNotEmpty)
+                              Text('Catatan: ${l.note}', style: AppType.caption.copyWith(color: AppColors.warning)),
+                            if (totals.lineDiscounts.length > i && totals.lineDiscounts[i] > 0)
+                              Text(
+                                'Diskon -${rupiah(totals.lineDiscounts[i])}',
+                                style: AppType.caption.copyWith(color: AppColors.success),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        rupiah(l.unitPrice * l.qty - (totals.lineDiscounts.length > i ? totals.lineDiscounts[i] : 0)),
+                        style: AppType.bodyStrong,
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+              ],
+              const SizedBox(height: AppSpace.s3),
+              AppSummaryRow('Subtotal', rupiah(totals.subtotal)),
+              if (totals.orderDiscount > 0)
+                AppSummaryRow('Diskon', '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
+              if (totals.serviceTotal > 0) AppSummaryRow('Service', rupiah(totals.serviceTotal)),
+              if (totals.taxTotal > 0) AppSummaryRow('Pajak', rupiah(totals.taxTotal)),
+              if (totals.rounding != 0) AppSummaryRow('Pembulatan', rupiah(totals.rounding)),
+              AppSummaryRow('Total', rp(totals.grandTotal), emphasis: true),
+            ],
+          ),
+        ),
+        actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Tutup'))],
+      );
+    },
+  );
 
   Future<void> _run(Future<void> Function(CheckoutFlow flow) action) async {
     if (_busy) return;
@@ -115,14 +213,14 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               if (openBill)
                 narrow
                     ? IconButton(
-                        tooltip: 'Order belum dibayar',
+                        tooltip: 'Open Bill',
                         onPressed: _busy ? null : _openBills,
                         icon: const Icon(Icons.receipt_long_rounded),
                       )
                     : TextButton.icon(
                         onPressed: _busy ? null : _openBills,
                         icon: const Icon(Icons.receipt_long_rounded),
-                        label: const Text('Belum dibayar'),
+                        label: const Text('Open Bill'),
                       ),
               IconButton(
                 tooltip: 'Kosongkan',
@@ -136,13 +234,21 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         final labelField = Padding(
           padding: EdgeInsets.fromLTRB(gutter, AppSpace.s3, gutter, AppSpace.s2),
           child: TextField(
+            key: _labelKey,
             controller: _label,
-            decoration: const InputDecoration(
-              labelText: 'Nama pelanggan / meja',
+            focusNode: _labelFocus,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              labelText: 'Nama pelanggan / meja *',
               isDense: true,
-              prefixIcon: Icon(Icons.person_outline_rounded),
+              prefixIcon: const Icon(Icons.person_outline_rounded),
+              errorText: _labelError,
             ),
-            onChanged: notifier.setCustomerLabel,
+            onChanged: (v) {
+              notifier.setCustomerLabel(v);
+              if (_labelError != null && v.trim().isNotEmpty) setState(() => _labelError = null);
+            },
           ),
         );
 
@@ -235,18 +341,23 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 child: OutlinedButton(
                   // Padding kecil supaya label tidak patah di panel sempit.
                   style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: AppSpace.s3)),
-                  onPressed: canAct ? () => _run((f) => f.printChecker()) : null,
-                  child: const Text('Checker', maxLines: 1, overflow: TextOverflow.ellipsis),
+                  // Tampilkan rincian pesanan untuk dicek bersama pelanggan; tidak menyimpan, tidak mencetak.
+                  onPressed: canAct
+                      ? () {
+                          if (_requireLabel()) _reviewOrder();
+                        }
+                      : null,
+                  child: const Text('Cek pesanan', maxLines: 1, overflow: TextOverflow.ellipsis),
                 ),
               ),
               if (openBill) ...[
                 const SizedBox(width: AppSpace.s2),
                 Expanded(
-                  flex: 2,
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: AppSpace.s3)),
-                    onPressed: canAct ? () => _run((f) => f.holdBill()) : null,
-                    child: const Text('Simpan, belum bayar', maxLines: 1, overflow: TextOverflow.ellipsis),
+                    onPressed: canAct ? () => _act((f) => f.openBill()) : null,
+                    // Order dari daftar Open Bill: simpan tambahan pesanan, tetap belum dibayar.
+                    child: Text(cart.isSaved ? 'Simpan Bill' : 'Open Bill', maxLines: 1, overflow: TextOverflow.ellipsis),
                   ),
                 ),
               ],
@@ -258,7 +369,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               minimumSize: const Size.fromHeight(AppSize.touchLg),
               textStyle: AppType.title,
             ),
-            onPressed: canAct ? () => _run((f) => f.pay()) : null,
+            onPressed: canAct ? () => _act((f) => f.pay()) : null,
             child: _busy
                 ? const SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
                 : Text('Bayar ${rp(totals.grandTotal)}'),

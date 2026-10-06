@@ -103,6 +103,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               return ListView(padding: EdgeInsets.fromLTRB(gutter, 0, gutter, gutter), children: [
               Wrap(spacing: AppSpace.s3, runSpacing: AppSpace.s3, children: [
                 AppStatCard('Penjualan', rp(r['sales'] as int), emphasis: true, width: cardWidth),
+                AppStatCard('Laba kotor', rp((r['gross_profit'] as int?) ?? 0), width: cardWidth),
+                AppStatCard('HPP (modal)', rp((r['cost'] as int?) ?? 0), width: cardWidth),
                 AppStatCard('Order lunas', '${r['orders']}', width: cardWidth),
                 AppStatCard('Rata-rata / order', rp(r['average'] as int), width: cardWidth),
                 AppStatCard('Diskon', rp(r['discounts'] as int), width: cardWidth),
@@ -110,6 +112,26 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 if ((r['tax'] as int) > 0) AppStatCard('Pajak', rp(r['tax'] as int), width: cardWidth),
                 AppStatCard('Void', '${voids['orders']} order · ${rp(voids['refunded'] as int)}', width: cardWidth),
               ]),
+              if (((r['cost_missing_items'] as int?) ?? 0) > 0)
+                Container(
+                  margin: const EdgeInsets.only(top: AppSpace.s3),
+                  padding: const EdgeInsets.all(AppSpace.s3),
+                  decoration: BoxDecoration(color: AppColors.warningSoft, borderRadius: AppRadius.mdAll),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline_rounded, size: 20, color: AppColors.warning),
+                      const SizedBox(width: AppSpace.s2),
+                      Expanded(
+                        child: Text(
+                          '${r['cost_missing_items']} item terjual belum punya harga modal, jadi laba kotor terlihat '
+                          'lebih besar dari sebenarnya. Isi modal di Kelola Menu (berlaku untuk penjualan berikutnya).',
+                          style: AppType.body.copyWith(color: AppColors.warning),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: AppSpace.s4),
               if (width < 560) ...[
                 byMethodCard,
@@ -124,7 +146,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               const SizedBox(height: AppSpace.s3),
               AppSectionCard(title: 'Produk terlaris', children: [
                 for (final p in (r['top_products'] as List).cast<Map<String, dynamic>>())
-                  AppSummaryRow('${p['qty']}× ${p['name']}', rp(p['revenue'] as int)),
+                  AppSummaryRow(
+                    '${p['qty']}× ${p['name']}',
+                    p['profit'] == null ? rp(p['revenue'] as int) : '${rp(p['revenue'] as int)} · laba ${rp(p['profit'] as int)}',
+                  ),
               ]),
               if ((r['daily'] as List).length > 1) ...[
                 const SizedBox(height: AppSpace.s3),
@@ -134,7 +159,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 ]),
               ],
               const SizedBox(height: AppSpace.s3),
-              Text('Penjualan = order lunas (void tidak dihitung).',
+              Text('Penjualan = order lunas (void tidak dihitung). Laba kotor = penjualan − pajak − HPP.',
                   style: AppType.caption.copyWith(color: AppColors.inkMuted)),
             ]);
             });

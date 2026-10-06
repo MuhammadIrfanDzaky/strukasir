@@ -20,8 +20,12 @@ class PosScreen extends ConsumerStatefulWidget {
 }
 
 class _PosScreenState extends ConsumerState<PosScreen> {
-  /// Kategori terpilih; null = Semua (default).
+  /// Kategori terpilih; null = Semua (default), [_favorites] = produk favorit.
   String? _categoryId;
+  static const _favorites = '__favorit__';
+
+  /// Pencarian nama / kode produk (lintas kategori). null = kotak cari tertutup.
+  String? _query;
 
   Future<void> _pick(Menu menu, MenuProduct product) async {
     final selection = ModifierSelection(product, menu.groupsFor(product));
@@ -45,11 +49,31 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           AppErrorState(title: 'Menu gagal dimuat', message: '$e', onRetry: () => ref.invalidate(menuProvider)),
       data: (s) {
         final categories = s.menu.activeCategories;
+        final all = [for (final c in categories) ...s.menu.productsIn(c.id)];
+        final hasFavorites = all.any((p) => p.favorite);
         // Kategori yang dipilih bisa hilang setelah menu diperbarui → kembali ke Semua.
-        final categoryId = categories.any((c) => c.id == _categoryId) ? _categoryId : null;
-        final products = categoryId == null
-            ? [for (final c in categories) ...s.menu.productsIn(c.id)]
-            : s.menu.productsIn(categoryId);
+        final categoryId = (_categoryId == _favorites && hasFavorites) || categories.any((c) => c.id == _categoryId)
+            ? _categoryId
+            : null;
+        final searching = _query != null && _query!.trim().isNotEmpty;
+        final products = searching
+            ? all.where((p) => p.matches(_query!)).toList()
+            : switch (categoryId) {
+                null => all,
+                _favorites => all.where((p) => p.favorite).toList(),
+                final id => s.menu.productsIn(id),
+              };
+
+        Widget chip(String label, String? id, {IconData? icon}) => Padding(
+              padding: const EdgeInsets.only(right: AppSpace.s2),
+              child: ChoiceChip(
+                avatar: icon == null ? null : Icon(icon, size: 18),
+                label: Text(label),
+                showCheckmark: false,
+                selected: !searching && categoryId == id,
+                onSelected: (_) => setState(() => _categoryId = id),
+              ),
+            );
 
         final short = context.isShort;
         final catalog = Column(
@@ -72,41 +96,65 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               ),
             SizedBox(
               height: short ? 52 : 64,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.fromLTRB(AppSpace.s4, short ? AppSpace.s2 : AppSpace.s3, AppSpace.s4, 0),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: AppSpace.s2),
-                    child: ChoiceChip(
-                      label: const Text('Semua'),
-                      showCheckmark: false,
-                      selected: categoryId == null,
-                      onSelected: (_) => setState(() => _categoryId = null),
-                    ),
-                  ),
-                  for (final c in categories)
-                    Padding(
-                      padding: const EdgeInsets.only(right: AppSpace.s2),
-                      child: ChoiceChip(
-                        label: Text(c.name),
-                        showCheckmark: false,
-                        selected: c.id == categoryId,
-                        onSelected: (_) => setState(() => _categoryId = c.id),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(AppSpace.s2, short ? AppSpace.s2 : AppSpace.s3, 0, 0),
+                child: _query != null
+                    // Kotak cari menggantikan baris kategori; tutup → kembali ke kategori.
+                    ? Row(
+                        children: [
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: AppSpace.s2),
+                              child: TextField(
+                                autofocus: true,
+                                decoration: const InputDecoration(
+                                  hintText: 'Cari nama atau kode produk',
+                                  prefixIcon: Icon(Icons.search_rounded),
+                                  isDense: true,
+                                ),
+                                onChanged: (v) => setState(() => _query = v),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Tutup pencarian',
+                            onPressed: () => setState(() => _query = null),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                          const SizedBox(width: AppSpace.s2),
+                        ],
+                      )
+                    : ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.only(right: AppSpace.s4),
+                        children: [
+                          IconButton(
+                            tooltip: 'Cari produk',
+                            onPressed: () => setState(() => _query = ''),
+                            icon: const Icon(Icons.search_rounded),
+                          ),
+                          chip('Semua', null),
+                          if (hasFavorites) chip('Favorit', _favorites, icon: Icons.star_rounded),
+                          for (final c in categories) chip(c.name, c.id),
+                        ],
                       ),
-                    ),
-                ],
               ),
             ),
             Expanded(
               child: products.isEmpty
-                  ? AppEmptyState(
-                      icon: Icons.local_cafe_rounded,
-                      title: 'Belum ada produk',
-                      message: categoryId == null
-                          ? 'Menu masih kosong. Owner bisa menambah produk di Kelola Menu.'
-                          : 'Kategori ini masih kosong. Owner bisa menambah produk di Kelola Menu.',
-                    )
+                  ? searching
+                      ? AppEmptyState(
+                          icon: Icons.search_off_rounded,
+                          title: 'Produk tidak ditemukan',
+                          message: 'Tidak ada nama atau kode yang memuat "${_query!.trim()}".',
+                        )
+                      : AppEmptyState(
+                          icon: Icons.local_cafe_rounded,
+                          title: 'Belum ada produk',
+                          message: categoryId == null
+                              ? 'Menu masih kosong. Owner bisa menambah produk di Kelola Menu.'
+                              : 'Kategori ini masih kosong. Owner bisa menambah produk di Kelola Menu.',
+                        )
                   : GridView.builder(
                       padding: EdgeInsets.all(context.isCompact ? AppSpace.s3 : AppSpace.s4),
                       gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
@@ -125,16 +173,23 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
         return LayoutBuilder(
           builder: (context, box) {
+            // Pilihan tata letak memakai tinggi TANPA keyboard: kalau ikut berubah saat keyboard
+            // muncul, panel keranjang dibangun ulang dan kolom yang sedang diketik kehilangan fokus.
+            // Inset diambil dari View (layar fisik): Scaffold menghapus viewInsets dari MediaQuery isinya.
+            final view = View.of(context);
+            final height = box.maxHeight + view.viewInsets.bottom / view.devicePixelRatio;
             // Tablet portrait (tinggi) → keranjang di bawah katalog; katalog tetap lebar.
-            if (box.maxHeight > box.maxWidth && box.maxWidth >= 520 && box.maxHeight >= 900) {
+            if (height > box.maxWidth && box.maxWidth >= 520 && height >= 900) {
+              final dock = (height * 0.44).clamp(420.0, 560.0);
+              // Sedang mencari → katalog (dengan kotak cari) wajib terlihat; keranjang yang mengecil.
+              final room = _query != null ? box.maxHeight - 160 : box.maxHeight;
+              final cartHeight = (dock < room ? dock : room).clamp(0.0, box.maxHeight);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: catalog),
-                  SizedBox(
-                    height: (box.maxHeight * 0.44).clamp(420.0, 560.0),
-                    child: const CartPanel(dock: CartDock.bottom),
-                  ),
+                  // Saat keyboard terbuka, keranjang tetap utuh; katalog mengecil / disembunyikan sementara.
+                  Expanded(child: box.maxHeight - cartHeight >= 140 ? catalog : const SizedBox.shrink()),
+                  SizedBox(height: cartHeight, child: const CartPanel(dock: CartDock.bottom)),
                 ],
               );
             }

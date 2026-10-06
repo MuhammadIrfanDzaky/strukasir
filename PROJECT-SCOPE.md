@@ -1,7 +1,8 @@
 # Project Scope & Competency Ledger
 
 - **Category:** internal-tools +payments +multi-tenant
-- **Security tags:** always, deploy, auth, admin, money
+- **Security tags:** always, deploy, auth, admin, money, upload
+  (`upload` ditambahkan 2026-10-06: owner mengunggah logo struk.)
   (`webhook` dari +payments di-drop untuk v1: belum ada payment gateway — QRIS statis dikonfirmasi manual.
   Reopen saat QRIS dinamis / gateway apa pun ditambahkan.)
 - **Classified:** 2026-10-03
@@ -60,6 +61,7 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | 47 | Availability & Incident Handling | deferred | Langkah darurat untuk kasir (server down → app tetap print; hotspot HP) di runbook |
 | 49 | Bus Factor & Continuity | deferred | Daftar yang wajib disimpan di password manager bersama ada di `docs/deploy.md` (Oracle, domain, Cloudflare/R2, keystore APK + password). Belum dilakukan |
 | 50 | Admin / Back-office Tooling | deferred | Owner mengelola menu/user/laporan di app; koreksi data tanpa DB client |
+| 22 | File & Media Handling | applied | Logo struk per kedai: diproses di tablet (hitam-putih, ≤ 384 px, `receipt_logo.dart`), disimpan sebagai base64 di `tenant_settings.receipt_logo` (CHECK ≤ 87.400 karakter), divalidasi server (`App\Support\ReceiptLogo`), dikirim ke tablet lewat `GET /menu`; diuji `ReceiptSettingsTest`, `receipt_logo_test.dart`. Foto produk masih ditunda |
 
 ## Deferred by decision
 | # | Competency | Reason | Reopen when |
@@ -75,7 +77,6 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | # | Competency | Why |
 |---|---|---|
 | 11 | SEO & Metadata | Aplikasi internal, tidak ada halaman publik |
-| 22 | File & Media Handling | v1 tanpa upload (foto produk opsional ditunda). Reopen jika foto produk/logo diunggah |
 | 31 | Webhooks & Third-Party Integrations | Tidak ada inbound webhook/gateway di v1 (QRIS statis). Reopen saat QRIS dinamis/GoFood |
 | 33 | Transactional Email & Deliverability | Tidak mengirim email di v1 |
 | 34 | AI / LLM Integration | Tidak ada fitur AI |
@@ -86,6 +87,7 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | SEC-01 | Injection | critical | 27 | PASS | Query lewat Eloquent/query builder; raw SQL hanya `set_config` berparameter (`TenantContext`) dan DDL migrasi dengan nama tabel konstan (`Rls`); `selectRaw` statis di `MenuController`. Dinilai ulang tiap endpoint baru |
 | SEC-02 | XSS | critical | 27 | n/a | Klien = app Flutter native, API hanya JSON, tidak ada render HTML. Reopen jika ada web dashboard |
 | SEC-03 | Mass assignment | critical | 18 | PASS | FormRequest di semua endpoint (`app/Http/Requests`); `$fillable` eksplisit tanpa `tenant_id`/`role`/`failed_attempts`; `tenant_id` ditimpa dari konteks (`TenantIsolationTest::test_tenant_id_is_taken_from_context_not_from_input`). Dinilai ulang tiap endpoint baru |
+| SEC-04 | Path traversal | critical | 22 | PASS | Tidak ada file di disk: logo disimpan di kolom DB, tidak ada path dari input pengguna |
 | SEC-08 | Insecure deserialization | high | 18 | PASS | Hanya JSON tervalidasi; tidak ada `unserialize`/`eval` (dipindai) |
 | SEC-09 | Open redirect | medium | 27 | n/a | API tanpa redirect (bearer token, tanpa callback URL) |
 | SEC-10 | Password policy | high | 25 | PASS | Tidak ada endpoint set password oleh user; password owner dibuat server 16 karakter acak (`pos:create-tenant`, `pos:reset-owner-password`); PIN 4–6 digit + lockout |
@@ -103,6 +105,8 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | SEC-23 | Webhook verification | critical | 31 | n/a | Tag `webhook` di-drop: tidak ada gateway di v1. Reopen saat QRIS dinamis |
 | SEC-24 | Secrets management | critical | 29 | PASS | Riwayat git dipindai: tidak ada APP_KEY, password seed, kunci R2 atau private key; file rahasia di-gitignore |
 | SEC-25 | Verbose errors | high | 46 | PASS | `APP_DEBUG=false` di compose produksi; 404/500 JSON generik tanpa trace (diverifikasi di build produksi lokal); `MissingTenantContext` → 500 generik |
+| SEC-27 | Unsafe file uploads | critical | 22 | PASS | Logo: hanya PNG dicek dari magic bytes + `getimagesizefromstring`, maks. 64 KB & 384×400 px, SVG/JPEG/PNG palsu ditolak (`ReceiptLogo::validate`, `ReceiptSettingsTest::test_only_small_png_is_accepted`); tidak pernah disajikan sebagai file dari origin app (hanya base64 di JSON ber-token); hanya izin `settings.manage` (owner) |
+| SEC-28 | Storage bucket access | critical | 22 | n/a | Tidak ada bucket/object storage: logo di database (ikut RLS & backup) |
 | SEC-26 | Unbounded data fetching | high | 14 | PASS | `GET /orders` & `/shifts` paginasi maks 50; laporan dibatasi 1 tahun; menu & staf terbatas ukuran kedai; resource tanpa `pin_hash`/`password` |
 | SEC-29 | Source maps in production | medium | 35 | n/a | Tidak ada bundle browser |
 | SEC-30 | HTTPS enforced | critical | 27 | PASS | Caddy: redirect 308 HTTP→HTTPS + HSTS 1 tahun (diverifikasi lokal; cek ulang di domain saat Preflight) |

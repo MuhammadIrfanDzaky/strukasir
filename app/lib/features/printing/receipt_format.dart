@@ -6,7 +6,12 @@ import '../../core/money.dart';
 
 const int kLineWidth = 32;
 
+/// Bungkus teks per kata. Spasi di awal (indentasi) dipertahankan di setiap baris hasil.
 List<String> wrap(String text, {int width = kLineWidth}) {
+  final indent = RegExp(r'^ *').stringMatch(text)!;
+  if (indent.isNotEmpty && indent.length <= width ~/ 4) {
+    return [for (final l in wrap(text.substring(indent.length), width: width - indent.length)) '$indent$l'];
+  }
   final lines = <String>[];
   var current = '';
   for (final word in text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty)) {
@@ -57,67 +62,83 @@ String _time(String iso) {
   return '${two(d.day)}/${two(d.month)}/${d.year} ${two(d.hour)}:${two(d.minute)}';
 }
 
-const _methodLabel = {'cash': 'Tunai', 'debit': 'Debit', 'qris': 'QRIS'};
+const _methodLabel = {'cash': 'cash', 'debit': 'debit', 'qris': 'qris'};
 
-/// Struk pelanggan. `paid=false` → bill "BELUM DIBAYAR" (tanpa baris pembayaran).
-List<String> customerReceipt(Map<String, dynamic> order) {
+/// Satu baris cetak (sudah ≤ 32 karakter). `bold` = huruf tebal ESC/POS (lebar tetap sama).
+class PrintLine {
+  const PrintLine(this.text, {this.bold = false});
+
+  final String text;
+  final bool bold;
+
+  @override
+  String toString() => text;
+}
+
+List<PrintLine> _plain(Iterable<String> lines) => [for (final l in lines) PrintLine(l)];
+List<PrintLine> _bold(Iterable<String> lines) => [for (final l in lines) PrintLine(l, bold: true)];
+
+/// Struk pelanggan, mengikuti format struk BerryBrew: identitas kedai, Date/Cashier/Customer/
+/// Transaction No, item (nama tebal + pilihan), ringkasan, pembayaran, lalu pesan penutup.
+/// Logo (bila ada) dicetak printer di atas baris pertama. `paid=false` → bill "BELUM DIBAYAR".
+List<PrintLine> customerReceipt(Map<String, dynamic> order) {
   final paid = order['status'] == 'paid';
   final receipt = order['receipt'] as Map<String, dynamic>? ?? const {};
-  final out = <String>[
-    center((receipt['name'] as String?) ?? ''),
-    if ((receipt['header'] as String?)?.isNotEmpty ?? false)
-      for (final l in (receipt['header'] as String).split('\n')) ...wrap(l).map(center),
-    divider(),
-    'No   : ${order['number']}',
-    'Waktu: ${_time((order['paid_at'] ?? order['created_at']) as String)}',
-    if (order['cashier'] != null) 'Kasir: ${order['cashier']}',
-    if ((order['customer_label'] as String?)?.isNotEmpty ?? false) ...wrap('Nama : ${order['customer_label']}'),
-    divider(),
+  final header = (receipt['header'] as String?)?.trim() ?? '';
+  final footer = (receipt['footer'] as String?)?.trim() ?? '';
+  final items = (order['items'] as List).cast<Map<String, dynamic>>();
+
+  final out = <PrintLine>[
+    ..._bold(wrap((receipt['name'] as String?) ?? '').map(center)),
+    if (header.isNotEmpty)
+      for (final l in header.split('\n')) ..._plain(wrap(l).map(center)),
+    PrintLine(divider()),
+    PrintLine('Date: ${_time((order['paid_at'] ?? order['created_at']) as String)}'),
+    if (order['cashier'] != null) ..._plain(wrap('Cashier: ${order['cashier']}')),
+    if ((order['customer_label'] as String?)?.isNotEmpty ?? false) ..._plain(wrap('Customer: ${order['customer_label']}')),
+    ..._plain(wrap('Transaction No: ${order['number']}')),
+    PrintLine(divider()),
   ];
 
-  for (final item in (order['items'] as List).cast<Map<String, dynamic>>()) {
+  for (final item in items) {
     final qty = item['qty'] as int;
     final unit = (item['unit_price'] as int) + (item['modifiers_total'] as int);
-    out.addAll(wrap(item['name'] as String));
-    for (final m in (item['modifiers'] as List).cast<Map<String, dynamic>>()) {
-      out.addAll(wrap('  + ${m['name']}'));
-    }
-    if (item['note'] != null) out.addAll(wrap('  * ${item['note']}'));
-    out.addAll(leftRight('  $qty x ${rupiah(unit)}', rupiah(qty * unit)));
+    final options = (item['modifiers'] as List).cast<Map<String, dynamic>>().map((m) => m['name']).join(', ');
+    out.addAll(_bold(wrap(options.isEmpty ? item['name'] as String : '${item['name']} $options')));
+    if (item['note'] != null) out.addAll(_plain(wrap('  * ${item['note']}')));
+    out.addAll(_plain(leftRight('  $qty x ${rupiah(unit)}', rupiah(qty * unit))));
     final disc = item['discount_total'] as int;
-    if (disc > 0) out.addAll(leftRight('  Diskon', '-${rupiah(disc)}'));
+    if (disc > 0) out.addAll(_plain(leftRight('  Diskon', '-${rupiah(disc)}')));
   }
 
-  final itemDiscounts =
-      (order['items'] as List).cast<Map<String, dynamic>>().fold<int>(0, (s, i) => s + (i['discount_total'] as int));
+  final itemDiscounts = items.fold<int>(0, (s, i) => s + (i['discount_total'] as int));
   final orderDiscount = (order['discount_total'] as int) - itemDiscounts;
+  final payments = paid ? (order['payments'] as List).cast<Map<String, dynamic>>() : const <Map<String, dynamic>>[];
 
-  out.add(divider());
-  out.addAll(leftRight('Subtotal', rupiah(order['subtotal'] as int)));
-  if (orderDiscount > 0) out.addAll(leftRight('Diskon', '-${rupiah(orderDiscount)}'));
-  if ((order['service_total'] as int) > 0) out.addAll(leftRight('Service', rupiah(order['service_total'] as int)));
-  if ((order['tax_total'] as int) > 0) out.addAll(leftRight('Pajak', rupiah(order['tax_total'] as int)));
-  if ((order['rounding'] as int) != 0) out.addAll(leftRight('Pembulatan', rupiah(order['rounding'] as int)));
-  out.addAll(leftRight('TOTAL', 'Rp ${rupiah(order['grand_total'] as int)}'));
+  out
+    ..add(PrintLine(divider()))
+    ..add(PrintLine('Total Qty: ${items.fold<int>(0, (s, i) => s + (i['qty'] as int))}'))
+    ..addAll(_plain(leftRight('  Sub Total', rupiah(order['subtotal'] as int))));
+  if (orderDiscount > 0) out.addAll(_plain(leftRight('  Diskon', '-${rupiah(orderDiscount)}')));
+  if ((order['service_total'] as int) > 0) out.addAll(_plain(leftRight('  Service', rupiah(order['service_total'] as int))));
+  if ((order['tax_total'] as int) > 0) out.addAll(_plain(leftRight('  Pajak', rupiah(order['tax_total'] as int))));
+  if ((order['rounding'] as int) != 0) out.addAll(_plain(leftRight('  Pembulatan', rupiah(order['rounding'] as int))));
+  out.addAll(_bold(leftRight('  Total', rupiah(order['grand_total'] as int))));
 
-  if (paid) {
-    for (final p in (order['payments'] as List).cast<Map<String, dynamic>>()) {
-      final label = _methodLabel[p['method']] ?? '${p['method']}';
-      out.addAll(leftRight(label, rupiah((p['tendered'] ?? p['amount']) as int)));
-    }
-    if ((order['change_total'] as int) > 0) out.addAll(leftRight('Kembali', rupiah(order['change_total'] as int)));
+  for (final p in payments) {
+    final label = _methodLabel[p['method']] ?? '${p['method']}';
+    out.addAll(_plain(leftRight('  Bayar ($label)', rupiah((p['tendered'] ?? p['amount']) as int))));
+  }
+  if (payments.any((p) => p['method'] == 'cash')) {
+    out.addAll(_plain(leftRight('  Kembalian', rupiah(order['change_total'] as int))));
   }
 
-  out.add(divider());
-  if (paid) {
-    out.add(center('LUNAS'));
-    if ((receipt['footer'] as String?)?.isNotEmpty ?? false) {
-      for (final l in (receipt['footer'] as String).split('\n')) {
-        out.addAll(wrap(l).map(center));
-      }
+  out.add(PrintLine(divider()));
+  if (!paid) out.add(PrintLine(center('*** BELUM DIBAYAR ***'), bold: true));
+  if (footer.isNotEmpty) {
+    for (final l in footer.split('\n')) {
+      out.addAll(_plain(wrap(l).map(center)));
     }
-  } else {
-    out.add(center('*** BELUM DIBAYAR ***'));
   }
   return out;
 }
@@ -149,24 +170,4 @@ List<String> shiftReport(Map<String, dynamic> shift) {
     if ((shift['note'] as String?)?.isNotEmpty ?? false) ...wrap('Catatan: ${shift['note']}'),
     divider(),
   ];
-}
-
-/// Checker untuk barista: tanpa harga; item, pilihan, dan catatan.
-List<String> checker(Map<String, dynamic> order) {
-  final out = <String>[
-    center('CHECKER'),
-    'No  : ${order['number']}',
-    if ((order['customer_label'] as String?)?.isNotEmpty ?? false) ...wrap('Nama: ${order['customer_label']}'),
-    'Jam : ${_time(order['created_at'] as String).substring(11)}',
-    divider(),
-  ];
-  for (final item in (order['items'] as List).cast<Map<String, dynamic>>()) {
-    out.addAll(wrap('${item['qty']}x ${item['name']}'));
-    for (final m in (item['modifiers'] as List).cast<Map<String, dynamic>>()) {
-      out.addAll(wrap('   + ${m['name']}'));
-    }
-    if (item['note'] != null) out.addAll(wrap('   * ${item['note']}'));
-  }
-  out.add(divider());
-  return out;
 }

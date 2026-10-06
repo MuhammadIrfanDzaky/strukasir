@@ -12,11 +12,17 @@ class Product extends Model
 {
     use BelongsToTenant, HasUuids;
 
-    protected $fillable = ['category_id', 'name', 'price', 'active', 'sold_out', 'sort'];
+    protected $fillable = ['category_id', 'code', 'name', 'price', 'cost', 'active', 'sold_out', 'favorite', 'sort'];
 
     protected function casts(): array
     {
-        return ['price' => 'integer', 'active' => 'boolean', 'sold_out' => 'boolean'];
+        return [
+            'price' => 'integer',
+            'cost' => 'integer',
+            'active' => 'boolean',
+            'sold_out' => 'boolean',
+            'favorite' => 'boolean',
+        ];
     }
 
     public function category(): BelongsTo

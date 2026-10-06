@@ -9,6 +9,7 @@ import '../../core/ui/responsive.dart';
 import '../menu/menu_controller.dart';
 import '../menu/menu_models.dart';
 import 'menu_admin_api.dart';
+import 'product_import.dart';
 
 /// Kelola menu oleh owner: produk, kategori, grup modifier.
 class MenuAdminScreen extends ConsumerWidget {
@@ -84,51 +85,217 @@ Widget _withAddButton(String label, VoidCallback onPressed, List<Widget> childre
 
 // ───────────────────────────── Produk ─────────────────────────────
 
-class _ProductsTab extends ConsumerWidget {
+class _ProductsTab extends ConsumerStatefulWidget {
   const _ProductsTab({required this.menu});
 
   final Menu menu;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ProductsTab> createState() => _ProductsTabState();
+}
+
+class _ProductsTabState extends ConsumerState<_ProductsTab> {
+  String _query = '';
+
+  /// Filter kategori; null = semua.
+  String? _categoryId;
+
+  Menu get menu => widget.menu;
+
+  @override
+  Widget build(BuildContext context) {
     if (menu.categories.isEmpty) {
-      return const AppEmptyState(
+      return AppEmptyState(
         icon: Icons.category_rounded,
         title: 'Belum ada kategori',
-        message: 'Buat kategori dulu di tab "Kategori".',
+        message: 'Buat kategori dulu di tab "Kategori", atau import menu dari file CSV.',
+        action: OutlinedButton.icon(
+          onPressed: () => importProducts(context, ref),
+          icon: const Icon(Icons.upload_file_rounded),
+          label: const Text('Import CSV'),
+        ),
       );
     }
 
-    return _withAddButton('Produk baru', () => _openForm(context, null), [
-              for (final c in menu.categories) ...[
-                Container(
-                  color: AppColors.surfaceSunken,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.s4, vertical: AppSpace.s2),
-                  child: AppOverline(c.name, color: AppColors.ink),
+    final categories = [
+      for (final c in menu.categories)
+        if (_categoryId == null || c.id == _categoryId) c,
+    ];
+    final groups = [
+      for (final c in categories)
+        (c, menu.productsIn(c.id, includeInactive: true).where((p) => p.matches(_query)).toList()),
+    ].where((g) => g.$2.isNotEmpty).toList();
+    final count = groups.fold<int>(0, (n, g) => n + g.$2.length);
+    final compact = context.isCompact;
+
+    final toolbar = Padding(
+      padding: EdgeInsets.fromLTRB(compact ? AppSpace.s3 : AppSpace.s4, AppSpace.s3, compact ? AppSpace.s3 : AppSpace.s4, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search_rounded),
+                    hintText: 'Cari nama atau kode produk',
+                    isDense: true,
+                  ),
+                  onChanged: (v) => setState(() => _query = v),
                 ),
-                for (final p in menu.productsIn(c.id, includeInactive: true))
-                  ListTile(
-                    tileColor: AppColors.surface,
-                    title: Text(p.name,
-                        style: TextStyle(
-                          decoration: p.active ? null : TextDecoration.lineThrough,
-                          color: p.active ? null : AppColors.inkMuted,
-                        )),
-                    subtitle: Text([rp(p.price), ...menu.groupsFor(p).map((g) => g.name)].join(' · ')),
-                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                      if (!p.active) const AppBadge('Nonaktif'),
-                      if (p.soldOut) const AppBadge('Habis', tone: AppTone.danger),
-                      const SizedBox(width: AppSpace.s2),
-                      const Icon(Icons.edit_rounded),
-                    ]),
-                    onTap: () => _openForm(context, p),
+              ),
+              const SizedBox(width: AppSpace.s2),
+              compact
+                  ? IconButton.outlined(
+                      tooltip: 'Import CSV',
+                      onPressed: () => importProducts(context, ref),
+                      icon: const Icon(Icons.upload_file_rounded),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: () => importProducts(context, ref),
+                      icon: const Icon(Icons.upload_file_rounded),
+                      label: const Text('Import CSV'),
+                    ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.s2),
+          SizedBox(
+            height: 40,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                for (final (id, label) in [(null, 'Semua'), for (final c in menu.categories) (c.id, c.name)])
+                  Padding(
+                    padding: const EdgeInsets.only(right: AppSpace.s2),
+                    child: ChoiceChip(
+                      label: Text(label),
+                      showCheckmark: false,
+                      selected: _categoryId == id,
+                      onSelected: (_) => setState(() => _categoryId = id),
+                    ),
                   ),
               ],
-            ]);
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpace.s2),
+            child: Text('$count produk', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+          ),
+        ],
+      ),
+    );
+
+    final empty = AppEmptyState(
+      icon: Icons.search_off_rounded,
+      title: 'Tidak ada produk yang cocok',
+      message: _query.isEmpty ? null : 'Tidak ada nama atau kode yang memuat "$_query".',
+    );
+    final rows = [
+      for (final (c, products) in groups) ...[
+        Container(
+          color: AppColors.surfaceSunken,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.s4, vertical: AppSpace.s2),
+          child: AppOverline('${c.name} · ${products.length}', color: AppColors.ink),
+        ),
+        for (final p in products) _ProductRow(product: p, menu: menu, onTap: () => _openForm(context, p)),
+      ],
+    ];
+
+    // Layar pendek (HP landscape): toolbar ikut di-scroll supaya daftar produk tetap dapat ruang.
+    if (context.isShort) {
+      return _withAddButton('Produk baru', () => _openForm(context, null), [
+        toolbar,
+        if (groups.isEmpty) SizedBox(height: 220, child: empty) else ...rows,
+      ]);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        toolbar,
+        Expanded(child: groups.isEmpty ? empty : _withAddButton('Produk baru', () => _openForm(context, null), rows)),
+      ],
+    );
   }
 
   void _openForm(BuildContext context, MenuProduct? product) =>
       showDialog<void>(context: context, builder: (_) => ProductForm(menu: menu, product: product));
+}
+
+/// Satu produk di Kelola Menu: nama + kode, harga jual, modal, margin, status.
+class _ProductRow extends StatelessWidget {
+  const _ProductRow({required this.product, required this.menu, required this.onTap});
+
+  final MenuProduct product;
+  final Menu menu;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = product;
+    final margin = p.marginPercent;
+    final muted = AppType.caption.copyWith(color: AppColors.inkMuted);
+    final groups = menu.groupsFor(p).map((g) => g.name).join(', ');
+
+    return Material(
+      color: AppColors.surface,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(AppSpace.s4, AppSpace.s3, AppSpace.s2, AppSpace.s3),
+          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.line))),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: AppSpace.s2,
+                      runSpacing: AppSpace.s1,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          p.name,
+                          style: AppType.bodyStrong.copyWith(
+                            decoration: p.active ? null : TextDecoration.lineThrough,
+                            color: p.active ? AppColors.ink : AppColors.inkMuted,
+                          ),
+                        ),
+                        if (p.favorite) const Icon(Icons.star_rounded, size: 18, color: AppColors.accent),
+                        if (p.code != null) AppBadge(p.code!),
+                        if (!p.active) const AppBadge('Nonaktif'),
+                        if (p.soldOut) const AppBadge('Habis', tone: AppTone.danger),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpace.s1),
+                    Wrap(
+                      spacing: AppSpace.s4,
+                      runSpacing: AppSpace.s1,
+                      children: [
+                        Text(rp(p.price), style: AppType.bodyStrong.copyWith(color: AppColors.primary)),
+                        Text(p.cost == null ? 'Modal belum diisi' : 'Modal ${rp(p.cost!)}', style: muted),
+                        if (margin != null)
+                          Text(
+                            'Margin ${margin.toStringAsFixed(0)}%',
+                            style: muted.copyWith(
+                              color: margin < 0 ? AppColors.danger : AppColors.success,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (groups.isNotEmpty) Text(groups, style: muted, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.inkMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class ProductForm extends ConsumerStatefulWidget {
@@ -145,6 +312,9 @@ class _ProductFormState extends ConsumerState<ProductForm> {
   final _form = GlobalKey<FormState>();
   late final _name = TextEditingController(text: widget.product?.name);
   late final _price = TextEditingController(text: widget.product == null ? '' : rupiah(widget.product!.price));
+  late final _code = TextEditingController(text: widget.product?.code);
+  late final _cost = TextEditingController(text: widget.product?.cost == null ? '' : rupiah(widget.product!.cost!));
+  late bool _favorite = widget.product?.favorite ?? false;
   late String? _categoryId = widget.product?.categoryId ?? widget.menu.categories.firstOrNull?.id;
   late bool _active = widget.product?.active ?? true;
   late bool _soldOut = widget.product?.soldOut ?? false;
@@ -155,7 +325,18 @@ class _ProductFormState extends ConsumerState<ProductForm> {
   void dispose() {
     _name.dispose();
     _price.dispose();
+    _code.dispose();
+    _cost.dispose();
     super.dispose();
+  }
+
+  /// Margin dari isian saat ini, mis. "Margin 50% · laba Rp 3.000 per porsi".
+  String? get _marginText {
+    final price = parseRupiah(_price.text);
+    final cost = parseRupiah(_cost.text);
+    if (price == null || cost == null || price == 0) return null;
+    final margin = (price - cost) * 100 / price;
+    return 'Margin ${margin.toStringAsFixed(margin.abs() < 10 ? 1 : 0)}% · laba ${rp(price - cost)} per porsi';
   }
 
   Future<void> _save() async {
@@ -168,6 +349,9 @@ class _ProductFormState extends ConsumerState<ProductForm> {
             categoryId: _categoryId!,
             name: _name.text,
             price: parseRupiah(_price.text)!,
+            code: _code.text,
+            cost: _cost.text.trim().isEmpty ? null : parseRupiah(_cost.text),
+            favorite: _favorite,
             active: _active,
             soldOut: _soldOut,
             modifierGroupIds: _groupIds,
@@ -196,10 +380,49 @@ class _ProductFormState extends ConsumerState<ProductForm> {
               ),
               const SizedBox(height: AppSpace.s3),
               TextFormField(
-                controller: _price,
-                decoration: const InputDecoration(labelText: 'Harga', prefixText: 'Rp '),
-                keyboardType: TextInputType.number,
-                validator: (v) => parseRupiah(v ?? '') == null ? 'Isi harga dalam angka' : null,
+                controller: _code,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(labelText: 'Kode produk (opsional)', hintText: 'mis. BB03'),
+                validator: (v) => (v ?? '').trim().isEmpty || RegExp(r'^[A-Za-z0-9._-]{1,30}$').hasMatch(v!.trim())
+                    ? null
+                    : 'Huruf, angka, titik, minus, atau garis bawah (maks. 30)',
+              ),
+              const SizedBox(height: AppSpace.s3),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _price,
+                      decoration: const InputDecoration(labelText: 'Harga jual', prefixText: 'Rp '),
+                      keyboardType: TextInputType.number,
+                      validator: (v) => parseRupiah(v ?? '') == null ? 'Isi harga dalam angka' : null,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.s3),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _cost,
+                      decoration: const InputDecoration(labelText: 'Modal (HPP)', prefixText: 'Rp '),
+                      keyboardType: TextInputType.number,
+                      validator: (v) =>
+                          (v ?? '').trim().isEmpty || parseRupiah(v!) != null ? null : 'Isi dalam angka',
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpace.s1),
+                child: Text(
+                  _marginText ?? 'Isi modal untuk melihat margin & laba kotor di laporan.',
+                  style: AppType.caption.copyWith(
+                    color: (parseRupiah(_cost.text) ?? 0) > (parseRupiah(_price.text) ?? 0)
+                        ? AppColors.danger
+                        : AppColors.inkMuted,
+                  ),
+                ),
               ),
               const SizedBox(height: AppSpace.s3),
               DropdownButtonFormField<String>(
@@ -220,6 +443,12 @@ class _ProductFormState extends ConsumerState<ProductForm> {
                 title: const Text('Habis hari ini'),
                 value: _soldOut,
                 onChanged: (v) => setState(() => _soldOut = v),
+              ),
+              SwitchListTile(
+                title: const Text('Favorit'),
+                subtitle: const Text('Tampil di filter "Favorit" layar kasir'),
+                value: _favorite,
+                onChanged: (v) => setState(() => _favorite = v),
               ),
               const Padding(padding: EdgeInsets.symmetric(vertical: AppSpace.s2), child: Divider()),
               const AppOverline('Pilihan untuk produk ini (urutan = urutan tampil)'),

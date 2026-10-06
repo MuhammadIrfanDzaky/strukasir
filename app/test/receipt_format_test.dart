@@ -39,36 +39,46 @@ Map<String, dynamic> order({String status = 'paid'}) => {
 
 void main() {
   test('semua baris struk muat di kertas 58mm (32 karakter)', () {
-    for (final doc in [customerReceipt(order()), customerReceipt(order(status: 'open')), checker(order())]) {
+    for (final doc in [customerReceipt(order()), customerReceipt(order(status: 'open'))]) {
       for (final line in doc) {
-        expect(line.length, lessThanOrEqualTo(kLineWidth), reason: '"$line"');
+        expect(line.text.length, lessThanOrEqualTo(kLineWidth), reason: '"${line.text}"');
       }
     }
   });
 
-  test('struk lunas memuat total, pembayaran, kembalian, dan footer', () {
-    final text = customerReceipt(order()).join('\n');
-    expect(text, contains('T1-0042'));
-    expect(text, contains('+ Cold'));
+  test('struk lunas mengikuti format BerryBrew', () {
+    final lines = customerReceipt(order());
+    final text = lines.join('\n');
+    expect(lines.first.text.trim(), 'BerryBrew');
+    expect(lines.first.bold, isTrue, reason: 'nama kedai tebal');
+    expect(text, contains('Jl. Contoh No. 1'));
+    expect(text, contains('Date: '));
+    expect(text, contains('Cashier: Kasir 1'));
+    expect(text, contains('Customer: Mas Andi / Meja 3'));
+    expect(text, contains('Transaction No: T1-0042'));
+    // Nama item + pilihan dalam satu baris tebal, lalu qty × harga.
+    final item = lines.firstWhere((l) => l.text.startsWith('Americano'));
+    expect(item.text, 'Americano Cold');
+    expect(item.bold, isTrue);
+    expect(text, contains('  1 x 15.000'));
+    expect(text, contains('* es dipisah'));
+    expect(text, contains('Total Qty: 3'));
+    expect(text, contains('Sub Total'));
     expect(text, contains('-5.000')); // diskon order = 9.600 - 4.600
-    expect(text, contains('Rp 51.400'));
+    expect(lines.firstWhere((l) => l.text.startsWith('  Total ')).bold, isTrue);
+    expect(text, contains('Bayar (cash)'));
     expect(text, contains('60.000'));
+    expect(text, contains('Kembalian'));
     expect(text, contains('8.600'));
-    expect(text, contains('LUNAS'));
     expect(text, contains('Terima kasih!'));
+    expect(text, isNot(contains('CHECKER')));
   });
 
   test('bill belum bayar tanpa baris pembayaran', () {
     final text = customerReceipt(order(status: 'open')).join('\n');
     expect(text, contains('BELUM DIBAYAR'));
-    expect(text, isNot(contains('Kembali')));
-  });
-
-  test('checker tanpa harga, dengan catatan', () {
-    final text = checker(order()).join('\n');
-    expect(text, contains('2x Kopi Susu'));
-    expect(text, contains('* es dipisah'));
-    expect(text, isNot(contains('13.000')));
+    expect(text, isNot(contains('Kembalian')));
+    expect(text, isNot(contains('Bayar (')));
   });
 
   test('laporan shift muat 58mm dan menandai kekurangan kas', () {
