@@ -4,6 +4,7 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
+import '../../core/ui/responsive.dart';
 import 'printer_service.dart';
 import 'receipt_format.dart';
 
@@ -40,8 +41,26 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     final saved = ref.watch(printerProvider).value;
     final service = ref.read(printerProvider.notifier);
 
+    final compact = context.isCompact;
+    final testButton = OutlinedButton(
+      onPressed: saved == null || _busy
+          ? null
+          : () => _run(() async {
+                await service.printLines([
+                  center('TES PRINTER'),
+                  divider('='),
+                  '12345678901234567890123456789012',
+                  ...leftRight('Americano Cold', 'Rp 15.000'),
+                  divider(),
+                  center('Printer siap dipakai'),
+                ]);
+                setState(() => _message = 'Tes cetak terkirim.');
+              }),
+      child: const Text('Tes cetak'),
+    );
+
     return ListView(
-      padding: const EdgeInsets.all(AppSpace.s5),
+      padding: EdgeInsets.all(compact ? AppSpace.s3 : AppSpace.s5),
       children: [
         Align(
           alignment: Alignment.topLeft,
@@ -57,7 +76,8 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                   Container(
                     padding: const EdgeInsets.all(AppSpace.s3),
                     decoration: BoxDecoration(color: AppColors.surfaceApp, borderRadius: AppRadius.mdAll),
-                    child: Row(children: [
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Row(children: [
                       Container(
                         width: 44,
                         height: 44,
@@ -75,30 +95,17 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                             Text(saved.mac, style: AppType.caption.copyWith(color: AppColors.inkMuted)),
                         ]),
                       ),
-                      OutlinedButton(
-                        onPressed: saved == null || _busy
-                            ? null
-                            : () => _run(() async {
-                                  await service.printLines([
-                                    center('TES PRINTER'),
-                                    divider('='),
-                                    '12345678901234567890123456789012',
-                                    ...leftRight('Americano Cold', 'Rp 15.000'),
-                                    divider(),
-                                    center('Printer siap dipakai'),
-                                  ]);
-                                  setState(() => _message = 'Tes cetak terkirim.');
-                                }),
-                        child: const Text('Tes cetak'),
-                      ),
+                      if (!compact) testButton,
                     ]),
+                    if (compact) ...[const SizedBox(height: AppSpace.s3), testButton],
+                  ]),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpace.s4),
               AppSectionCard(
                 title: 'Printer ter-pair',
-                trailing: FilledButton.icon(
+                trailing: (compact ? FilledButton.tonalIcon : FilledButton.icon)(
                   onPressed: _busy
                       ? null
                       : () => _run(() async {

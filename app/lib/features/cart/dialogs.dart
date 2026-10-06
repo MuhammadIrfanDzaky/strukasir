@@ -22,6 +22,7 @@ Future<(bool, Discount?)> showDiscountDialog(BuildContext context, {Discount? cu
     context: context,
     builder: (_) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
+        scrollable: true,
         title: const Text('Diskon'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           SegmentedButton<bool>(
@@ -94,6 +95,7 @@ class _ApprovalDialogState extends ConsumerState<ApprovalDialog> {
     _ownerId ??= owners.firstOrNull?.id;
 
     return AlertDialog(
+      scrollable: true,
       title: const Row(children: [
         Icon(Icons.verified_user_rounded, color: AppColors.primary),
         SizedBox(width: AppSpace.s2),
@@ -145,10 +147,11 @@ class OpenBillsDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return AlertDialog(
+      scrollable: true,
       title: const Text('Order belum dibayar'),
       content: SizedBox(
         width: 520,
-        height: 420,
+        height: (MediaQuery.sizeOf(context).height * 0.6).clamp(240.0, 420.0),
         child: FutureBuilder<List<OrderJson>>(
           future: ref.read(orderApiProvider).openOrders(),
           builder: (context, snap) {

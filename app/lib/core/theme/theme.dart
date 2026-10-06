@@ -191,6 +191,20 @@ ThemeData buildAppTheme() {
       labelType: NavigationRailLabelType.all,
       groupAlignment: -1,
     ),
+    // Bar navigasi bawah (HP portrait): putih agar tidak bersaing dengan isi layar.
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      height: 68,
+      elevation: 0,
+      indicatorColor: AppColors.primarySoft,
+      indicatorShape: RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
+      iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(
+          size: 24, color: s.contains(WidgetState.selected) ? AppColors.primaryStrong : AppColors.inkMuted)),
+      labelTextStyle: WidgetStateProperty.resolveWith((s) => AppType.caption.copyWith(
+          color: s.contains(WidgetState.selected) ? AppColors.ink : AppColors.inkMuted,
+          fontWeight: s.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500)),
+    ),
     tabBarTheme: TabBarThemeData(
       labelColor: AppColors.primary,
       unselectedLabelColor: AppColors.inkMuted,

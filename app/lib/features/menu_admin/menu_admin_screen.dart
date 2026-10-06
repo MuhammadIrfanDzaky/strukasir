@@ -5,6 +5,7 @@ import '../../core/api_client.dart';
 import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
+import '../../core/ui/responsive.dart';
 import '../menu/menu_controller.dart';
 import '../menu/menu_models.dart';
 import 'menu_admin_api.dart';
@@ -66,13 +67,20 @@ Future<bool> _run(BuildContext context, Future<void> Function() action) async {
   }
 }
 
-Widget _addButton(String label, VoidCallback onPressed) => Align(
-      alignment: Alignment.centerRight,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: FilledButton.icon(onPressed: onPressed, icon: const Icon(Icons.add_rounded), label: Text(label)),
+/// Daftar + tombol tambah mengambang di kanan bawah (tidak memakan satu baris di layar pendek).
+Widget _withAddButton(String label, VoidCallback onPressed, List<Widget> children) => Stack(children: [
+      ListView(padding: const EdgeInsets.only(bottom: 88), children: children),
+      Positioned(
+        right: AppSpace.s4,
+        bottom: AppSpace.s4,
+        child: FloatingActionButton.extended(
+          heroTag: label,
+          onPressed: onPressed,
+          icon: const Icon(Icons.add_rounded),
+          label: Text(label),
+        ),
       ),
-    );
+    ]);
 
 // ───────────────────────────── Produk ─────────────────────────────
 
@@ -91,12 +99,7 @@ class _ProductsTab extends ConsumerWidget {
       );
     }
 
-    return Column(
-      children: [
-        _addButton('Produk baru', () => _openForm(context, null)),
-        Expanded(
-          child: ListView(
-            children: [
+    return _withAddButton('Produk baru', () => _openForm(context, null), [
               for (final c in menu.categories) ...[
                 Container(
                   color: AppColors.surfaceSunken,
@@ -121,11 +124,7 @@ class _ProductsTab extends ConsumerWidget {
                     onTap: () => _openForm(context, p),
                   ),
               ],
-            ],
-          ),
-        ),
-      ],
-    );
+            ]);
   }
 
   void _openForm(BuildContext context, MenuProduct? product) =>
@@ -182,13 +181,13 @@ class _ProductFormState extends ConsumerState<ProductForm> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      scrollable: true,
       title: Text(widget.product == null ? 'Produk baru' : 'Ubah produk'),
       content: SizedBox(
         width: 480,
         child: Form(
           key: _form,
-          child: ListView(
-            shrinkWrap: true,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
                 controller: _name,
@@ -254,12 +253,7 @@ class _CategoriesTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final api = ref.read(menuAdminApiProvider);
 
-    return Column(
-      children: [
-        _addButton('Kategori baru', () => _edit(context, api, null)),
-        Expanded(
-          child: ListView(
-            children: [
+    return _withAddButton('Kategori baru', () => _edit(context, api, null), [
               for (final c in menu.categories)
                 ListTile(
                   tileColor: AppColors.surface,
@@ -286,11 +280,7 @@ class _CategoriesTab extends ConsumerWidget {
                     ),
                   ]),
                 ),
-            ],
-          ),
-        ),
-      ],
-    );
+            ]);
   }
 
   Future<void> _edit(BuildContext context, MenuAdminApi api, MenuCategory? c) async {
@@ -312,12 +302,7 @@ class _GroupsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
-      children: [
-        _addButton('Grup pilihan baru', () => _open(context, null)),
-        Expanded(
-          child: ListView(
-            children: [
+    return _withAddButton('Grup pilihan baru', () => _open(context, null), [
               for (final g in menu.modifierGroups)
                 ListTile(
                   tileColor: AppColors.surface,
@@ -328,11 +313,7 @@ class _GroupsTab extends ConsumerWidget {
                   trailing: const Icon(Icons.edit_rounded),
                   onTap: () => _open(context, g),
                 ),
-            ],
-          ),
-        ),
-      ],
-    );
+            ]);
   }
 
   void _open(BuildContext context, MenuModifierGroup? group) =>
@@ -412,13 +393,13 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      scrollable: true,
       title: Text(widget.group == null ? 'Grup pilihan baru' : 'Ubah grup pilihan'),
       content: SizedBox(
         width: 520,
         child: Form(
           key: _form,
-          child: ListView(
-            shrinkWrap: true,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
                 controller: _name,
@@ -431,8 +412,7 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
                 onChanged: (v) => setState(() => _required = v),
               ),
               Row(children: [
-                const Text('Maksimal dipilih'),
-                const Spacer(),
+                const Expanded(child: Text('Maksimal dipilih')),
                 IconButton(
                     onPressed: _max > 1 ? () => setState(() => _max--) : null, icon: const Icon(Icons.remove_rounded)),
                 Text('$_max', style: AppType.title),
@@ -445,34 +425,41 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
               for (final (i, r) in _rows.indexed)
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpace.s3),
-                  child: Row(children: [
-                  Expanded(
-                    flex: 3,
-                    child: TextFormField(
+                  child: Builder(builder: (context) {
+                    final name = TextFormField(
                       controller: r.name,
                       decoration: InputDecoration(labelText: 'Pilihan ${i + 1}'),
                       validator: (v) => (v?.trim().isNotEmpty ?? false) ? null : 'Wajib diisi',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
+                    );
+                    final price = TextFormField(
                       controller: r.price,
                       decoration: const InputDecoration(labelText: 'Tambahan harga', prefixText: '+Rp '),
                       keyboardType: TextInputType.number,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _rows.length > 1
-                        ? () => setState(() {
-                              _rows.removeAt(i);
-                              if (_max > _rows.length) _max = _rows.length;
-                            })
-                        : null,
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ]),
+                    );
+                    final remove = IconButton(
+                      tooltip: 'Hapus pilihan',
+                      onPressed: _rows.length > 1
+                          ? () => setState(() {
+                                _rows.removeAt(i);
+                                if (_max > _rows.length) _max = _rows.length;
+                              })
+                          : null,
+                      icon: const Icon(Icons.close_rounded),
+                    );
+                    // HP sempit: nama & harga bertumpuk supaya kolom tidak terlalu kecil.
+                    if (context.isCompact) {
+                      return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Expanded(child: Column(children: [name, const SizedBox(height: AppSpace.s2), price])),
+                        remove,
+                      ]);
+                    }
+                    return Row(children: [
+                      Expanded(flex: 3, child: name),
+                      const SizedBox(width: 12),
+                      Expanded(flex: 2, child: price),
+                      remove,
+                    ]);
+                  }),
                 ),
               TextButton.icon(
                 onPressed: () => setState(() => _rows.add(_OptionRow())),
@@ -503,6 +490,7 @@ Future<bool> _confirm(BuildContext context, String message) async =>
     await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
+        scrollable: true,
         content: Text(message),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
@@ -517,6 +505,7 @@ Future<String?> _askText(BuildContext context, String title, String initial) {
   return showDialog<String>(
     context: context,
     builder: (_) => AlertDialog(
+      scrollable: true,
       title: Text(title),
       content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'Nama')),
       actions: [

@@ -68,10 +68,11 @@ class _PaymentDialogState extends State<PaymentDialog> {
     final problem = _problem;
 
     return AlertDialog(
+      scrollable: true,
       title: Text('Bayar ${widget.number}'),
       content: SizedBox(
         width: 520,
-        child: ListView(shrinkWrap: true, children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
           Container(
             padding: const EdgeInsets.all(AppSpace.s4),
             decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: AppRadius.lgAll),
@@ -85,16 +86,30 @@ class _PaymentDialogState extends State<PaymentDialog> {
             if (i > 0) const Padding(padding: EdgeInsets.only(top: AppSpace.s3), child: Divider()),
             const SizedBox(height: AppSpace.s3),
             Row(children: [
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'cash', label: Text('Tunai'), icon: Icon(Icons.payments_rounded)),
-                  ButtonSegment(value: 'debit', label: Text('Debit'), icon: Icon(Icons.credit_card_rounded)),
-                  ButtonSegment(value: 'qris', label: Text('QRIS'), icon: Icon(Icons.qr_code_rounded)),
-                ],
-                selected: {r.method},
-                onSelectionChanged: (s) => setState(() => r.method = s.first),
+              // Mengisi lebar dialog; di HP sempit ikon disembunyikan agar label tetap terbaca.
+              Expanded(
+                child: SegmentedButton<String>(
+                  expandedInsets: EdgeInsets.zero,
+                  showSelectedIcon: false,
+                  style: MediaQuery.sizeOf(context).width < 480
+                      ? const ButtonStyle(padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: AppSpace.s2)))
+                      : null,
+                  segments: [
+                    for (final (value, label, icon) in const [
+                      ('cash', 'Tunai', Icons.payments_rounded),
+                      ('debit', 'Debit', Icons.credit_card_rounded),
+                      ('qris', 'QRIS', Icons.qr_code_rounded),
+                    ])
+                      ButtonSegment(
+                        value: value,
+                        label: Text(label),
+                        icon: MediaQuery.sizeOf(context).width < 480 ? null : Icon(icon),
+                      ),
+                  ],
+                  selected: {r.method},
+                  onSelectionChanged: (s) => setState(() => r.method = s.first),
+                ),
               ),
-              const Spacer(),
               if (_rows.length > 1)
                 IconButton(
                     tooltip: 'Hapus baris',

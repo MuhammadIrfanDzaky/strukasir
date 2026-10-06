@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/theme.dart';
+import 'core/theme/tokens.dart';
 import 'core/ui/components.dart';
+import 'core/ui/responsive.dart';
 import 'features/cart/cart_controller.dart';
 import 'features/menu/menu_controller.dart';
 import 'features/session/login_screen.dart';
@@ -15,9 +16,7 @@ import 'home_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Tablet kasir dipakai mendatar.
-  await SystemChrome.setPreferredOrientations(
-      [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+  // Semua orientasi: tablet & HP, portrait maupun landscape.
   runApp(const ProviderScope(child: StrukasirApp()));
 }
 
@@ -30,7 +29,36 @@ class StrukasirApp extends StatelessWidget {
       title: 'Strukasir',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      builder: appBuilder,
       home: const VersionGate(child: SessionGate()),
+    );
+  }
+}
+
+/// Pembungkus semua layar: font sistem tetap dihormati tapi dibatasi 1.2× supaya layar kasir
+/// tidak pecah, dan margin dialog mengikuti ukuran layar.
+Widget appBuilder(BuildContext context, Widget? child) =>
+    MediaQuery.withClampedTextScaling(maxScaleFactor: 1.2, child: ResponsiveDialogs(child: child!));
+
+/// Margin dialog mengikuti layar: di HP lebih rapat supaya isi dialog tidak sesak.
+class ResponsiveDialogs extends StatelessWidget {
+  const ResponsiveDialogs({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(
+        dialogTheme: theme.dialogTheme.copyWith(
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: context.isCompact ? AppSpace.s4 : AppSpace.s10,
+            vertical: context.isShort ? AppSpace.s3 : AppSpace.s6,
+          ),
+        ),
+      ),
+      child: child,
     );
   }
 }
@@ -51,7 +79,9 @@ class SessionGate extends ConsumerWidget {
       if (prev?.value is LoggedIn && next.value is! LoggedIn) ref.invalidate(cartProvider);
     });
 
-    return ref.watch(sessionProvider).when(
+    return ref
+        .watch(sessionProvider)
+        .when(
           loading: () => const Scaffold(body: Center(child: BrandMark(size: 72))),
           error: (e, _) => Scaffold(
             body: AppErrorState(

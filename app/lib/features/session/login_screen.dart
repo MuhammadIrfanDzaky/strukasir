@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api_client.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
+import '../../core/ui/responsive.dart';
 import 'session_controller.dart';
 
 final staffProvider = FutureProvider.autoDispose<List<StaffMember>>(
@@ -20,96 +21,135 @@ class LoginScreen extends ConsumerWidget {
     final staff = ref.watch(staffProvider);
     final tenant = session.device.tenantName.isEmpty ? 'Strukasir' : session.device.tenantName;
 
-    return Scaffold(
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            width: 360,
+    final stacked = context.screen.width < 720;
+    final device = Row(children: [
+      const Icon(Icons.tablet_android_rounded, size: 18, color: AppColors.onInkMuted),
+      const SizedBox(width: AppSpace.s2),
+      Flexible(
+        child: Text('Tablet ${session.device.code}',
+            style: AppType.body.copyWith(color: AppColors.onInkMuted), overflow: TextOverflow.ellipsis),
+      ),
+    ]);
+
+    final brand = stacked
+        ? Container(
             color: AppColors.ink,
-            padding: const EdgeInsets.all(AppSpace.s8),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const BrandLockup(height: 44, reversed: true),
-              const Spacer(),
-              const AppOverline('Kedai', color: AppColors.onInkMuted),
-              const SizedBox(height: AppSpace.s1),
-              Text(tenant, style: AppType.headline.copyWith(color: AppColors.onInk)),
-              const SizedBox(height: AppSpace.s2),
-              Row(children: [
-                const Icon(Icons.tablet_android_rounded, size: 18, color: AppColors.onInkMuted),
-                const SizedBox(width: AppSpace.s2),
-                Text('Tablet ${session.device.code}', style: AppType.body.copyWith(color: AppColors.onInkMuted)),
+            padding: const EdgeInsets.fromLTRB(AppSpace.s5, AppSpace.s4, AppSpace.s5, AppSpace.s4),
+            child: SafeArea(
+              bottom: false,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const BrandLockup(height: 32, reversed: true),
+                const SizedBox(height: AppSpace.s4),
+                const AppOverline('Kedai', color: AppColors.onInkMuted),
+                Text(tenant,
+                    style: AppType.titleLg.copyWith(color: AppColors.onInk), maxLines: 2, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: AppSpace.s1),
+                device,
               ]),
-            ]),
-          ),
-          Expanded(
-            child: staff.when(
-              loading: () => const AppLoading(),
-              error: (e, _) => AppErrorState(
-                title: 'Daftar staf gagal dimuat',
-                message: '$e',
-                onRetry: () => ref.invalidate(staffProvider),
-              ),
-              data: (members) => Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppSpace.s8),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 640),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          Expanded(child: Text('Siapa yang bertugas?', style: AppType.headline)),
-                          IconButton(
-                            tooltip: 'Muat ulang',
-                            onPressed: () => ref.invalidate(staffProvider),
-                            icon: const Icon(Icons.refresh_rounded),
-                          ),
-                        ]),
-                        const SizedBox(height: AppSpace.s1),
-                        Text('Pilih nama Anda, lalu masukkan PIN.',
-                            style: AppType.body.copyWith(color: AppColors.inkMuted)),
-                        const SizedBox(height: AppSpace.s6),
-                        Wrap(
-                          spacing: AppSpace.s4,
-                          runSpacing: AppSpace.s4,
-                          children: [
-                            for (final m in members)
-                              _StaffCard(
-                                member: m,
-                                onTap: () => showDialog<void>(
-                                  context: context,
-                                  barrierDismissible: false,
-                                  builder: (_) => PinDialog(member: m),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
+            ),
+          )
+        : Container(
+            width: context.screen.width >= 1000 ? 360 : 280,
+            color: AppColors.ink,
+            padding: EdgeInsets.all(context.isShort ? AppSpace.s5 : AppSpace.s8),
+            child: SafeArea(
+              right: false,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                BrandLockup(height: context.isShort ? 32 : 44, reversed: true),
+                const Spacer(),
+                const AppOverline('Kedai', color: AppColors.onInkMuted),
+                const SizedBox(height: AppSpace.s1),
+                Text(tenant,
+                    style: (context.isShort ? AppType.titleLg : AppType.headline).copyWith(color: AppColors.onInk),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: AppSpace.s2),
+                device,
+              ]),
+            ),
+          );
+
+    final picker = staff.when(
+      loading: () => const AppLoading(),
+      error: (e, _) => AppErrorState(
+        title: 'Daftar staf gagal dimuat',
+        message: '$e',
+        onRetry: () => ref.invalidate(staffProvider),
+      ),
+      data: (members) => LayoutBuilder(builder: (context, box) {
+        final pad = box.maxWidth < 600 ? AppSpace.s4 : AppSpace.s8;
+        final width = (box.maxWidth - pad * 2).clamp(0.0, 640.0);
+        // Kartu staf mengisi lebar: minimal 2 kolom di HP, lebar kartu ±150–200 dp.
+        final cols = columnsFor(width, minItem: 150, spacing: AppSpace.s3, min: 2, max: 4);
+        final cardWidth = (width - AppSpace.s3 * (cols - 1)) / cols;
+        return Align(
+          alignment: stacked ? Alignment.topCenter : Alignment.center,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(pad),
+            child: SizedBox(
+              width: width,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Expanded(
+                      child: Text('Siapa yang bertugas?', style: box.maxWidth < 600 ? AppType.titleLg : AppType.headline),
                     ),
+                    IconButton(
+                      tooltip: 'Muat ulang',
+                      onPressed: () => ref.invalidate(staffProvider),
+                      icon: const Icon(Icons.refresh_rounded),
+                    ),
+                  ]),
+                  const SizedBox(height: AppSpace.s1),
+                  Text('Pilih nama Anda, lalu masukkan PIN.', style: AppType.body.copyWith(color: AppColors.inkMuted)),
+                  const SizedBox(height: AppSpace.s5),
+                  Wrap(
+                    spacing: AppSpace.s3,
+                    runSpacing: AppSpace.s3,
+                    children: [
+                      for (final m in members)
+                        _StaffCard(
+                          member: m,
+                          width: cardWidth,
+                          onTap: () => showDialog<void>(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => PinDialog(member: m),
+                          ),
+                        ),
+                    ],
                   ),
-                ),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        );
+      }),
+    );
+
+    return Scaffold(
+      body: stacked
+          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [brand, Expanded(child: picker)])
+          : Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [brand, Expanded(child: picker)]),
     );
   }
 }
 
 class _StaffCard extends StatelessWidget {
-  const _StaffCard({required this.member, required this.onTap});
+  const _StaffCard({required this.member, required this.onTap, this.width = 196});
 
   final StaffMember member;
   final VoidCallback onTap;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
     final owner = member.role == 'owner';
+    // Tinggi mengikuti isi (font sistem bisa diperbesar di perangkat); semua kartu memakai badge
+    // supaya tingginya tetap seragam.
     return SizedBox(
-      width: 196,
-      height: 148,
+      width: width,
       child: Material(
         color: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: AppRadius.lgAll, side: const BorderSide(color: AppColors.line)),
@@ -118,14 +158,14 @@ class _StaffCard extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(AppSpace.s4),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
               AppAvatar(member.name),
-              const Spacer(),
+              const SizedBox(height: AppSpace.s3),
               Text(member.name, style: AppType.title, maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
               owner
                   ? const AppBadge('Owner', tone: AppTone.brand, icon: Icons.verified_user_rounded)
-                  : Text('Kasir', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+                  : const AppBadge('Kasir', icon: Icons.person_rounded),
             ]),
           ),
         ),
@@ -202,9 +242,88 @@ class _PinDialogState extends ConsumerState<PinDialog> {
           );
   }
 
+  Widget _dots() => Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (var i = 0; i < _maxLength; i++)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              margin: const EdgeInsets.all(6),
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: i < _pin.length ? AppColors.primary : AppColors.surface,
+                border: Border.all(color: i < _pin.length ? AppColors.primary : AppColors.lineStrong, width: 1.5),
+              ),
+            ),
+        ],
+      );
+
+  Widget _errorLine() => SizedBox(
+        height: 32,
+        child: Center(
+          child: _error == null
+              ? null
+              : Text(_error!, textAlign: TextAlign.center, style: AppType.caption.copyWith(color: AppColors.danger)),
+        ),
+      );
+
+  /// Keypad 3×4. Baris biasa (bukan GridView) supaya aman di dialog yang bisa di-scroll.
+  Widget _keypad(double aspect) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final (i, row) in const [
+            ['1', '2', '3'],
+            ['4', '5', '6'],
+            ['7', '8', '9'],
+            ['OK', '0', '⌫'],
+          ].indexed)
+            Padding(
+              padding: EdgeInsets.only(top: i == 0 ? 0 : AppSpace.s2),
+              child: Row(children: [
+                for (final (j, k) in row.indexed) ...[
+                  if (j > 0) const SizedBox(width: AppSpace.s2),
+                  Expanded(child: AspectRatio(aspectRatio: aspect, child: _key(k))),
+                ],
+              ]),
+            ),
+        ],
+      );
+
   @override
   Widget build(BuildContext context) {
+    final cancel = TextButton(onPressed: _busy ? null : () => Navigator.of(context).pop(), child: const Text('Batal'));
+
+    if (context.isShort) {
+      return Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpace.s4),
+          child: SizedBox(
+            width: 520,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              Expanded(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  AppAvatar(widget.member.name, size: 44),
+                  const SizedBox(height: AppSpace.s2),
+                  Text(widget.member.name, style: AppType.title, textAlign: TextAlign.center),
+                  Text('Masukkan PIN', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+                  const SizedBox(height: AppSpace.s2),
+                  _dots(),
+                  _errorLine(),
+                  cancel,
+                ]),
+              ),
+              const SizedBox(width: AppSpace.s4),
+              SizedBox(width: 252, child: _keypad(1.9)),
+            ]),
+          ),
+        ),
+      );
+    }
+
     return AlertDialog(
+      scrollable: true,
       contentPadding: const EdgeInsets.fromLTRB(AppSpace.s6, AppSpace.s6, AppSpace.s6, AppSpace.s2),
       content: SizedBox(
         width: 320,
@@ -213,50 +332,16 @@ class _PinDialogState extends ConsumerState<PinDialog> {
           children: [
             AppAvatar(widget.member.name, size: 56),
             const SizedBox(height: AppSpace.s3),
-            Text(widget.member.name, style: AppType.titleLg),
+            Text(widget.member.name, style: AppType.titleLg, textAlign: TextAlign.center),
             Text('Masukkan PIN', style: AppType.body.copyWith(color: AppColors.inkMuted)),
             const SizedBox(height: AppSpace.s4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (var i = 0; i < _maxLength; i++)
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
-                    margin: const EdgeInsets.all(6),
-                    width: 16,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: i < _pin.length ? AppColors.primary : AppColors.surface,
-                      border: Border.all(color: i < _pin.length ? AppColors.primary : AppColors.lineStrong, width: 1.5),
-                    ),
-                  ),
-              ],
-            ),
-            SizedBox(
-              height: 32,
-              child: Center(
-                child: _error == null
-                    ? null
-                    : Text(_error!, textAlign: TextAlign.center, style: AppType.caption.copyWith(color: AppColors.danger)),
-              ),
-            ),
-            GridView.count(
-              shrinkWrap: true,
-              crossAxisCount: 3,
-              mainAxisSpacing: AppSpace.s2,
-              crossAxisSpacing: AppSpace.s2,
-              childAspectRatio: 1.6,
-              children: [
-                for (final k in ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'OK', '0', '⌫']) _key(k),
-              ],
-            ),
+            _dots(),
+            _errorLine(),
+            _keypad(1.6),
           ],
         ),
       ),
-      actions: [
-        TextButton(onPressed: _busy ? null : () => Navigator.of(context).pop(), child: const Text('Batal')),
-      ],
+      actions: [cancel],
     );
   }
 }

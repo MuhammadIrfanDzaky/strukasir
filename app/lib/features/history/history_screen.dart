@@ -5,6 +5,7 @@ import '../../core/api_client.dart';
 import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
+import '../../core/ui/responsive.dart';
 import '../cart/dialogs.dart';
 import '../cart/order_api.dart';
 import '../printing/printer_service.dart';
@@ -12,8 +13,7 @@ import '../printing/receipt_format.dart';
 import '../session/session_controller.dart';
 import '../shift/shift_controller.dart';
 
-String _isoDate(DateTime d) =>
-    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+String _isoDate(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
 /// Riwayat transaksi per hari bisnis: cari, lihat detail, cetak ulang, void.
 class HistoryScreen extends ConsumerStatefulWidget {
@@ -30,8 +30,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   Future<List<OrderJson>> _load() async {
     final q = _query.isEmpty ? '' : '&q=${Uri.encodeQueryComponent(_query)}';
-    final res = await ref.read(sessionProvider.notifier).authed(
-        (api, token) => api.get('/orders?date=${_isoDate(_date)}&per_page=50$q', token: token));
+    final res = await ref
+        .read(sessionProvider.notifier)
+        .authed((api, token) => api.get('/orders?date=${_isoDate(_date)}&per_page=50$q', token: token));
     return (res['data'] as List).cast<OrderJson>();
   }
 
@@ -39,73 +40,97 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(AppSpace.s5, AppSpace.s4, AppSpace.s5, AppSpace.s3),
-        child: Row(children: [
-          OutlinedButton.icon(
-            icon: const Icon(Icons.calendar_today_rounded, size: 20),
-            label: Text(_isoDate(_date)),
-            onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _date,
-                firstDate: DateTime.now().subtract(const Duration(days: 366)),
-                lastDate: DateTime.now(),
-              );
-              if (picked != null) {
-                _date = picked;
-                _reload();
+    final compact = context.isCompact;
+    final gutter = compact ? AppSpace.s3 : AppSpace.s5;
+    final dateButton = OutlinedButton.icon(
+      icon: const Icon(Icons.calendar_today_rounded, size: 20),
+      label: Text(_isoDate(_date)),
+      onPressed: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: _date,
+          firstDate: DateTime.now().subtract(const Duration(days: 366)),
+          lastDate: DateTime.now(),
+        );
+        if (picked != null) {
+          _date = picked;
+          _reload();
+        }
+      },
+    );
+    final search = TextField(
+      decoration: const InputDecoration(
+        prefixIcon: Icon(Icons.search_rounded),
+        hintText: 'Cari nomor order / nama',
+        isDense: true,
+      ),
+      onSubmitted: (v) {
+        _query = v.trim();
+        _reload();
+      },
+    );
+    final refresh = IconButton(tooltip: 'Muat ulang', onPressed: _reload, icon: const Icon(Icons.refresh_rounded));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(gutter, AppSpace.s4, gutter, AppSpace.s3),
+          // HP: tanggal + muat ulang di baris atas, kolom cari selebar layar di bawahnya.
+          child: compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(children: [dateButton, const Spacer(), refresh]),
+                    const SizedBox(height: AppSpace.s2),
+                    search,
+                  ],
+                )
+              : Row(
+                  children: [
+                    dateButton,
+                    const SizedBox(width: AppSpace.s3),
+                    Expanded(child: search),
+                    const SizedBox(width: AppSpace.s2),
+                    refresh,
+                  ],
+                ),
+        ),
+        Expanded(
+          child: FutureBuilder<List<OrderJson>>(
+            future: _orders,
+            builder: (context, snap) {
+              if (snap.hasError) {
+                final e = snap.error;
+                return AppErrorState(message: e is ApiException ? e.message : '$e', onRetry: _reload);
               }
+              if (!snap.hasData) return const AppLoading();
+              final orders = snap.data!;
+              if (orders.isEmpty) {
+                return AppEmptyState(
+                  icon: Icons.receipt_long_rounded,
+                  title: 'Belum ada transaksi',
+                  message: _query.isEmpty
+                      ? 'Tidak ada order pada ${_isoDate(_date)}.'
+                      : 'Tidak ada yang cocok dengan "$_query".',
+                );
+              }
+              return Padding(
+                padding: EdgeInsets.fromLTRB(gutter, 0, gutter, gutter),
+                child: Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: ListView.separated(
+                    itemCount: orders.length,
+                    separatorBuilder: (_, _) => const Divider(),
+                    itemBuilder: (_, i) => _OrderTile(order: orders[i], onChanged: _reload),
+                  ),
+                ),
+              );
             },
           ),
-          const SizedBox(width: AppSpace.s3),
-          Expanded(
-            child: TextField(
-              decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search_rounded), hintText: 'Cari nomor order / nama', isDense: true),
-              onSubmitted: (v) {
-                _query = v.trim();
-                _reload();
-              },
-            ),
-          ),
-          const SizedBox(width: AppSpace.s2),
-          IconButton(tooltip: 'Muat ulang', onPressed: _reload, icon: const Icon(Icons.refresh_rounded)),
-        ]),
-      ),
-      Expanded(
-        child: FutureBuilder<List<OrderJson>>(
-          future: _orders,
-          builder: (context, snap) {
-            if (snap.hasError) {
-              final e = snap.error;
-              return AppErrorState(message: e is ApiException ? e.message : '$e', onRetry: _reload);
-            }
-            if (!snap.hasData) return const AppLoading();
-            final orders = snap.data!;
-            if (orders.isEmpty) {
-              return AppEmptyState(
-                icon: Icons.receipt_long_rounded,
-                title: 'Belum ada transaksi',
-                message: _query.isEmpty ? 'Tidak ada order pada ${_isoDate(_date)}.' : 'Tidak ada yang cocok dengan "$_query".',
-              );
-            }
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpace.s5, 0, AppSpace.s5, AppSpace.s5),
-              child: Card(
-                clipBehavior: Clip.antiAlias,
-                child: ListView.separated(
-                  itemCount: orders.length,
-                  separatorBuilder: (_, _) => const Divider(),
-                  itemBuilder: (_, i) => _OrderTile(order: orders[i], onChanged: _reload),
-                ),
-              ),
-            );
-          },
         ),
-      ),
-    ]);
+      ],
+    );
   }
 }
 
@@ -121,33 +146,64 @@ class _OrderTile extends StatelessWidget {
     final created = DateTime.parse(order['created_at'] as String).toLocal();
     final time = '${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}';
 
-    return ListTile(
-      leading: SizedBox(
-        width: 48,
-        child: Text(time, style: AppType.bodyStrong.copyWith(color: AppColors.inkMuted)),
+    final compact = context.isCompact;
+    final total = Text(
+      rp(order['grand_total'] as int),
+      textAlign: TextAlign.right,
+      style: AppType.bodyStrong.copyWith(
+        color: status == 'void' ? AppColors.inkMuted : AppColors.ink,
+        decoration: status == 'void' ? TextDecoration.lineThrough : null,
       ),
-      title: Text('${order['number']}  ${(order['customer_label'] as String?) ?? ''}'),
-      subtitle: Text((order['items'] as List)
-          .cast<Map<String, dynamic>>()
-          .map((i) => '${i['qty']}x ${i['name']}')
-          .join(', ')),
-      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-        AppBadge.orderStatus(status),
-        const SizedBox(width: AppSpace.s4),
-        SizedBox(
-          width: 100,
-          child: Text(
-            rp(order['grand_total'] as int),
-            textAlign: TextAlign.right,
-            style: AppType.bodyStrong.copyWith(
-              color: status == 'void' ? AppColors.inkMuted : AppColors.ink,
-              decoration: status == 'void' ? TextDecoration.lineThrough : null,
+    );
+    final items = Text(
+      (order['items'] as List).cast<Map<String, dynamic>>().map((i) => '${i['qty']}x ${i['name']}').join(', '),
+      maxLines: compact ? 1 : 2,
+      overflow: TextOverflow.ellipsis,
+    );
+
+    return ListTile(
+      contentPadding: EdgeInsets.symmetric(horizontal: compact ? AppSpace.s3 : AppSpace.s4),
+      horizontalTitleGap: compact ? AppSpace.s2 : AppSpace.s4,
+      // HP: jam masuk ke baris judul (kolom jam terpisah terlalu sempit di HP kecil).
+      leading: compact
+          ? null
+          : SizedBox(
+              width: 48,
+              child: Text(time, style: AppType.bodyStrong.copyWith(color: AppColors.inkMuted)),
             ),
-          ),
-        ),
-      ]),
+      title: Text(
+        [if (compact) time, order['number'] as String, (order['customer_label'] as String?) ?? '']
+            .where((p) => p.isNotEmpty)
+            .join(compact ? ' · ' : '  '),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      // HP: status pindah ke bawah judul supaya nama & item tidak terhimpit.
+      subtitle: compact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                items,
+                const SizedBox(height: AppSpace.s1),
+                AppBadge.orderStatus(status),
+              ],
+            )
+          : items,
+      trailing: compact
+          ? total
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppBadge.orderStatus(status),
+                const SizedBox(width: AppSpace.s4),
+                SizedBox(width: 100, child: total),
+              ],
+            ),
       onTap: () async {
-        final changed = await showDialog<bool>(context: context, builder: (_) => OrderDetailDialog(order: order));
+        final changed = await showDialog<bool>(
+          context: context,
+          builder: (_) => OrderDetailDialog(order: order),
+        );
         if (changed == true) onChanged();
       },
     );
@@ -180,13 +236,23 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
+        scrollable: true,
         title: Text('Void ${widget.order['number']}'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          if (widget.order['status'] == 'paid')
-            Text('Uang ${rp(widget.order['grand_total'] as int)} dikembalikan ke pelanggan dan dicatat di shift ini.'),
-          const SizedBox(height: AppSpace.s3),
-          TextField(controller: reason, autofocus: true, decoration: const InputDecoration(labelText: 'Alasan (wajib)')),
-        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.order['status'] == 'paid')
+              Text(
+                'Uang ${rp(widget.order['grand_total'] as int)} dikembalikan ke pelanggan dan dicatat di shift ini.',
+              ),
+            const SizedBox(height: AppSpace.s3),
+            TextField(
+              controller: reason,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Alasan (wajib)'),
+            ),
+          ],
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
           FilledButton(
@@ -202,20 +268,26 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
     Approval? approval;
     if (!(user?.can('order.void') ?? false)) {
       approval = await showDialog<Approval>(
-          context: context, builder: (_) => const ApprovalDialog(reason: 'Void order butuh persetujuan owner.'));
+        context: context,
+        builder: (_) => const ApprovalDialog(reason: 'Void order butuh persetujuan owner.'),
+      );
       if (approval == null) return;
     }
 
     setState(() => _busy = true);
     try {
-      await ref.read(sessionProvider.notifier).authed((api, token) => api.post(
-            '/orders/${widget.order['id']}/void',
-            token: token,
-            data: {
-              'reason': reason.text.trim(),
-              if (approval != null) 'approval': {'user_id': approval.userId, 'pin': approval.pin},
-            },
-          ));
+      await ref
+          .read(sessionProvider.notifier)
+          .authed(
+            (api, token) => api.post(
+              '/orders/${widget.order['id']}/void',
+              token: token,
+              data: {
+                'reason': reason.text.trim(),
+                if (approval != null) 'approval': {'user_id': approval.userId, 'pin': approval.pin},
+              },
+            ),
+          );
       ref.invalidate(shiftProvider);
       if (mounted) Navigator.pop(context, true);
     } on ApiException catch (e) {
@@ -235,19 +307,27 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
     final lines = customerReceipt(o);
 
     return AlertDialog(
-      title: Row(children: [
-        Expanded(child: Text('Order ${o['number']}')),
-        AppBadge.orderStatus(o['status'] as String),
-      ]),
+      scrollable: true,
+      title: Row(
+        children: [
+          Expanded(child: Text('Order ${o['number']}')),
+          AppBadge.orderStatus(o['status'] as String),
+        ],
+      ),
       content: SizedBox(
         width: 400,
         child: Container(
           padding: const EdgeInsets.all(AppSpace.s4),
           decoration: BoxDecoration(color: AppColors.surfaceApp, borderRadius: AppRadius.mdAll),
-          child: SingleChildScrollView(
-            // Pratinjau persis seperti struk yang akan dicetak.
-            child: Text(lines.join('\n'),
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.35, color: AppColors.ink)),
+          // Pratinjau persis seperti struk yang akan dicetak; di HP sempit diperkecil, tidak dibungkus ulang.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.topLeft,
+            child: Text(
+              lines.join('\n'),
+              softWrap: false,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.35, color: AppColors.ink),
+            ),
           ),
         ),
       ),
@@ -258,8 +338,7 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
             onPressed: _busy ? null : _void,
             child: const Text('Void'),
           ),
-        if (o['status'] == 'paid')
-          TextButton(onPressed: _busy ? null : _reprint, child: const Text('Cetak ulang')),
+        if (o['status'] == 'paid') TextButton(onPressed: _busy ? null : _reprint, child: const Text('Cetak ulang')),
         FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Tutup')),
       ],
     );

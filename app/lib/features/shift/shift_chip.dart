@@ -6,9 +6,11 @@ import '../../core/theme/tokens.dart';
 import 'shift_controller.dart';
 import 'shift_dialogs.dart';
 
-/// Status shift di app bar: ketuk untuk membuka / menutup shift.
+/// Status shift di app bar: ketuk untuk membuka / menutup shift. [compact] = label pendek untuk HP.
 class ShiftChip extends ConsumerWidget {
-  const ShiftChip({super.key});
+  const ShiftChip({super.key, this.compact = false});
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,7 +32,7 @@ class ShiftChip extends ConsumerWidget {
             avatar: const Icon(Icons.lock_open_rounded, size: 18, color: AppColors.warning),
             color: const WidgetStatePropertyAll(AppColors.warningSoft),
             side: const BorderSide(color: AppColors.warningSoft),
-            label: const Text('Shift belum dibuka · Buka'),
+            label: Text(compact ? 'Buka shift' : 'Shift belum dibuka · Buka'),
             onPressed: () => showOpenShiftDialog(context, ref),
           );
         }
@@ -40,7 +42,8 @@ class ShiftChip extends ConsumerWidget {
           avatar: const Icon(Icons.circle, size: 10, color: AppColors.success),
           color: const WidgetStatePropertyAll(AppColors.successSoft),
           side: const BorderSide(color: AppColors.successSoft),
-          label: Text('Shift sejak $time · Tutup'),
+          tooltip: 'Tutup shift',
+          label: Text(compact ? 'Shift $time' : 'Shift sejak $time · Tutup'),
           onPressed: () => showCloseShiftDialog(context, ref),
         );
       },

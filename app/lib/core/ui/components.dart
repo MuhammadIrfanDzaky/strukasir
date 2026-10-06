@@ -37,7 +37,13 @@ class BrandLockup extends StatelessWidget {
     return Row(mainAxisSize: MainAxisSize.min, children: [
       BrandMark(size: height, reversed: reversed),
       SizedBox(width: height * 0.18),
-      Text('STRUKASIR', style: style),
+      Flexible(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text('STRUKASIR', style: style, textScaler: TextScaler.noScaling, maxLines: 1),
+        ),
+      ),
     ]);
   }
 }
@@ -120,7 +126,8 @@ class AppEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
+        // Bisa di-scroll: di HP landscape tingginya bisa lebih kecil dari isi.
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpace.s6),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 360),
@@ -208,11 +215,17 @@ class AppStatCard extends StatelessWidget {
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label.toUpperCase(),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: AppType.overline.copyWith(color: emphasis ? AppColors.primarySoft : AppColors.inkMuted)),
           const SizedBox(height: AppSpace.s2),
-          Text(value,
-              style: (emphasis ? AppType.moneyLg : AppType.titleLg)
-                  .copyWith(color: emphasis ? AppColors.onPrimary : AppColors.ink)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value,
+                style: (emphasis ? AppType.moneyLg : AppType.titleLg)
+                    .copyWith(color: emphasis ? AppColors.onPrimary : AppColors.ink)),
+          ),
         ]),
       );
 }

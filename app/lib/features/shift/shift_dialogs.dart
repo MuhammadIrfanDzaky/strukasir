@@ -19,6 +19,7 @@ Future<bool> showOpenShiftDialog(BuildContext context, WidgetRef ref) async {
     barrierDismissible: false,
     builder: (_) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
+        scrollable: true,
         title: const Text('Buka shift'),
         content: SizedBox(
           width: 360,
@@ -67,6 +68,7 @@ Future<void> showCloseShiftDialog(BuildContext context, WidgetRef ref) async {
     context: context,
     builder: (_) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
+        scrollable: true,
         title: const Text('Tutup shift'),
         content: SizedBox(
           width: 380,
@@ -119,6 +121,7 @@ class ShiftResultDialog extends ConsumerWidget {
     final byMethod = summary['by_method'] as Map<String, dynamic>;
     final diff = shift['difference'] as int;
     return AlertDialog(
+      scrollable: true,
       title: const Text('Shift ditutup'),
       content: SizedBox(
         width: 380,

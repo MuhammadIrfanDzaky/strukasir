@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/tokens.dart';
 import 'core/ui/components.dart';
+import 'core/ui/responsive.dart';
 import 'features/history/history_screen.dart';
 import 'features/menu/menu_controller.dart';
 import 'features/menu_admin/menu_admin_screen.dart';
@@ -13,10 +14,15 @@ import 'features/session/session_controller.dart';
 import 'features/shift/shift_chip.dart';
 
 /// Kerangka setelah login. Item navigasi mengikuti izin user; server tetap memeriksa ulang.
+///
+/// HP portrait → bar navigasi bawah; layar ≥600 dp → rail kiri (ringkas di layar pendek).
 class HomeShell extends ConsumerStatefulWidget {
-  const HomeShell({super.key, required this.session});
+  const HomeShell({super.key, required this.session, this.initialIndex = 0});
 
   final LoggedIn session;
+
+  /// Tab awal (untuk uji tampilan).
+  final int initialIndex;
 
   @override
   ConsumerState<HomeShell> createState() => _HomeShellState();
@@ -31,7 +37,9 @@ class _Destination {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
-  int _index = 0;
+  late int _index = widget.initialIndex;
+
+  void _logout() => ref.read(sessionProvider.notifier).logout();
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +53,41 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       _Destination('Printer', Icons.print_rounded, (_) => const PrinterSettingsScreen()),
     ];
     final index = _index.clamp(0, destinations.length - 1);
+    final compact = context.isCompact;
+    final short = context.isShort;
+
+    final topBar = _TopBar(
+      title: destinations[index].label,
+      userName: user.name,
+      role: user.role,
+      deviceCode: widget.session.device.code,
+      onRefresh: () => ref.read(menuProvider.notifier).refresh(),
+      onLogout: _logout,
+    );
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        topBar,
+        Expanded(child: destinations[index].builder(context)),
+      ],
+    );
+
+    if (compact) {
+      return Scaffold(
+        body: SafeArea(bottom: false, child: body),
+        bottomNavigationBar: MediaQuery.withClampedTextScaling(
+          maxScaleFactor: 1.1,
+          child: NavigationBar(
+          selectedIndex: index,
+          onDestinationSelected: (i) => setState(() => _index = i),
+          destinations: [
+            for (final d in destinations)
+              NavigationDestination(icon: Icon(d.icon), label: d.label == 'Kelola Menu' ? 'Menu' : d.label),
+          ],
+        ),
+        ),
+      );
+    }
 
     return Scaffold(
       body: Row(
@@ -52,24 +95,32 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           NavigationRail(
             selectedIndex: index,
             onDestinationSelected: (i) => setState(() => _index = i),
-            leading: const Padding(
-              padding: EdgeInsets.only(top: AppSpace.s4, bottom: AppSpace.s6),
-              child: BrandMark(size: 48, reversed: true),
-            ),
-            trailing: Expanded(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpace.s4),
-                  child: IconButton(
-                    tooltip: 'Keluar',
-                    color: AppColors.onInkMuted,
-                    onPressed: () => ref.read(sessionProvider.notifier).logout(),
-                    icon: const Icon(Icons.logout_rounded),
+            // Layar pendek (HP landscape): tanpa logo & label agar semua item muat; keluar lewat menu profil.
+            minWidth: context.widthClass == WidthClass.expanded && !short ? AppSize.rail : 80,
+            labelType: short ? NavigationRailLabelType.none : NavigationRailLabelType.all,
+            groupAlignment: short ? 0 : -1,
+            leading: short
+                ? null
+                : const Padding(
+                    padding: EdgeInsets.only(top: AppSpace.s4, bottom: AppSpace.s6),
+                    child: BrandMark(size: 48, reversed: true),
                   ),
-                ),
-              ),
-            ),
+            trailing: short
+                ? null
+                : Expanded(
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpace.s4),
+                        child: IconButton(
+                          tooltip: 'Keluar',
+                          color: AppColors.onInkMuted,
+                          onPressed: _logout,
+                          icon: const Icon(Icons.logout_rounded),
+                        ),
+                      ),
+                    ),
+                  ),
             destinations: [
               for (final d in destinations)
                 NavigationRailDestination(
@@ -79,21 +130,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 ),
             ],
           ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _TopBar(
-                  title: destinations[index].label,
-                  userName: user.name,
-                  role: user.role,
-                  deviceCode: widget.session.device.code,
-                  onRefresh: () => ref.read(menuProvider.notifier).refresh(),
-                ),
-                Expanded(child: destinations[index].builder(context)),
-              ],
-            ),
-          ),
+          Expanded(child: SafeArea(left: false, child: body)),
         ],
       ),
     );
@@ -107,6 +144,7 @@ class _TopBar extends StatelessWidget {
     required this.role,
     required this.deviceCode,
     required this.onRefresh,
+    required this.onLogout,
   });
 
   final String title;
@@ -114,31 +152,83 @@ class _TopBar extends StatelessWidget {
   final String role;
   final String deviceCode;
   final VoidCallback onRefresh;
+  final VoidCallback onLogout;
+
+  String get _roleLine => '${role == 'owner' ? 'Owner' : 'Kasir'} · Tablet $deviceCode';
 
   @override
-  Widget build(BuildContext context) => Container(
-        height: AppSize.topBar,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpace.s5),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(bottom: BorderSide(color: AppColors.line)),
-        ),
-        child: Row(children: [
-          Text(title, style: AppType.titleLg),
-          const Spacer(),
-          const ShiftChip(),
-          const SizedBox(width: AppSpace.s2),
-          IconButton(tooltip: 'Muat ulang menu', onPressed: onRefresh, icon: const Icon(Icons.sync_rounded)),
-          const SizedBox(width: AppSpace.s2),
-          const SizedBox(height: 32, child: VerticalDivider()),
-          const SizedBox(width: AppSpace.s3),
-          AppAvatar(userName, size: 36),
-          const SizedBox(width: AppSpace.s2),
-          Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(userName, style: AppType.bodyStrong),
-            Text('${role == 'owner' ? 'Owner' : 'Kasir'} · Tablet $deviceCode',
-                style: AppType.caption.copyWith(color: AppColors.inkMuted)),
-          ]),
-        ]),
-      );
+  Widget build(BuildContext context) {
+    final compact = context.isCompact;
+    final wide = context.widthClass == WidthClass.expanded && !context.isShort;
+
+    return Container(
+      height: context.isShort || compact ? 56 : AppSize.topBar,
+      padding: EdgeInsets.only(left: compact ? AppSpace.s4 : AppSpace.s5, right: AppSpace.s2),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.line)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: compact ? AppType.title : AppType.titleLg,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          ShiftChip(compact: !wide),
+          if (wide) IconButton(tooltip: 'Muat ulang menu', onPressed: onRefresh, icon: const Icon(Icons.sync_rounded)),
+          const SizedBox(width: AppSpace.s1),
+          PopupMenuButton<String>(
+            tooltip: 'Akun',
+            position: PopupMenuPosition.under,
+            onSelected: (v) => v == 'refresh' ? onRefresh() : onLogout(),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                enabled: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(userName, style: AppType.bodyStrong.copyWith(color: AppColors.ink)),
+                    Text(_roleLine, style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'refresh',
+                child: ListTile(leading: Icon(Icons.sync_rounded), title: Text('Muat ulang menu')),
+              ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: ListTile(leading: Icon(Icons.logout_rounded), title: Text('Keluar')),
+              ),
+            ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.s2, vertical: AppSpace.s1),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppAvatar(userName, size: compact ? 32 : 36),
+                  if (wide) ...[
+                    const SizedBox(width: AppSpace.s2),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(userName, style: AppType.bodyStrong),
+                        Text(_roleLine, style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

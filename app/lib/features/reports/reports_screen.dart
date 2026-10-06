@@ -5,6 +5,7 @@ import '../../core/api_client.dart';
 import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
+import '../../core/ui/responsive.dart';
 import '../session/session_controller.dart';
 
 String _isoDate(DateTime d) =>
@@ -38,23 +39,30 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final compact = context.isCompact;
+    final gutter = compact ? AppSpace.s3 : AppSpace.s5;
+    final range = SegmentedButton<_Range>(
+      // HP: tombol rentang mengisi lebar layar.
+      expandedInsets: compact ? EdgeInsets.zero : null,
+      showSelectedIcon: !compact,
+      segments: [
+        const ButtonSegment(value: _Range.today, label: Text('Hari ini')),
+        const ButtonSegment(value: _Range.week, label: Text('7 hari')),
+        ButtonSegment(value: _Range.month, label: Text(compact ? 'Bulan' : 'Bulan ini')),
+      ],
+      selected: {_range},
+      onSelectionChanged: (s) => setState(() {
+        _range = s.first;
+        _report = _load();
+      }),
+    );
+
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(AppSpace.s5, AppSpace.s4, AppSpace.s5, AppSpace.s3),
+        padding: EdgeInsets.fromLTRB(gutter, AppSpace.s4, gutter, AppSpace.s3),
         child: Row(children: [
-          SegmentedButton<_Range>(
-            segments: const [
-              ButtonSegment(value: _Range.today, label: Text('Hari ini')),
-              ButtonSegment(value: _Range.week, label: Text('7 hari')),
-              ButtonSegment(value: _Range.month, label: Text('Bulan ini')),
-            ],
-            selected: {_range},
-            onSelectionChanged: (s) => setState(() {
-              _range = s.first;
-              _report = _load();
-            }),
-          ),
-          const Spacer(),
+          if (compact) Expanded(child: range) else range,
+          if (!compact) const Spacer(),
           IconButton(
             tooltip: 'Muat ulang',
             onPressed: () => setState(() => _report = _load()),
@@ -78,32 +86,41 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             final byMethod = r['by_method'] as Map<String, dynamic>;
             final voids = r['voids'] as Map<String, dynamic>;
 
-            return ListView(padding: const EdgeInsets.fromLTRB(AppSpace.s5, 0, AppSpace.s5, AppSpace.s5), children: [
+            final byMethodCard = AppSectionCard(title: 'Per metode bayar', children: [
+              for (final m in const [('cash', 'Tunai'), ('debit', 'Debit'), ('qris', 'QRIS')])
+                AppSummaryRow(m.$2, rp(byMethod[m.$1] as int)),
+            ]);
+            final byCashierCard = AppSectionCard(title: 'Per kasir', children: [
+              for (final c in (r['by_cashier'] as List).cast<Map<String, dynamic>>())
+                AppSummaryRow('${c['name']} (${c['orders']})', rp(c['sales'] as int)),
+            ]);
+
+            return LayoutBuilder(builder: (context, box) {
+              final width = box.maxWidth - gutter * 2;
+              // Kartu angka: 2 kolom di HP, bertambah sesuai lebar (min ±170 dp per kartu).
+              final cols = columnsFor(width, minItem: 170, spacing: AppSpace.s3, min: 2, max: 5);
+              final cardWidth = (width - AppSpace.s3 * (cols - 1)) / cols;
+              return ListView(padding: EdgeInsets.fromLTRB(gutter, 0, gutter, gutter), children: [
               Wrap(spacing: AppSpace.s3, runSpacing: AppSpace.s3, children: [
-                AppStatCard('Penjualan', rp(r['sales'] as int), emphasis: true),
-                AppStatCard('Order lunas', '${r['orders']}'),
-                AppStatCard('Rata-rata / order', rp(r['average'] as int)),
-                AppStatCard('Diskon', rp(r['discounts'] as int)),
-                if ((r['service'] as int) > 0) AppStatCard('Service', rp(r['service'] as int)),
-                if ((r['tax'] as int) > 0) AppStatCard('Pajak', rp(r['tax'] as int)),
-                AppStatCard('Void', '${voids['orders']} order · ${rp(voids['refunded'] as int)}'),
+                AppStatCard('Penjualan', rp(r['sales'] as int), emphasis: true, width: cardWidth),
+                AppStatCard('Order lunas', '${r['orders']}', width: cardWidth),
+                AppStatCard('Rata-rata / order', rp(r['average'] as int), width: cardWidth),
+                AppStatCard('Diskon', rp(r['discounts'] as int), width: cardWidth),
+                if ((r['service'] as int) > 0) AppStatCard('Service', rp(r['service'] as int), width: cardWidth),
+                if ((r['tax'] as int) > 0) AppStatCard('Pajak', rp(r['tax'] as int), width: cardWidth),
+                AppStatCard('Void', '${voids['orders']} order · ${rp(voids['refunded'] as int)}', width: cardWidth),
               ]),
               const SizedBox(height: AppSpace.s4),
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(
-                  child: AppSectionCard(title: 'Per metode bayar', children: [
-                    for (final m in const [('cash', 'Tunai'), ('debit', 'Debit'), ('qris', 'QRIS')])
-                      AppSummaryRow(m.$2, rp(byMethod[m.$1] as int)),
-                  ]),
-                ),
-                const SizedBox(width: AppSpace.s3),
-                Expanded(
-                  child: AppSectionCard(title: 'Per kasir', children: [
-                    for (final c in (r['by_cashier'] as List).cast<Map<String, dynamic>>())
-                      AppSummaryRow('${c['name']} (${c['orders']})', rp(c['sales'] as int)),
-                  ]),
-                ),
-              ]),
+              if (width < 560) ...[
+                byMethodCard,
+                const SizedBox(height: AppSpace.s3),
+                byCashierCard,
+              ] else
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: byMethodCard),
+                  const SizedBox(width: AppSpace.s3),
+                  Expanded(child: byCashierCard),
+                ]),
               const SizedBox(height: AppSpace.s3),
               AppSectionCard(title: 'Produk terlaris', children: [
                 for (final p in (r['top_products'] as List).cast<Map<String, dynamic>>())
@@ -120,6 +137,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               Text('Penjualan = order lunas (void tidak dihitung).',
                   style: AppType.caption.copyWith(color: AppColors.inkMuted)),
             ]);
+            });
           },
         ),
       ),

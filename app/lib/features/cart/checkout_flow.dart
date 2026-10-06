@@ -147,6 +147,7 @@ class CheckoutFlow {
   Future<void> _showDone(OrderJson order) => showDialog<void>(
         context: context,
         builder: (_) => AlertDialog(
+          scrollable: true,
           content: SizedBox(
             width: 360,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
