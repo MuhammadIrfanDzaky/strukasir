@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'core/theme/theme.dart';
 import 'core/theme/tokens.dart';
@@ -14,10 +15,23 @@ import 'features/shift/shift_controller.dart';
 import 'features/update/version_gate.dart';
 import 'home_shell.dart';
 
+/// DSN pelacak error, diisi saat build rilis: `--dart-define=SENTRY_DSN=...`. Kosong = nonaktif.
+const _sentryDsn = String.fromEnvironment('SENTRY_DSN');
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Semua orientasi: tablet & HP, portrait maupun landscape.
-  runApp(const ProviderScope(child: StrukasirApp()));
+  void run() => runApp(const ProviderScope(child: StrukasirApp()));
+  if (_sentryDsn.isEmpty) return run();
+
+  await SentryFlutter.init((o) {
+    o.dsn = _sentryDsn;
+    o.environment = const String.fromEnvironment('SENTRY_ENV', defaultValue: 'production');
+    // Privasi: tanpa data pribadi & tanpa screenshot (bisa memuat nama & nominal); hierarki layar default mati.
+    o.sendDefaultPii = false;
+    o.attachScreenshot = false;
+    o.tracesSampleRate = 0;
+  }, appRunner: run);
 }
 
 class StrukasirApp extends StatelessWidget {

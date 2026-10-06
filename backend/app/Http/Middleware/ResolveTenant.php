@@ -8,7 +8,10 @@ use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Closure;
 use Illuminate\Http\Request;
+use Sentry\State\Scope;
 use Symfony\Component\HttpFoundation\Response;
+
+use function Sentry\configureScope;
 
 /**
  * Menetapkan tenant aktif dari token yang terautentikasi — satu-satunya sumber tenant.
@@ -44,6 +47,12 @@ class ResolveTenant
         $this->context->set($tenant->id);
         $request->attributes->set('device', $device);
         $request->attributes->set('tenant', $tenant);
+
+        // Pelacak error: kenali kedai & tablet lewat ID, tanpa nama atau data pribadi.
+        configureScope(function (Scope $scope) use ($tenant, $device): void {
+            $scope->setTag('tenant_id', $tenant->id);
+            $scope->setTag('device_code', $device->code);
+        });
 
         if ($device->last_seen_at === null || $device->last_seen_at->lt(now()->subMinute())) {
             $device->forceFill(['last_seen_at' => now()])->saveQuietly();

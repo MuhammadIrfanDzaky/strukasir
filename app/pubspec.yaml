@@ -41,6 +41,7 @@ dependencies:
   uuid: ^4.6.0
   package_info_plus: ^10.2.2
   url_launcher: ^6.3.3
+  sentry_flutter: ^9.30.0
 
 dev_dependencies:
   flutter_test:
