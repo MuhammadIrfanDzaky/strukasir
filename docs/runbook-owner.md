@@ -47,6 +47,8 @@ ketuk **Belum dibayar** di atas keranjang, pilih order-nya, lalu ketuk **Bayar**
 | "Harga menu berubah" | Menu sudah diperbarui otomatis. Periksa total lalu tekan *Bayar* lagi. |
 | "Akun terkunci" | Terjadi setelah 5× PIN salah. Tunggu 5 menit. |
 | Owner lupa password / PIN | Hubungi developer (lihat kontak di bawah). |
+| Daftarkan tablet baru, diminta **Kode 2FA** | Buka aplikasi authenticator di HP owner, ketik 6 digit kode *Strukasir*. Kode berganti tiap 30 detik; bila ditolak, tunggu kode berikutnya. |
+| **HP owner hilang / ganti HP** | Hubungi developer: 2FA dimatikan, password direset, lalu 2FA dipasang ulang di HP baru. Tablet yang sudah terdaftar tetap jalan. |
 | "Perbarui aplikasi" | Ketuk *Unduh versi terbaru*, pasang, lalu buka lagi. |
 | Selisih kas di tutup shift | Cocokkan dengan **Laporan** (per metode bayar) dan riwayat void hari itu. |
 

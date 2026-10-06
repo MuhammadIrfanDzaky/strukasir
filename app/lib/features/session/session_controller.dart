@@ -107,12 +107,14 @@ class SessionController extends AsyncNotifier<Session> {
     required String email,
     required String password,
     required String deviceName,
+    String? otp,
   }) async {
     final api = ApiClient(baseUrl: serverUrl);
     final res = await api.post('/devices/register', data: {
       'email': email.trim(),
       'password': password,
       'device_name': deviceName.trim(),
+      if (otp != null && otp.trim().isNotEmpty) 'otp': otp.trim(),
       'device_id': await _store.installId(),
     });
 

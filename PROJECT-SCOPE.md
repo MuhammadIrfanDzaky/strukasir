@@ -5,12 +5,12 @@
   (`webhook` dari +payments di-drop untuk v1: belum ada payment gateway — QRIS statis dikonfirmasi manual.
   Reopen saat QRIS dinamis / gateway apa pun ditambahkan.)
 - **Classified:** 2026-10-03
-- **Last audit:** 2026-10-03
-- **Gates open:** 6 kompetensi blocking (#5, 6, 27, 44, 46, 48) + 1 security check blocking (SEC-19)
+- **Last audit:** 2026-10-06
+- **Gates open:** 6 kompetensi blocking (#5, 6, 27, 44, 46, 48); semua security check blocking PASS/n/a
   — hampir semuanya menunggu server produksi & akun (lihat docs/deploy.md); #6 menunggu keputusan owner
 - **Checkpoint terakhir:** M6 deploy (paket produksi diuji lokal: HTTPS, alur kasir, backup + restore) — 2026-10-03. M1 printer: menunggu printer tersedia di lokasi.
 
-Konteks: POS Android (Flutter) + Laravel 12 API + PostgreSQL untuk kedai kopi BerryBrew, dengan fondasi
+Konteks: STRUKASIR, POS Android (Flutter) + Laravel 12 API + PostgreSQL; klien pertama kedai kopi BerryBrew, dengan fondasi
 multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` (menyusul) dan catatan plan.
 
 ## Blocking (must be `applied` before launch)
@@ -41,7 +41,7 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | 3 | Architecture Decision Records | applied | `docs/adr/0001-fondasi-arsitektur.md` |
 | 4 | Client & Stakeholder Management | deferred | Skema harga (subs / beli putus) belum diputuskan klien; buat change-request log saat kontrak disepakati |
 | 7 | Frontend | deferred | State loading/empty/error di tiap layar Flutter |
-| 8 | UI/UX & Responsiveness | deferred | Target: tablet TablePC landscape; cepat disentuh, ringan untuk CPU lemah. Diverifikasi di perangkat asli, bukan 360/768/1280px |
+| 8 | UI/UX & Responsiveness | deferred | HP & tablet, portrait/landscape (compact/medium/expanded + layar pendek). Progres: `app/test/responsive_test.dart` merender 16 layar × 12 ukuran (320×568 s.d. 1366×1024) × skala font 1.0/1.3 dan gagal bila overflow; skala font dibatasi 1.2× (`appBuilder`). Belum: dicek di TablePC asli |
 | 9 | Application State | deferred | Riverpod; server = sumber kebenaran, drift hanya cache + antrean |
 | 12 | i18n / Timezone / Locale / Currency | deferred | Timestamp UTC di DB, tampil Asia/Jakarta; format Rupiah id_ID; nomor order per hari lokal |
 | 14 | APIs & Backend Logic | deferred | Kontrak respons/error konsisten, didokumentasikan di `docs/api.md` |
@@ -96,7 +96,7 @@ multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` 
 | SEC-15 | JWT handling | critical | 25 | n/a | Sanctum token opaque (hash di DB), bukan JWT |
 | SEC-16 | Session lifecycle | high | 25 | PASS | Logout hapus token; token user kedaluwarsa 16 jam; 1 sesi per user per tablet; cabut tablet / reset owner mencabut semua sesi (`AuthTest`, `AdminCommandsTest`). Belum ada fitur ganti PIN mandiri |
 | SEC-17 | Password reset flow | critical | 25 | n/a | Tidak ada reset mandiri di v1 (tanpa email); reset owner via artisan command oleh developer, tercatat di audit log. Reopen jika ada reset via email/WA |
-| SEC-19 | MFA & re-authentication | medium | 25 | FAIL | Aksi destruktif (void, refund, diskon > limit, ubah harga) wajib PIN owner ulang. MFA owner: deferred |
+| SEC-19 | MFA & re-authentication | medium | 25 | PASS | Aksi destruktif (void, refund, diskon > limit) wajib PIN owner ulang (`Approval`). 2FA TOTP owner untuk pendaftaran tablet (satu-satunya login password): rahasia terenkripsi (`encrypted` cast), anti-replay per langkah waktu, kode salah ikut lockout & audit (`App\Support\TwoFactor`, `DeviceRegistrationController`, `pos:owner-2fa`); diuji `TwoFactorTest` |
 | SEC-20 | Broken access control / IDOR | critical | 26 | PASS | Semua route `{id}` (categories, products, modifier-groups) di-resolve setelah tenant ditetapkan → ID kedai lain 404; referensi lintas tenant ditolak (`MenuTest::test_cannot_touch_another_tenants_menu`, `TenantIsolationTest`). Dinilai ulang tiap endpoint baru |
 | SEC-21 | Business logic flaws | critical | 14 | PASS | `PricingService` menghitung ulang dari harga server; klien hanya kirim produk/qty/modifier; qty 1–999, diskon dibatasi, total bayar harus pas (`OrderTest`) |
 | SEC-22 | Race conditions | critical | 20 | PASS | Bayar: `lockForUpdate` + cek status di transaksi; nomor order dari `order_counters` terkunci; PK UUID order/pembayaran dari tablet = idempotency key (`OrderTest::test_resending_*`, `test_paying_twice_*`) |

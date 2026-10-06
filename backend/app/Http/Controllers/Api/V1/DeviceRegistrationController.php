@@ -10,17 +10,18 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\Tenancy\TenantContext;
+use App\Support\TwoFactor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * Owner mendaftarkan tablet sekali dengan email + password. Tablet menyimpan token perangkat;
+ * Owner mendaftarkan tablet sekali dengan email + password (+ kode 2FA bila aktif). Tablet menyimpan token perangkat;
  * setelah itu kasir cukup login dengan PIN.
  */
 class DeviceRegistrationController extends Controller
 {
-    public function __invoke(RegisterDeviceRequest $request, TenantContext $context): JsonResponse
+    public function __invoke(RegisterDeviceRequest $request, TenantContext $context, TwoFactor $twoFactor): JsonResponse
     {
         $owner = User::query()->where('email', strtolower((string) $request->input('email')))->first();
         $invalid = response()->json(['message' => 'Email atau password salah.'], 422);
@@ -31,7 +32,7 @@ class DeviceRegistrationController extends Controller
             return $invalid;
         }
 
-        return $context->run($owner->tenant_id, function () use ($owner, $request, $invalid) {
+        return $context->run($owner->tenant_id, function () use ($owner, $request, $invalid, $twoFactor) {
             if ($owner->isLocked()) {
                 return response()->json([
                     'message' => 'Akun terkunci sementara karena terlalu banyak percobaan gagal.',
@@ -44,6 +45,26 @@ class DeviceRegistrationController extends Controller
                 Audit::record('auth.password_failed', $owner, user: $owner);
 
                 return $invalid;
+            }
+
+            // 2FA (SEC-19): password benar tapi kode belum dikirim → minta kode, bukan percobaan gagal.
+            if ($owner->hasTwoFactor()) {
+                $otp = trim((string) $request->input('otp'));
+                if ($otp === '') {
+                    return response()->json([
+                        'message' => 'Masukkan kode 2FA dari aplikasi authenticator.',
+                        'errors' => ['otp' => ['Masukkan kode 6 digit dari aplikasi authenticator.']],
+                    ], 422);
+                }
+                if (! $twoFactor->verify($owner, $otp)) {
+                    $owner->registerFailedAttempt();
+                    Audit::record('auth.otp_failed', $owner, user: $owner);
+
+                    return response()->json([
+                        'message' => 'Kode 2FA salah atau sudah dipakai.',
+                        'errors' => ['otp' => ['Kode 2FA salah atau sudah dipakai. Tunggu kode berikutnya.']],
+                    ], 422);
+                }
             }
 
             $tenant = Tenant::findOrFail($owner->tenant_id);

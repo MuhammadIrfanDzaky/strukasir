@@ -45,6 +45,11 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install -y docker.io docker-compose-v2 git ufw
 sudo usermod -aG docker $USER            # logout & login ulang setelah ini
 sudo ufw allow OpenSSH && sudo ufw allow 80,443/tcp && sudo ufw allow 443/udp && sudo ufw enable
+
+# Swap 2 GB: cadangan saat build image / lonjakan memori di VPS RAM 2 GB.
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-swap.conf && sudo sysctl --system
 ```
 
 - Bila panel penyedia punya firewall sendiri, buka juga **TCP 80, 443** (dan UDP 443).
@@ -68,6 +73,8 @@ cp deploy/backup.env.gdrive.example deploy/backup.env && nano deploy/backup.env 
 Isi `deploy/.env`:
 - `SERVER_NAME` dan `APP_URL`: domain Anda.
 - `APP_KEY`: buat dengan `docker run --rm php:8.4-cli php -r "echo 'base64:'.base64_encode(random_bytes(32)), PHP_EOL;"`.
+  Simpan di password manager dan **jangan diganti** setelah produksi berjalan: rahasia 2FA owner
+  dienkripsi dengan kunci ini (ganti kunci = semua 2FA harus dipasang ulang).
 - `POSTGRES_PASSWORD` dan `APP_DB_PASSWORD`: acak, **hanya huruf & angka** (`openssl rand -base64 24 | tr -dc A-Za-z0-9`).
 - `BACKUP_HEARTBEAT_URL` (opsional).
 
@@ -81,6 +88,16 @@ $C exec app php artisan pos:create-tenant berrybrew "BerryBrew" --owner-email=<e
 ```
 
 Command terakhir menampilkan **password & PIN owner sekali saja**. Serahkan langsung ke owner.
+
+Lalu aktifkan **2FA owner** bersama owner (HP owner di tangan, aplikasi Google Authenticator / Aegis
+terpasang). Setelah aktif, mendaftarkan tablet baru butuh email + password + kode 6 digit:
+
+```bash
+$C exec -it app php artisan pos:owner-2fa <email-owner>
+```
+
+Perintah menampilkan kunci sekali (ketik di aplikasi authenticator, atau buat QR dari URI yang
+ditampilkan), lalu meminta satu kode untuk konfirmasi. Jam HP owner harus otomatis.
 
 Cek hasilnya:
 
@@ -141,6 +158,8 @@ Jumlah baris harus sama dengan produksi pada saat backup dibuat. Menimpa produks
 |---|---|
 | Kedai baru | `$C exec app php artisan pos:create-tenant <kode> "<Nama>" --owner-email=<email>` |
 | Owner lupa password / PIN | `$C exec app php artisan pos:reset-owner-password <email> --pin` |
+| Aktifkan / ganti 2FA owner | `$C exec -it app php artisan pos:owner-2fa <email>` |
+| HP owner hilang (matikan 2FA) | `$C exec app php artisan pos:owner-2fa <email> --disable`, lalu reset password & aktifkan lagi |
 | Log aplikasi | `$C logs -f app` |
 | Log backup | `$C logs backup` |
 

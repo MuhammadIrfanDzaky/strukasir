@@ -24,7 +24,7 @@ class TenantDataService
     ];
 
     /** Kolom rahasia yang tidak pernah ikut diekspor. */
-    private const HIDDEN = ['users' => ['password', 'pin_hash', 'remember_token']];
+    private const HIDDEN = ['users' => ['password', 'pin_hash', 'remember_token', 'two_factor_secret', 'two_factor_last_step']];
 
     public function __construct(private readonly TenantContext $context) {}
 

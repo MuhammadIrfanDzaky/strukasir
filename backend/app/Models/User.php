@@ -23,7 +23,7 @@ class User extends Authenticatable
     // tenant_id, role, failed_attempts, locked_until sengaja TIDAK fillable (SEC-03).
     protected $fillable = ['name', 'email'];
 
-    protected $hidden = ['password', 'pin_hash', 'remember_token'];
+    protected $hidden = ['password', 'pin_hash', 'remember_token', 'two_factor_secret'];
 
     protected function casts(): array
     {
@@ -32,6 +32,9 @@ class User extends Authenticatable
             'role' => Role::class,
             'active' => 'boolean',
             'locked_until' => 'datetime',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_confirmed_at' => 'datetime',
+            'two_factor_last_step' => 'integer',
         ];
     }
 
@@ -39,6 +42,12 @@ class User extends Authenticatable
     public function requiresTenantContext(): bool
     {
         return false;
+    }
+
+    /** 2FA aktif = rahasia tersimpan DAN sudah dikonfirmasi dengan satu kode yang benar. */
+    public function hasTwoFactor(): bool
+    {
+        return $this->two_factor_secret !== null && $this->two_factor_confirmed_at !== null;
     }
 
     public function setPin(string $pin): void
