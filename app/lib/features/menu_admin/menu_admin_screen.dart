@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
 import '../../core/money.dart';
+import '../../core/theme/tokens.dart';
+import '../../core/ui/components.dart';
 import '../menu/menu_controller.dart';
 import '../menu/menu_models.dart';
 import 'menu_admin_api.dart';
@@ -19,11 +21,23 @@ class MenuAdminScreen extends ConsumerWidget {
       length: 3,
       child: Column(
         children: [
-          const TabBar(tabs: [Tab(text: 'Produk'), Tab(text: 'Kategori'), Tab(text: 'Pilihan / Modifier')]),
+          const ColoredBox(
+            color: AppColors.surface,
+            child: TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              padding: EdgeInsets.symmetric(horizontal: AppSpace.s3),
+              tabs: [Tab(text: 'Produk'), Tab(text: 'Kategori'), Tab(text: 'Pilihan / Modifier')],
+            ),
+          ),
           Expanded(
             child: state.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Menu gagal dimuat: $e')),
+              loading: () => const AppLoading(),
+              error: (e, _) => AppErrorState(
+                title: 'Menu gagal dimuat',
+                message: '$e',
+                onRetry: () => ref.invalidate(menuProvider),
+              ),
               data: (s) => TabBarView(children: [
                 _ProductsTab(menu: s.menu),
                 _CategoriesTab(menu: s.menu),
@@ -56,7 +70,7 @@ Widget _addButton(String label, VoidCallback onPressed) => Align(
       alignment: Alignment.centerRight,
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: FilledButton.icon(onPressed: onPressed, icon: const Icon(Icons.add), label: Text(label)),
+        child: FilledButton.icon(onPressed: onPressed, icon: const Icon(Icons.add_rounded), label: Text(label)),
       ),
     );
 
@@ -70,7 +84,11 @@ class _ProductsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (menu.categories.isEmpty) {
-      return const Center(child: Text('Buat kategori dulu di tab "Kategori".'));
+      return const AppEmptyState(
+        icon: Icons.category_rounded,
+        title: 'Belum ada kategori',
+        message: 'Buat kategori dulu di tab "Kategori".',
+      );
     }
 
     return Column(
@@ -80,22 +98,26 @@ class _ProductsTab extends ConsumerWidget {
           child: ListView(
             children: [
               for (final c in menu.categories) ...[
-                ListTile(
-                  title: Text(c.name, style: Theme.of(context).textTheme.titleMedium),
-                  dense: true,
-                  tileColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                Container(
+                  color: AppColors.surfaceSunken,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.s4, vertical: AppSpace.s2),
+                  child: AppOverline(c.name, color: AppColors.ink),
                 ),
                 for (final p in menu.productsIn(c.id, includeInactive: true))
                   ListTile(
+                    tileColor: AppColors.surface,
                     title: Text(p.name,
-                        style: TextStyle(decoration: p.active ? null : TextDecoration.lineThrough)),
-                    subtitle: Text([
-                      rp(p.price),
-                      if (!p.active) 'nonaktif',
-                      if (p.soldOut) 'habis',
-                      ...menu.groupsFor(p).map((g) => g.name),
-                    ].join(' · ')),
-                    trailing: const Icon(Icons.edit),
+                        style: TextStyle(
+                          decoration: p.active ? null : TextDecoration.lineThrough,
+                          color: p.active ? null : AppColors.inkMuted,
+                        )),
+                    subtitle: Text([rp(p.price), ...menu.groupsFor(p).map((g) => g.name)].join(' · ')),
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (!p.active) const AppBadge('Nonaktif'),
+                      if (p.soldOut) const AppBadge('Habis', tone: AppTone.danger),
+                      const SizedBox(width: AppSpace.s2),
+                      const Icon(Icons.edit_rounded),
+                    ]),
                     onTap: () => _openForm(context, p),
                   ),
               ],
@@ -173,12 +195,14 @@ class _ProductFormState extends ConsumerState<ProductForm> {
                 decoration: const InputDecoration(labelText: 'Nama produk'),
                 validator: (v) => (v?.trim().isNotEmpty ?? false) ? null : 'Wajib diisi',
               ),
+              const SizedBox(height: AppSpace.s3),
               TextFormField(
                 controller: _price,
                 decoration: const InputDecoration(labelText: 'Harga', prefixText: 'Rp '),
                 keyboardType: TextInputType.number,
                 validator: (v) => parseRupiah(v ?? '') == null ? 'Isi harga dalam angka' : null,
               ),
+              const SizedBox(height: AppSpace.s3),
               DropdownButtonFormField<String>(
                 initialValue: _categoryId,
                 decoration: const InputDecoration(labelText: 'Kategori'),
@@ -198,9 +222,8 @@ class _ProductFormState extends ConsumerState<ProductForm> {
                 value: _soldOut,
                 onChanged: (v) => setState(() => _soldOut = v),
               ),
-              const Divider(),
-              Text('Pilihan untuk produk ini (urutan = urutan tampil)',
-                  style: Theme.of(context).textTheme.labelLarge),
+              const Padding(padding: EdgeInsets.symmetric(vertical: AppSpace.s2), child: Divider()),
+              const AppOverline('Pilihan untuk produk ini (urutan = urutan tampil)'),
               for (final g in widget.menu.modifierGroups)
                 CheckboxListTile(
                   title: Text(g.name),
@@ -239,6 +262,7 @@ class _CategoriesTab extends ConsumerWidget {
             children: [
               for (final c in menu.categories)
                 ListTile(
+                  tileColor: AppColors.surface,
                   title: Text(c.name),
                   subtitle: Text('${menu.productsIn(c.id, includeInactive: true).length} produk'
                       '${c.active ? '' : ' · nonaktif'}'),
@@ -248,9 +272,12 @@ class _CategoriesTab extends ConsumerWidget {
                       onChanged: (v) => _run(
                           context, () => api.saveCategory(id: c.id, name: c.name, active: v, sort: c.sort)),
                     ),
-                    IconButton(icon: const Icon(Icons.edit), onPressed: () => _edit(context, api, c)),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline),
+                        tooltip: 'Ubah', icon: const Icon(Icons.edit_rounded), onPressed: () => _edit(context, api, c)),
+                    IconButton(
+                      tooltip: 'Hapus',
+                      color: AppColors.danger,
+                      icon: const Icon(Icons.delete_outline_rounded),
                       onPressed: () async {
                         if (await _confirm(context, 'Hapus kategori "${c.name}"?') && context.mounted) {
                           await _run(context, () => api.deleteCategory(c.id));
@@ -293,11 +320,12 @@ class _GroupsTab extends ConsumerWidget {
             children: [
               for (final g in menu.modifierGroups)
                 ListTile(
+                  tileColor: AppColors.surface,
                   title: Text('${g.name}  ·  ${g.rule}'),
                   subtitle: Text(g.activeModifiers
                       .map((m) => m.priceDelta > 0 ? '${m.name} (+${rupiah(m.priceDelta)})' : m.name)
                       .join(', ')),
-                  trailing: const Icon(Icons.edit),
+                  trailing: const Icon(Icons.edit_rounded),
                   onTap: () => _open(context, g),
                 ),
             ],
@@ -406,15 +434,18 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
                 const Text('Maksimal dipilih'),
                 const Spacer(),
                 IconButton(
-                    onPressed: _max > 1 ? () => setState(() => _max--) : null, icon: const Icon(Icons.remove)),
-                Text('$_max', style: Theme.of(context).textTheme.titleMedium),
+                    onPressed: _max > 1 ? () => setState(() => _max--) : null, icon: const Icon(Icons.remove_rounded)),
+                Text('$_max', style: AppType.title),
                 IconButton(
                     onPressed: _max < _rows.length ? () => setState(() => _max++) : null,
-                    icon: const Icon(Icons.add)),
+                    icon: const Icon(Icons.add_rounded)),
               ]),
               const Divider(),
+              const SizedBox(height: AppSpace.s3),
               for (final (i, r) in _rows.indexed)
-                Row(children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpace.s3),
+                  child: Row(children: [
                   Expanded(
                     flex: 3,
                     child: TextFormField(
@@ -439,12 +470,13 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
                               if (_max > _rows.length) _max = _rows.length;
                             })
                         : null,
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close_rounded),
                   ),
                 ]),
+                ),
               TextButton.icon(
                 onPressed: () => setState(() => _rows.add(_OptionRow())),
-                icon: const Icon(Icons.add),
+                icon: const Icon(Icons.add_rounded),
                 label: const Text('Tambah pilihan'),
               ),
             ],
@@ -453,7 +485,11 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
       ),
       actions: [
         if (widget.group != null)
-          TextButton(onPressed: _busy ? null : _delete, child: const Text('Hapus grup')),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            onPressed: _busy ? null : _delete,
+            child: const Text('Hapus grup'),
+          ),
         TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Batal')),
         FilledButton(onPressed: _busy ? null : _save, child: const Text('Simpan')),
       ],

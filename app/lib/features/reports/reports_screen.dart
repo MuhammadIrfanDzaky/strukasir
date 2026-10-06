@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
 import '../../core/money.dart';
+import '../../core/theme/tokens.dart';
+import '../../core/ui/components.dart';
 import '../session/session_controller.dart';
 
 String _isoDate(DateTime d) =>
@@ -36,11 +38,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(children: [
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(AppSpace.s5, AppSpace.s4, AppSpace.s5, AppSpace.s3),
         child: Row(children: [
           SegmentedButton<_Range>(
             segments: const [
@@ -55,7 +55,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             }),
           ),
           const Spacer(),
-          IconButton(onPressed: () => setState(() => _report = _load()), icon: const Icon(Icons.refresh)),
+          IconButton(
+            tooltip: 'Muat ulang',
+            onPressed: () => setState(() => _report = _load()),
+            icon: const Icon(Icons.refresh_rounded),
+          ),
         ]),
       ),
       Expanded(
@@ -64,116 +68,61 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           builder: (context, snap) {
             if (snap.hasError) {
               final e = snap.error;
-              return Center(child: Text(e is ApiException ? e.message : '$e'));
+              return AppErrorState(
+                message: e is ApiException ? e.message : '$e',
+                onRetry: () => setState(() => _report = _load()),
+              );
             }
-            if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+            if (!snap.hasData) return const AppLoading();
             final r = snap.data!;
             final byMethod = r['by_method'] as Map<String, dynamic>;
             final voids = r['voids'] as Map<String, dynamic>;
 
-            return ListView(padding: const EdgeInsets.all(12), children: [
-              Wrap(spacing: 12, runSpacing: 12, children: [
-                _Stat('Penjualan', rp(r['sales'] as int), emphasis: true),
-                _Stat('Order lunas', '${r['orders']}'),
-                _Stat('Rata-rata / order', rp(r['average'] as int)),
-                _Stat('Diskon', rp(r['discounts'] as int)),
-                if ((r['service'] as int) > 0) _Stat('Service', rp(r['service'] as int)),
-                if ((r['tax'] as int) > 0) _Stat('Pajak', rp(r['tax'] as int)),
-                _Stat('Void', '${voids['orders']} order · ${rp(voids['refunded'] as int)}'),
+            return ListView(padding: const EdgeInsets.fromLTRB(AppSpace.s5, 0, AppSpace.s5, AppSpace.s5), children: [
+              Wrap(spacing: AppSpace.s3, runSpacing: AppSpace.s3, children: [
+                AppStatCard('Penjualan', rp(r['sales'] as int), emphasis: true),
+                AppStatCard('Order lunas', '${r['orders']}'),
+                AppStatCard('Rata-rata / order', rp(r['average'] as int)),
+                AppStatCard('Diskon', rp(r['discounts'] as int)),
+                if ((r['service'] as int) > 0) AppStatCard('Service', rp(r['service'] as int)),
+                if ((r['tax'] as int) > 0) AppStatCard('Pajak', rp(r['tax'] as int)),
+                AppStatCard('Void', '${voids['orders']} order · ${rp(voids['refunded'] as int)}'),
               ]),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpace.s4),
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Expanded(
-                  child: _Section('Per metode bayar', [
+                  child: AppSectionCard(title: 'Per metode bayar', children: [
                     for (final m in const [('cash', 'Tunai'), ('debit', 'Debit'), ('qris', 'QRIS')])
-                      _Row(m.$2, rp(byMethod[m.$1] as int)),
+                      AppSummaryRow(m.$2, rp(byMethod[m.$1] as int)),
                   ]),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpace.s3),
                 Expanded(
-                  child: _Section('Per kasir', [
+                  child: AppSectionCard(title: 'Per kasir', children: [
                     for (final c in (r['by_cashier'] as List).cast<Map<String, dynamic>>())
-                      _Row('${c['name']} (${c['orders']})', rp(c['sales'] as int)),
+                      AppSummaryRow('${c['name']} (${c['orders']})', rp(c['sales'] as int)),
                   ]),
                 ),
               ]),
-              const SizedBox(height: 12),
-              _Section('Produk terlaris', [
+              const SizedBox(height: AppSpace.s3),
+              AppSectionCard(title: 'Produk terlaris', children: [
                 for (final p in (r['top_products'] as List).cast<Map<String, dynamic>>())
-                  _Row('${p['qty']}× ${p['name']}', rp(p['revenue'] as int)),
+                  AppSummaryRow('${p['qty']}× ${p['name']}', rp(p['revenue'] as int)),
               ]),
               if ((r['daily'] as List).length > 1) ...[
-                const SizedBox(height: 12),
-                _Section('Per hari', [
+                const SizedBox(height: AppSpace.s3),
+                AppSectionCard(title: 'Per hari', children: [
                   for (final d in (r['daily'] as List).cast<Map<String, dynamic>>())
-                    _Row('${d['date']} (${d['orders']})', rp(d['sales'] as int)),
+                    AppSummaryRow('${d['date']} (${d['orders']})', rp(d['sales'] as int)),
                 ]),
               ],
-              const SizedBox(height: 8),
-              Text('Penjualan = order lunas (void tidak dihitung).', style: theme.textTheme.bodySmall),
+              const SizedBox(height: AppSpace.s3),
+              Text('Penjualan = order lunas (void tidak dihitung).',
+                  style: AppType.caption.copyWith(color: AppColors.inkMuted)),
             ]);
           },
         ),
       ),
     ]);
   }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat(this.label, this.value, {this.emphasis = false});
-
-  final String label;
-  final String value;
-  final bool emphasis;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SizedBox(
-      width: 220,
-      child: Card(
-        color: emphasis ? theme.colorScheme.primaryContainer : null,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: theme.textTheme.labelLarge),
-            const SizedBox(height: 4),
-            Text(value, style: emphasis ? theme.textTheme.headlineSmall : theme.textTheme.titleMedium),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
-class _Section extends StatelessWidget {
-  const _Section(this.title, this.children);
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            if (children.isEmpty) const Text('Belum ada data.') else ...children,
-          ]),
-        ),
-      );
-}
-
-class _Row extends StatelessWidget {
-  const _Row(this.label, this.value);
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(children: [Expanded(child: Text(label)), Text(value)]),
-      );
 }

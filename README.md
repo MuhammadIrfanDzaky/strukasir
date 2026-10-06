@@ -1,7 +1,8 @@
-# BerryBrew POS
+# STRUKASIR
 
-Sistem kasir (POS) untuk kedai kopi BerryBrew: app Android (Flutter) + API Laravel 12 + PostgreSQL,
-dengan fondasi multi-tenant agar bisa dipakai kedai lain.
+Aplikasi kasir untuk UMKM: app Android (Flutter) + API Laravel 12 + PostgreSQL, dengan fondasi
+multi-tenant. Klien pertama: kedai kopi BerryBrew. Identitas merek (logo, warna, tipe) ada di
+[`docs/brand/`](docs/brand/) dan design system di artifact "Strukasir".
 
 | Folder | Isi |
 |---|---|

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/money.dart';
+import '../../core/theme/tokens.dart';
+import '../../core/ui/components.dart';
 import 'order_api.dart';
 
 /// Nominal tunai yang umum diserahkan pelanggan, mis. total 28.000 → 28.000 / 30.000 / 50.000 / 100.000.
@@ -63,7 +65,6 @@ class _PaymentDialogState extends State<PaymentDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final problem = _problem;
 
     return AlertDialog(
@@ -71,31 +72,45 @@ class _PaymentDialogState extends State<PaymentDialog> {
       content: SizedBox(
         width: 520,
         child: ListView(shrinkWrap: true, children: [
-          Text('Total ${rp(widget.total)}', style: theme.textTheme.headlineSmall),
-          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(AppSpace.s4),
+            decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: AppRadius.lgAll),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const AppOverline('Total tagihan', color: AppColors.primaryStrong),
+              Text(rp(widget.total), style: AppType.display.copyWith(color: AppColors.primaryStrong)),
+            ]),
+          ),
+          const SizedBox(height: AppSpace.s2),
           for (final (i, r) in _rows.indexed) ...[
-            const Divider(),
+            if (i > 0) const Padding(padding: EdgeInsets.only(top: AppSpace.s3), child: Divider()),
+            const SizedBox(height: AppSpace.s3),
             Row(children: [
               SegmentedButton<String>(
                 segments: const [
-                  ButtonSegment(value: 'cash', label: Text('Tunai'), icon: Icon(Icons.payments)),
-                  ButtonSegment(value: 'debit', label: Text('Debit'), icon: Icon(Icons.credit_card)),
-                  ButtonSegment(value: 'qris', label: Text('QRIS'), icon: Icon(Icons.qr_code)),
+                  ButtonSegment(value: 'cash', label: Text('Tunai'), icon: Icon(Icons.payments_rounded)),
+                  ButtonSegment(value: 'debit', label: Text('Debit'), icon: Icon(Icons.credit_card_rounded)),
+                  ButtonSegment(value: 'qris', label: Text('QRIS'), icon: Icon(Icons.qr_code_rounded)),
                 ],
                 selected: {r.method},
                 onSelectionChanged: (s) => setState(() => r.method = s.first),
               ),
               const Spacer(),
               if (_rows.length > 1)
-                IconButton(onPressed: () => setState(() => _rows.removeAt(i)), icon: const Icon(Icons.close)),
+                IconButton(
+                    tooltip: 'Hapus baris',
+                    onPressed: () => setState(() => _rows.removeAt(i)),
+                    icon: const Icon(Icons.close_rounded)),
             ]),
-            if (_rows.length > 1)
+            const SizedBox(height: AppSpace.s3),
+            if (_rows.length > 1) ...[
               TextField(
                 controller: r.amount,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: 'Nominal', prefixText: 'Rp '),
                 onChanged: (_) => setState(() {}),
               ),
+              const SizedBox(height: AppSpace.s3),
+            ],
             if (r.method == 'cash') ...[
               TextField(
                 controller: r.tendered,
@@ -103,8 +118,8 @@ class _PaymentDialogState extends State<PaymentDialog> {
                 decoration: const InputDecoration(labelText: 'Uang diterima', prefixText: 'Rp '),
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: 8),
-              Wrap(spacing: 8, children: [
+              const SizedBox(height: AppSpace.s2),
+              Wrap(spacing: AppSpace.s2, runSpacing: AppSpace.s2, children: [
                 for (final v in suggestedCash(r.amountValue))
                   ActionChip(
                     label: Text(v == r.amountValue ? 'Uang pas' : rupiah(v)),
@@ -112,23 +127,18 @@ class _PaymentDialogState extends State<PaymentDialog> {
                   ),
               ]),
               if ((r.tenderedValue ?? 0) > r.amountValue)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text('Kembalian ${rp(r.tenderedValue! - r.amountValue)}',
-                      style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.primary)),
+                Container(
+                  margin: const EdgeInsets.only(top: AppSpace.s3),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.s4, vertical: AppSpace.s3),
+                  decoration: BoxDecoration(color: AppColors.successSoft, borderRadius: AppRadius.mdAll),
+                  child: AppSummaryRow('Kembalian', rp(r.tenderedValue! - r.amountValue),
+                      emphasis: true, valueColor: AppColors.success),
                 ),
             ],
             if (r.method == 'qris')
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text('Pastikan notifikasi dana masuk muncul di aplikasi merchant QRIS sebelum konfirmasi. '
-                    'Nama Anda tercatat sebagai pengonfirmasi.'),
-              ),
-            if (r.method == 'debit')
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text('Konfirmasi setelah transaksi di mesin EDC berhasil.'),
-              ),
+              const _Note('Pastikan notifikasi dana masuk muncul di aplikasi merchant QRIS sebelum konfirmasi. '
+                  'Nama Anda tercatat sebagai pengonfirmasi.'),
+            if (r.method == 'debit') const _Note('Konfirmasi setelah transaksi di mesin EDC berhasil.'),
           ],
           if (widget.splitEnabled && _rows.length < 3)
             TextButton.icon(
@@ -136,11 +146,11 @@ class _PaymentDialogState extends State<PaymentDialog> {
                 final rest = widget.total - _sum;
                 _rows.add(_Row('qris', rest > 0 ? rest : 0));
               }),
-              icon: const Icon(Icons.call_split),
+              icon: const Icon(Icons.call_split_rounded),
               label: const Text('Bagi ke metode lain'),
             ),
           if (problem != null && _rows.length > 1)
-            Text(problem, style: TextStyle(color: theme.colorScheme.error)),
+            Text(problem, style: AppType.caption.copyWith(color: AppColors.danger)),
         ]),
       ),
       actions: [
@@ -161,4 +171,22 @@ class _PaymentDialogState extends State<PaymentDialog> {
       ],
     );
   }
+}
+
+/// Catatan prosedur untuk metode non-tunai.
+class _Note extends StatelessWidget {
+  const _Note(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(AppSpace.s3),
+        decoration: BoxDecoration(color: AppColors.surfaceSunken, borderRadius: AppRadius.mdAll),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.info_outline_rounded, size: 20, color: AppColors.inkMuted),
+          const SizedBox(width: AppSpace.s2),
+          Expanded(child: Text(text, style: AppType.body)),
+        ]),
+      );
 }

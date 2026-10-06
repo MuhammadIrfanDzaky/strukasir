@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/theme/theme.dart';
+import 'core/ui/components.dart';
 import 'features/cart/cart_controller.dart';
 import 'features/menu/menu_controller.dart';
 import 'features/session/login_screen.dart';
@@ -16,22 +18,18 @@ Future<void> main() async {
   // Tablet kasir dipakai mendatar.
   await SystemChrome.setPreferredOrientations(
       [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
-  runApp(const ProviderScope(child: BerryBrewApp()));
+  runApp(const ProviderScope(child: StrukasirApp()));
 }
 
-class BerryBrewApp extends StatelessWidget {
-  const BerryBrewApp({super.key});
+class StrukasirApp extends StatelessWidget {
+  const StrukasirApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'BerryBrew POS',
+      title: 'Strukasir',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF6D4C41), // cokelat kopi
-        useMaterial3: true,
-        visualDensity: VisualDensity.comfortable,
-      ),
+      theme: buildAppTheme(),
       home: const VersionGate(child: SessionGate()),
     );
   }
@@ -54,8 +52,14 @@ class SessionGate extends ConsumerWidget {
     });
 
     return ref.watch(sessionProvider).when(
-          loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-          error: (e, _) => Scaffold(body: Center(child: Text('Gagal membaca sesi: $e'))),
+          loading: () => const Scaffold(body: Center(child: BrandMark(size: 72))),
+          error: (e, _) => Scaffold(
+            body: AppErrorState(
+              title: 'Gagal membaca sesi',
+              message: '$e',
+              onRetry: () => ref.invalidate(sessionProvider),
+            ),
+          ),
           data: (session) => switch (session) {
             NeedsSetup() => const SetupScreen(),
             NeedsLogin() => LoginScreen(session: session),

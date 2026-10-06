@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Token Strukasir: surface-app, ink & primary -->
+    <color name="strukasir_surface">#F8FAFC</color>
+    <color name="strukasir_ink">#0F172A</color>
+    <color name="ic_launcher_background">#3730A3</color>
+</resources>

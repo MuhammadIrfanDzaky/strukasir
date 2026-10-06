@@ -1,6 +1,6 @@
-# Panduan Infrastruktur BerryBrew POS — Dari Nol
+# Panduan Infrastruktur Strukasir — Dari Nol
 
-Dokumen ini menjelaskan **semua istilah "server-server-an"** yang dipakai BerryBrew POS: VPS, hosting,
+Dokumen ini menjelaskan **semua istilah "server-server-an"** yang dipakai Strukasir: VPS, hosting,
 domain, DNS, Cloudflare, HTTPS, database, Docker, backup, R2/Google Drive, monitoring, sampai alur
 lengkapnya. Bahasanya sederhana, dengan analogi **kedai kopi**.
 
@@ -15,7 +15,7 @@ Di bagian akhir ada **prompt untuk Gemini**: satu gambar per topik, plus gambar 
 
 1. [Gambaran besar dalam satu analogi](#1-gambaran-besar-dalam-satu-analogi)
 2. [Kamus istilah](#2-kamus-istilah)
-3. [Arsitektur BerryBrew POS](#3-arsitektur-berrybrew-pos)
+3. [Arsitektur Strukasir](#3-arsitektur-strukasir)
 4. [Alur 1 — Kasir menekan "Bayar"](#4-alur-1--kasir-menekan-bayar)
 5. [Alur 2 — Backup otomatis jam 03.00](#5-alur-2--backup-otomatis-jam-0300)
 6. [Alur 3 — Deploy & update aplikasi](#6-alur-3--deploy--update-aplikasi)
@@ -31,7 +31,7 @@ Di bagian akhir ada **prompt untuk Gemini**: satu gambar per topik, plus gambar 
 
 Bayangkan sistem kasir ini sebagai **kedai kopi cabang pusat** yang melayani pesanan dari tablet kasir:
 
-| Dunia nyata | Di sistem BerryBrew POS | Fungsinya |
+| Dunia nyata | Di sistem Strukasir | Fungsinya |
 |---|---|---|
 | Kasir di depan | **App Flutter** di tablet | Tempat kasir menginput pesanan |
 | Alamat kedai ("Jl. Kopi No. 1") | **Domain** (`pos-berrybrew.my.id`) | Nama yang mudah diingat |
@@ -232,7 +232,7 @@ kalau keystore hilang, app tidak bisa di-update dan harus dipasang ulang dari aw
 
 ---
 
-## 3. Arsitektur BerryBrew POS
+## 3. Arsitektur Strukasir
 
 ```mermaid
 flowchart TB

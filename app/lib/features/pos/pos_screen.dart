@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/money.dart';
+import '../../core/theme/tokens.dart';
+import '../../core/ui/components.dart';
 import '../cart/cart_controller.dart';
 import '../cart/cart_panel.dart';
 import '../menu/menu_controller.dart';
@@ -35,13 +37,11 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final state = ref.watch(menuProvider);
 
     return state.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('Menu gagal dimuat: $e'),
-          const SizedBox(height: 12),
-          FilledButton(onPressed: () => ref.invalidate(menuProvider), child: const Text('Coba lagi')),
-        ]),
+      loading: () => const AppLoading(),
+      error: (e, _) => AppErrorState(
+        title: 'Menu gagal dimuat',
+        message: '$e',
+        onRetry: () => ref.invalidate(menuProvider),
       ),
       data: (s) {
         final categories = s.menu.activeCategories;
@@ -49,6 +49,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         final products = categoryId == null ? <MenuProduct>[] : s.menu.productsIn(categoryId);
 
         return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
               flex: 3,
@@ -57,9 +58,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 children: [
                   if (s.fromCache)
                     MaterialBanner(
+                      leading: const Icon(Icons.cloud_off_rounded, color: AppColors.warning),
                       content: Text(s.refreshError == null
                           ? 'Memakai menu tersimpan, sedang memeriksa pembaruan…'
-                          : 'Offline — memakai menu tersimpan. (${s.refreshError})'),
+                          : 'Offline: memakai menu tersimpan. (${s.refreshError})'),
                       actions: [
                         TextButton(
                           onPressed: () => ref.read(menuProvider.notifier).refresh(),
@@ -68,16 +70,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       ],
                     ),
                   SizedBox(
-                    height: 56,
+                    height: 64,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.fromLTRB(AppSpace.s4, AppSpace.s3, AppSpace.s4, 0),
                       children: [
                         for (final c in categories)
                           Padding(
-                            padding: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.only(right: AppSpace.s2),
                             child: ChoiceChip(
                               label: Text(c.name),
+                              showCheckmark: false,
                               selected: c.id == categoryId,
                               onSelected: (_) => setState(() => _categoryId = c.id),
                             ),
@@ -87,14 +90,18 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   ),
                   Expanded(
                     child: products.isEmpty
-                        ? const Center(child: Text('Belum ada produk di kategori ini.'))
+                        ? const AppEmptyState(
+                            icon: Icons.local_cafe_rounded,
+                            title: 'Belum ada produk',
+                            message: 'Kategori ini masih kosong. Owner bisa menambah produk di Kelola Menu.',
+                          )
                         : GridView.builder(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(AppSpace.s4),
                             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 200,
-                              mainAxisExtent: 110,
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
+                              maxCrossAxisExtent: 210,
+                              mainAxisExtent: 116,
+                              crossAxisSpacing: AppSpace.s3,
+                              mainAxisSpacing: AppSpace.s3,
                             ),
                             itemCount: products.length,
                             itemBuilder: (_, i) => _ProductTile(
@@ -106,7 +113,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 ],
               ),
             ),
-            const VerticalDivider(width: 1),
             const Expanded(flex: 2, child: CartPanel()),
           ],
         );
@@ -123,25 +129,33 @@ class _ProductTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
+    final soldOut = product.soldOut;
+    return Material(
+      color: soldOut ? AppColors.surfaceSunken : AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.mdAll,
+        side: BorderSide(color: soldOut ? AppColors.surfaceSunken : AppColors.line),
+      ),
       clipBehavior: Clip.antiAlias,
-      color: product.soldOut ? theme.colorScheme.surfaceContainerHighest : null,
       child: InkWell(
         onTap: product.sellable ? onTap : null,
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppSpace.s3 + 2),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(product.name,
-                    maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
+                child: Text(
+                  product.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppType.title.copyWith(color: soldOut ? AppColors.inkMuted : AppColors.ink),
+                ),
               ),
-              Text(product.soldOut ? 'HABIS' : rp(product.price),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: product.soldOut ? theme.colorScheme.error : theme.colorScheme.primary,
-                  )),
+              if (soldOut)
+                const AppBadge('Habis', tone: AppTone.danger)
+              else
+                Text(rp(product.price), style: AppType.title.copyWith(color: AppColors.primary)),
             ],
           ),
         ),
@@ -165,8 +179,6 @@ class _ModifierDialogState extends State<ModifierDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return AlertDialog(
       title: Text(s.product.name),
       content: SizedBox(
@@ -176,16 +188,16 @@ class _ModifierDialogState extends State<ModifierDialog> {
           children: [
             for (final g in s.groups) ...[
               Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 6),
+                padding: const EdgeInsets.only(top: AppSpace.s4, bottom: AppSpace.s2),
                 child: Row(children: [
-                  Text(g.name, style: theme.textTheme.titleSmall),
-                  const SizedBox(width: 8),
-                  Text(g.rule, style: theme.textTheme.bodySmall),
+                  Text(g.name, style: AppType.title),
+                  const SizedBox(width: AppSpace.s2),
+                  AppBadge(g.rule),
                 ]),
               ),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: AppSpace.s2,
+                runSpacing: AppSpace.s2,
                 children: [
                   for (final m in g.activeModifiers)
                     FilterChip(
@@ -197,8 +209,8 @@ class _ModifierDialogState extends State<ModifierDialog> {
               ),
               if (s.errorFor(g) case final error?)
                 Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(error, style: TextStyle(color: theme.colorScheme.error)),
+                  padding: const EdgeInsets.only(top: AppSpace.s1),
+                  child: Text(error, style: AppType.caption.copyWith(color: AppColors.danger)),
                 ),
             ],
           ],

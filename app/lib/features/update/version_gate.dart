@@ -4,6 +4,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_client.dart';
+import '../../core/theme/tokens.dart';
+import '../../core/ui/components.dart';
 import '../session/session_controller.dart';
 
 /// Bandingkan versi semantik "1.2.3" (bagian build "+4" diabaikan). <0 jika a lebih lama dari b.
@@ -70,21 +72,25 @@ class VersionGate extends ConsumerWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.system_update, size: 64),
-            const SizedBox(height: 16),
-            Text('Perbarui aplikasi', style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            Text('Versi terpasang ${info.current}. Minimal versi ${info.minVersion} agar data tetap aman '
-                'dan sesuai server.', textAlign: TextAlign.center),
-            const SizedBox(height: 24),
+            const BrandMark(size: 72),
+            const SizedBox(height: AppSpace.s5),
+            Text('Perbarui aplikasi', style: AppType.headline),
+            const SizedBox(height: AppSpace.s2),
+            Text(
+                'Versi terpasang ${info.current}. Minimal versi ${info.minVersion} agar data tetap aman '
+                'dan sesuai server.',
+                textAlign: TextAlign.center,
+                style: AppType.body.copyWith(color: AppColors.inkMuted)),
+            const SizedBox(height: AppSpace.s6),
             if (info.downloadUrl != null)
               FilledButton.icon(
                 onPressed: () => launchUrl(Uri.parse(info.downloadUrl!), mode: LaunchMode.externalApplication),
-                icon: const Icon(Icons.download),
+                icon: const Icon(Icons.download_rounded),
                 label: const Text('Unduh versi terbaru'),
               )
             else
-              const Text('Hubungi admin untuk file pembaruan.'),
+              Text('Hubungi admin untuk file pembaruan.', style: AppType.bodyStrong),
+            const SizedBox(height: AppSpace.s2),
             TextButton(onPressed: () => ref.invalidate(updateInfoProvider), child: const Text('Periksa lagi')),
           ]),
         ),

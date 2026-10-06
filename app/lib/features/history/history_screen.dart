@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
 import '../../core/money.dart';
+import '../../core/theme/tokens.dart';
+import '../../core/ui/components.dart';
 import '../cart/dialogs.dart';
 import '../cart/order_api.dart';
 import '../printing/printer_service.dart';
@@ -37,12 +39,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(AppSpace.s5, AppSpace.s4, AppSpace.s5, AppSpace.s3),
         child: Row(children: [
           OutlinedButton.icon(
-            icon: const Icon(Icons.calendar_today),
+            icon: const Icon(Icons.calendar_today_rounded, size: 20),
             label: Text(_isoDate(_date)),
             onPressed: () async {
               final picked = await showDatePicker(
@@ -57,18 +59,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               }
             },
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpace.s3),
           Expanded(
             child: TextField(
               decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search), hintText: 'Cari nomor order / nama', isDense: true),
+                  prefixIcon: Icon(Icons.search_rounded), hintText: 'Cari nomor order / nama', isDense: true),
               onSubmitted: (v) {
                 _query = v.trim();
                 _reload();
               },
             ),
           ),
-          IconButton(onPressed: _reload, icon: const Icon(Icons.refresh)),
+          const SizedBox(width: AppSpace.s2),
+          IconButton(tooltip: 'Muat ulang', onPressed: _reload, icon: const Icon(Icons.refresh_rounded)),
         ]),
       ),
       Expanded(
@@ -77,15 +80,27 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           builder: (context, snap) {
             if (snap.hasError) {
               final e = snap.error;
-              return Center(child: Text(e is ApiException ? e.message : '$e'));
+              return AppErrorState(message: e is ApiException ? e.message : '$e', onRetry: _reload);
             }
-            if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+            if (!snap.hasData) return const AppLoading();
             final orders = snap.data!;
-            if (orders.isEmpty) return const Center(child: Text('Belum ada transaksi.'));
-            return ListView.separated(
-              itemCount: orders.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
-              itemBuilder: (_, i) => _OrderTile(order: orders[i], onChanged: _reload),
+            if (orders.isEmpty) {
+              return AppEmptyState(
+                icon: Icons.receipt_long_rounded,
+                title: 'Belum ada transaksi',
+                message: _query.isEmpty ? 'Tidak ada order pada ${_isoDate(_date)}.' : 'Tidak ada yang cocok dengan "$_query".',
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpace.s5, 0, AppSpace.s5, AppSpace.s5),
+              child: Card(
+                clipBehavior: Clip.antiAlias,
+                child: ListView.separated(
+                  itemCount: orders.length,
+                  separatorBuilder: (_, _) => const Divider(),
+                  itemBuilder: (_, i) => _OrderTile(order: orders[i], onChanged: _reload),
+                ),
+              ),
             );
           },
         ),
@@ -103,24 +118,33 @@ class _OrderTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = order['status'] as String;
-    final scheme = Theme.of(context).colorScheme;
     final created = DateTime.parse(order['created_at'] as String).toLocal();
     final time = '${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}';
 
     return ListTile(
-      leading: Text(time),
+      leading: SizedBox(
+        width: 48,
+        child: Text(time, style: AppType.bodyStrong.copyWith(color: AppColors.inkMuted)),
+      ),
       title: Text('${order['number']}  ${(order['customer_label'] as String?) ?? ''}'),
       subtitle: Text((order['items'] as List)
           .cast<Map<String, dynamic>>()
           .map((i) => '${i['qty']}x ${i['name']}')
           .join(', ')),
       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-        Chip(
-          label: Text(switch (status) { 'paid' => 'Lunas', 'open' => 'Belum bayar', _ => 'Void' }),
-          backgroundColor: status == 'void' ? scheme.errorContainer : null,
+        AppBadge.orderStatus(status),
+        const SizedBox(width: AppSpace.s4),
+        SizedBox(
+          width: 100,
+          child: Text(
+            rp(order['grand_total'] as int),
+            textAlign: TextAlign.right,
+            style: AppType.bodyStrong.copyWith(
+              color: status == 'void' ? AppColors.inkMuted : AppColors.ink,
+              decoration: status == 'void' ? TextDecoration.lineThrough : null,
+            ),
+          ),
         ),
-        const SizedBox(width: 12),
-        SizedBox(width: 90, child: Text(rp(order['grand_total'] as int), textAlign: TextAlign.right)),
       ]),
       onTap: () async {
         final changed = await showDialog<bool>(context: context, builder: (_) => OrderDetailDialog(order: order));
@@ -160,11 +184,16 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           if (widget.order['status'] == 'paid')
             Text('Uang ${rp(widget.order['grand_total'] as int)} dikembalikan ke pelanggan dan dicatat di shift ini.'),
+          const SizedBox(height: AppSpace.s3),
           TextField(controller: reason, autofocus: true, decoration: const InputDecoration(labelText: 'Alasan (wajib)')),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Void')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Void'),
+          ),
         ],
       ),
     );
@@ -206,17 +235,29 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
     final lines = customerReceipt(o);
 
     return AlertDialog(
-      title: Text('Order ${o['number']}'),
+      title: Row(children: [
+        Expanded(child: Text('Order ${o['number']}')),
+        AppBadge.orderStatus(o['status'] as String),
+      ]),
       content: SizedBox(
-        width: 380,
-        child: SingleChildScrollView(
-          // Pratinjau persis seperti struk yang akan dicetak.
-          child: Text(lines.join('\n'), style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+        width: 400,
+        child: Container(
+          padding: const EdgeInsets.all(AppSpace.s4),
+          decoration: BoxDecoration(color: AppColors.surfaceApp, borderRadius: AppRadius.mdAll),
+          child: SingleChildScrollView(
+            // Pratinjau persis seperti struk yang akan dicetak.
+            child: Text(lines.join('\n'),
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.35, color: AppColors.ink)),
+          ),
         ),
       ),
       actions: [
         if (o['status'] != 'void')
-          TextButton(onPressed: _busy ? null : _void, child: const Text('Void')),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            onPressed: _busy ? null : _void,
+            child: const Text('Void'),
+          ),
         if (o['status'] == 'paid')
           TextButton(onPressed: _busy ? null : _reprint, child: const Text('Cetak ulang')),
         FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Tutup')),

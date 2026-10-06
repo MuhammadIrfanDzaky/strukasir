@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
+import '../../core/theme/tokens.dart';
+import '../../core/ui/components.dart';
 import 'session_controller.dart';
 
 final staffProvider = FutureProvider.autoDispose<List<StaffMember>>(
@@ -16,62 +18,115 @@ class LoginScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final staff = ref.watch(staffProvider);
+    final tenant = session.device.tenantName.isEmpty ? 'Strukasir' : session.device.tenantName;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(session.device.tenantName.isEmpty ? 'BerryBrew POS' : session.device.tenantName),
-        actions: [
-          Center(child: Text('Tablet ${session.device.code}  ')),
-          IconButton(
-            tooltip: 'Muat ulang',
-            onPressed: () => ref.invalidate(staffProvider),
-            icon: const Icon(Icons.refresh),
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            width: 360,
+            color: AppColors.ink,
+            padding: const EdgeInsets.all(AppSpace.s8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const BrandLockup(height: 44, reversed: true),
+              const Spacer(),
+              const AppOverline('Kedai', color: AppColors.onInkMuted),
+              const SizedBox(height: AppSpace.s1),
+              Text(tenant, style: AppType.headline.copyWith(color: AppColors.onInk)),
+              const SizedBox(height: AppSpace.s2),
+              Row(children: [
+                const Icon(Icons.tablet_android_rounded, size: 18, color: AppColors.onInkMuted),
+                const SizedBox(width: AppSpace.s2),
+                Text('Tablet ${session.device.code}', style: AppType.body.copyWith(color: AppColors.onInkMuted)),
+              ]),
+            ]),
+          ),
+          Expanded(
+            child: staff.when(
+              loading: () => const AppLoading(),
+              error: (e, _) => AppErrorState(
+                title: 'Daftar staf gagal dimuat',
+                message: '$e',
+                onRetry: () => ref.invalidate(staffProvider),
+              ),
+              data: (members) => Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(AppSpace.s8),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 640),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Expanded(child: Text('Siapa yang bertugas?', style: AppType.headline)),
+                          IconButton(
+                            tooltip: 'Muat ulang',
+                            onPressed: () => ref.invalidate(staffProvider),
+                            icon: const Icon(Icons.refresh_rounded),
+                          ),
+                        ]),
+                        const SizedBox(height: AppSpace.s1),
+                        Text('Pilih nama Anda, lalu masukkan PIN.',
+                            style: AppType.body.copyWith(color: AppColors.inkMuted)),
+                        const SizedBox(height: AppSpace.s6),
+                        Wrap(
+                          spacing: AppSpace.s4,
+                          runSpacing: AppSpace.s4,
+                          children: [
+                            for (final m in members)
+                              _StaffCard(
+                                member: m,
+                                onTap: () => showDialog<void>(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (_) => PinDialog(member: m),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
-      body: staff.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorRetry(message: '$e', onRetry: () => ref.invalidate(staffProvider)),
-        data: (members) => Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                Text('Siapa yang bertugas?', style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 24),
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    for (final m in members)
-                      SizedBox(
-                        width: 170,
-                        height: 110,
-                        child: Card(
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: () => showDialog<void>(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (_) => PinDialog(member: m),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(m.role == 'owner' ? Icons.verified_user : Icons.person, size: 32),
-                                const SizedBox(height: 8),
-                                Text(m.name, style: Theme.of(context).textTheme.titleMedium),
-                                Text(m.role == 'owner' ? 'Owner' : 'Kasir'),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
+    );
+  }
+}
+
+class _StaffCard extends StatelessWidget {
+  const _StaffCard({required this.member, required this.onTap});
+
+  final StaffMember member;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final owner = member.role == 'owner';
+    return SizedBox(
+      width: 196,
+      height: 148,
+      child: Material(
+        color: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.lgAll, side: const BorderSide(color: AppColors.line)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpace.s4),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              AppAvatar(member.name),
+              const Spacer(),
+              Text(member.name, style: AppType.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 2),
+              owner
+                  ? const AppBadge('Owner', tone: AppTone.brand, icon: Icons.verified_user_rounded)
+                  : Text('Kasir', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+            ]),
           ),
         ),
       ),
@@ -126,50 +181,74 @@ class _PinDialogState extends ConsumerState<PinDialog> {
     if (_pin.length == _maxLength) _submit();
   }
 
+  Widget _key(String k) {
+    final onPressed = _busy ? null : () => k == 'OK' ? _submit() : _press(k);
+    final child = k == '⌫'
+        ? const Icon(Icons.backspace_rounded, semanticLabel: 'Hapus')
+        : Text(k, style: AppType.headline.copyWith(fontSize: 24, color: k == 'OK' ? AppColors.onPrimary : AppColors.ink));
+    final style = ButtonStyle(
+      shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: AppRadius.mdAll)),
+      padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+    );
+    return k == 'OK'
+        ? FilledButton(onPressed: onPressed, style: style, child: child)
+        : FilledButton(
+            onPressed: onPressed,
+            style: style.copyWith(
+              backgroundColor: const WidgetStatePropertyAll(AppColors.surfaceSunken),
+              foregroundColor: const WidgetStatePropertyAll(AppColors.ink),
+            ),
+            child: child,
+          );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
     return AlertDialog(
-      title: Text('PIN ${widget.member.name}'),
+      contentPadding: const EdgeInsets.fromLTRB(AppSpace.s6, AppSpace.s6, AppSpace.s6, AppSpace.s2),
       content: SizedBox(
-        width: 300,
+        width: 320,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            AppAvatar(widget.member.name, size: 56),
+            const SizedBox(height: AppSpace.s3),
+            Text(widget.member.name, style: AppType.titleLg),
+            Text('Masukkan PIN', style: AppType.body.copyWith(color: AppColors.inkMuted)),
+            const SizedBox(height: AppSpace.s4),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 for (var i = 0; i < _maxLength; i++)
-                  Container(
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
                     margin: const EdgeInsets.all(6),
                     width: 16,
                     height: 16,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: i < _pin.length ? scheme.primary : scheme.surfaceContainerHighest,
+                      color: i < _pin.length ? AppColors.primary : AppColors.surface,
+                      border: Border.all(color: i < _pin.length ? AppColors.primary : AppColors.lineStrong, width: 1.5),
                     ),
                   ),
               ],
             ),
             SizedBox(
-              height: 24,
-              child: _error == null
-                  ? null
-                  : Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: scheme.error)),
+              height: 32,
+              child: Center(
+                child: _error == null
+                    ? null
+                    : Text(_error!, textAlign: TextAlign.center, style: AppType.caption.copyWith(color: AppColors.danger)),
+              ),
             ),
             GridView.count(
               shrinkWrap: true,
               crossAxisCount: 3,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
+              mainAxisSpacing: AppSpace.s2,
+              crossAxisSpacing: AppSpace.s2,
               childAspectRatio: 1.6,
               children: [
-                for (final k in ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'OK', '0', '⌫'])
-                  FilledButton.tonal(
-                    onPressed: _busy ? null : () => k == 'OK' ? _submit() : _press(k),
-                    child: Text(k, style: const TextStyle(fontSize: 22)),
-                  ),
+                for (final k in ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'OK', '0', '⌫']) _key(k),
               ],
             ),
           ],
@@ -180,25 +259,4 @@ class _PinDialogState extends ConsumerState<PinDialog> {
       ],
     );
   }
-}
-
-class _ErrorRetry extends StatelessWidget {
-  const _ErrorRetry({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.cloud_off, size: 48),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            FilledButton(onPressed: onRetry, child: const Text('Coba lagi')),
-          ],
-        ),
-      );
 }

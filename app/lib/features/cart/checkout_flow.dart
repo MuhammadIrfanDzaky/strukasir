@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
 import '../../core/money.dart';
+import '../../core/theme/tokens.dart';
+import '../../core/ui/components.dart';
 import '../menu/menu_controller.dart';
 import '../printing/printer_service.dart';
 import '../printing/receipt_format.dart';
@@ -145,16 +147,26 @@ class CheckoutFlow {
   Future<void> _showDone(OrderJson order) => showDialog<void>(
         context: context,
         builder: (_) => AlertDialog(
-          title: Text('Lunas · ${order['number']}'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('Total ${rp(order['grand_total'] as int)}'),
-            if ((order['change_total'] as int) > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Text('Kembalian ${rp(order['change_total'] as int)}',
-                    style: Theme.of(context).textTheme.headlineMedium),
+          content: SizedBox(
+            width: 360,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: const BoxDecoration(color: AppColors.successSoft, shape: BoxShape.circle),
+                child: const Icon(Icons.check_rounded, size: 36, color: AppColors.success),
               ),
-          ]),
+              const SizedBox(height: AppSpace.s3),
+              Text('Lunas', style: AppType.titleLg),
+              Text('Order ${order['number']} · Total ${rp(order['grand_total'] as int)}',
+                  style: AppType.body.copyWith(color: AppColors.inkMuted)),
+              if ((order['change_total'] as int) > 0) ...[
+                const SizedBox(height: AppSpace.s4),
+                const AppOverline('Kembalian'),
+                Text(rp(order['change_total'] as int), style: AppType.display.copyWith(color: AppColors.success)),
+              ],
+            ]),
+          ),
           actions: [
             TextButton(onPressed: () => reprint(order), child: const Text('Cetak ulang struk')),
             FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Order baru')),

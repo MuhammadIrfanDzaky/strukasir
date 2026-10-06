@@ -17,7 +17,7 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
-/// Pembungkus Dio untuk API BerryBrew (`/api/v1`). Token dipilih per panggilan:
+/// Pembungkus Dio untuk API Strukasir (`/api/v1`). Token dipilih per panggilan:
 /// token perangkat untuk daftar staf & login PIN, token user untuk sisanya.
 class ApiClient {
   ApiClient({required String baseUrl, Dio? dio})

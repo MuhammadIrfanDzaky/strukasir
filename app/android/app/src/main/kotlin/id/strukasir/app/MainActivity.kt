@@ -1,4 +1,4 @@
-package id.berrybrew.berrybrew_pos
+package id.strukasir.app
 
 import io.flutter.embedding.android.FlutterActivity
 

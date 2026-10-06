@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
 import '../../core/money.dart';
+import '../../core/theme/tokens.dart';
+import '../../core/ui/components.dart';
 import '../printing/printer_service.dart';
 import '../printing/receipt_format.dart';
 import 'shift_controller.dart';
@@ -21,8 +23,9 @@ Future<bool> showOpenShiftDialog(BuildContext context, WidgetRef ref) async {
         content: SizedBox(
           width: 360,
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('Hitung uang tunai di laci sebelum mulai berjualan.'),
-            const SizedBox(height: 12),
+            Text('Hitung uang tunai di laci sebelum mulai berjualan.',
+                style: AppType.body.copyWith(color: AppColors.inkMuted)),
+            const SizedBox(height: AppSpace.s4),
             TextField(
               controller: controller,
               autofocus: true,
@@ -68,14 +71,16 @@ Future<void> showCloseShiftDialog(BuildContext context, WidgetRef ref) async {
         content: SizedBox(
           width: 380,
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('Hitung semua uang tunai di laci (termasuk modal awal).'),
-            const SizedBox(height: 12),
+            Text('Hitung semua uang tunai di laci (termasuk modal awal).',
+                style: AppType.body.copyWith(color: AppColors.inkMuted)),
+            const SizedBox(height: AppSpace.s4),
             TextField(
               controller: counted,
               autofocus: true,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(labelText: 'Uang tunai di laci', prefixText: 'Rp ', errorText: error),
             ),
+            const SizedBox(height: AppSpace.s3),
             TextField(controller: note, decoration: const InputDecoration(labelText: 'Catatan (opsional)')),
           ]),
         ),
@@ -113,31 +118,34 @@ class ShiftResultDialog extends ConsumerWidget {
     final summary = shift['summary'] as Map<String, dynamic>;
     final byMethod = summary['by_method'] as Map<String, dynamic>;
     final diff = shift['difference'] as int;
-    final theme = Theme.of(context);
-
-    Widget row(String label, String value, {TextStyle? style}) =>
-        Row(children: [Text(label, style: style), const Spacer(), Text(value, style: style)]);
-
     return AlertDialog(
       title: const Text('Shift ditutup'),
       content: SizedBox(
         width: 380,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          row('Modal awal', rp(summary['opening_cash'] as int)),
-          row('Tunai masuk', rp(summary['cash_in'] as int)),
-          if ((summary['cash_refund'] as int) > 0) row('Refund tunai', '-${rp(summary['cash_refund'] as int)}'),
-          row('Kas seharusnya', rp(shift['expected_cash'] as int)),
-          row('Kas dihitung', rp(shift['counted_cash'] as int)),
-          const Divider(),
-          row(
-            diff == 0 ? 'Selisih' : (diff > 0 ? 'Lebih' : 'Kurang'),
-            rp(diff.abs()),
-            style: theme.textTheme.titleLarge?.copyWith(color: diff == 0 ? null : theme.colorScheme.error),
+          AppSummaryRow('Modal awal', rp(summary['opening_cash'] as int)),
+          AppSummaryRow('Tunai masuk', rp(summary['cash_in'] as int)),
+          if ((summary['cash_refund'] as int) > 0)
+            AppSummaryRow('Refund tunai', '-${rp(summary['cash_refund'] as int)}'),
+          AppSummaryRow('Kas seharusnya', rp(shift['expected_cash'] as int)),
+          AppSummaryRow('Kas dihitung', rp(shift['counted_cash'] as int)),
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: AppSpace.s3),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.s4, vertical: AppSpace.s2),
+            decoration: BoxDecoration(
+              color: diff == 0 ? AppColors.successSoft : AppColors.dangerSoft,
+              borderRadius: AppRadius.mdAll,
+            ),
+            child: AppSummaryRow(
+              diff == 0 ? 'Selisih' : (diff > 0 ? 'Lebih' : 'Kurang'),
+              rp(diff.abs()),
+              emphasis: true,
+              valueColor: diff == 0 ? AppColors.success : AppColors.danger,
+            ),
           ),
-          const Divider(),
-          row('Order lunas', '${summary['paid_orders']}'),
-          row('Debit', rp(byMethod['debit'] as int)),
-          row('QRIS', rp(byMethod['qris'] as int)),
+          AppSummaryRow('Order lunas', '${summary['paid_orders']}'),
+          AppSummaryRow('Debit', rp(byMethod['debit'] as int)),
+          AppSummaryRow('QRIS', rp(byMethod['qris'] as int)),
         ]),
       ),
       actions: [

@@ -1,4 +1,4 @@
-# Panduan Harian BerryBrew POS
+# Panduan Harian Strukasir
 
 Untuk owner & kasir. Simpan di dekat meja kasir.
 
@@ -6,7 +6,7 @@ Untuk owner & kasir. Simpan di dekat meja kasir.
 
 **Buka toko**
 1. Nyalakan tablet dan printer. Pastikan Bluetooth tablet menyala.
-2. Buka app **BerryBrew POS**, pilih nama Anda, lalu masukkan PIN.
+2. Buka app **Strukasir**, pilih nama Anda, lalu masukkan PIN.
 3. Ketuk **Buka shift** di kanan atas, lalu isi uang tunai yang ada di laci (modal awal).
 
 **Melayani pesanan**

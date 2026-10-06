@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
 import '../../core/money.dart';
+import '../../core/theme/tokens.dart';
+import '../../core/ui/components.dart';
 import '../session/login_screen.dart';
 import '../session/session_controller.dart';
 import 'order_api.dart';
@@ -43,7 +45,12 @@ Future<(bool, Discount?)> showDiscountDialog(BuildContext context, {Discount? cu
           ),
         ]),
         actions: [
-          if (current != null) TextButton(onPressed: () => Navigator.pop(context, (true, null)), child: const Text('Hapus diskon')),
+          if (current != null)
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+              onPressed: () => Navigator.pop(context, (true, null)),
+              child: const Text('Hapus diskon'),
+            ),
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
           FilledButton(
             onPressed: () {
@@ -87,12 +94,16 @@ class _ApprovalDialogState extends ConsumerState<ApprovalDialog> {
     _ownerId ??= owners.firstOrNull?.id;
 
     return AlertDialog(
-      title: const Text('Persetujuan owner'),
+      title: const Row(children: [
+        Icon(Icons.verified_user_rounded, color: AppColors.primary),
+        SizedBox(width: AppSpace.s2),
+        Text('Persetujuan owner'),
+      ]),
       content: SizedBox(
-        width: 360,
+        width: 380,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(widget.reason),
-          const SizedBox(height: 12),
+          Text(widget.reason, style: AppType.body.copyWith(color: AppColors.inkMuted)),
+          const SizedBox(height: AppSpace.s4),
           if (staff.isLoading) const LinearProgressIndicator(),
           if (owners.isNotEmpty)
             DropdownButtonFormField<String>(
@@ -101,6 +112,7 @@ class _ApprovalDialogState extends ConsumerState<ApprovalDialog> {
               items: [for (final o in owners) DropdownMenuItem(value: o.id, child: Text(o.name))],
               onChanged: (v) => setState(() => _ownerId = v),
             ),
+          const SizedBox(height: AppSpace.s3),
           TextField(
             controller: _pin,
             obscureText: true,
@@ -142,23 +154,37 @@ class OpenBillsDialog extends ConsumerWidget {
           builder: (context, snap) {
             if (snap.hasError) {
               final e = snap.error;
-              return Center(child: Text(e is ApiException ? e.message : '$e'));
+              return AppEmptyState(
+                icon: Icons.cloud_off_rounded,
+                title: 'Gagal memuat',
+                message: e is ApiException ? e.message : '$e',
+              );
             }
-            if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+            if (!snap.hasData) return const AppLoading();
             final orders = snap.data!;
-            if (orders.isEmpty) return const Center(child: Text('Tidak ada order terbuka.'));
-            return ListView(children: [
-              for (final o in orders)
-                ListTile(
+            if (orders.isEmpty) {
+              return const AppEmptyState(
+                icon: Icons.receipt_long_rounded,
+                title: 'Tidak ada order terbuka',
+                message: 'Semua order sudah dibayar.',
+              );
+            }
+            return ListView.separated(
+              itemCount: orders.length,
+              separatorBuilder: (_, _) => const Divider(),
+              itemBuilder: (_, i) {
+                final o = orders[i];
+                return ListTile(
                   title: Text('${o['number']}  ·  ${(o['customer_label'] as String?) ?? '-'}'),
                   subtitle: Text((o['items'] as List)
                       .cast<Map<String, dynamic>>()
-                      .map((i) => '${i['qty']}x ${i['name']}')
+                      .map((it) => '${it['qty']}x ${it['name']}')
                       .join(', ')),
                   trailing: Text(rp(o['grand_total'] as int)),
                   onTap: () => Navigator.pop(context, o),
-                ),
-            ]);
+                );
+              },
+            );
           },
         ),
       ),
