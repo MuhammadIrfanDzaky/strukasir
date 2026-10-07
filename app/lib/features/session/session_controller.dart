@@ -235,6 +235,13 @@ class SessionController extends AsyncNotifier<Session> {
     }
   }
 
+  /// Owner mengeluarkan tablet ini dari usahanya: server mencabut tablet & semua sesinya,
+  /// lalu data lokal dihapus dan app kembali ke layar Selamat datang (Daftar / Masuk).
+  Future<void> unregisterDevice() async {
+    await authed((api, token) => api.post('/devices/current/unregister', token: token));
+    await _forgetDevice();
+  }
+
   Future<List<StaffMember>> staff() async {
     final s = _requireDevice();
     try {

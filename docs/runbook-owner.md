@@ -55,6 +55,7 @@ alamat, dan pesan penutup. Pratinjau di layar sama dengan hasil cetak. Ketuk **S
 | "Akun terkunci" | Terjadi setelah 5× PIN salah. Tunggu 5 menit. |
 | Owner **lupa password** | Di tablet baru: **Sudah punya akun? Masuk → Lupa password?** → kode dikirim ke email owner → isi kode & password baru. Bila email tidak sampai (cek folder spam), hubungi developer. |
 | Owner **lupa PIN** | Hubungi developer (lihat kontak di bawah). |
+| **Pindahkan / jual tablet** (atau ganti ke usaha lain) | Login sebagai owner → **Pengaturan → Tablet ini → Keluarkan tablet dari usaha**. Tablet kembali ke layar awal (Daftar / Masuk); data transaksi tetap di server. |
 | **Tambah tablet** | Pasang app di tablet baru → **Sudah punya akun? Masuk** → email & password owner. Nama tablet otomatis (Tablet 2, 3, …). |
 | Daftarkan tablet baru, diminta **Kode 2FA** | Buka aplikasi authenticator di HP owner, ketik 6 digit kode *Strukasir*. Kode berganti tiap 30 detik; bila ditolak, tunggu kode berikutnya. |
 | **HP owner hilang / ganti HP** | Hubungi developer: 2FA dimatikan, password direset, lalu 2FA dipasang ulang di HP baru. Tablet yang sudah terdaftar tetap jalan. |

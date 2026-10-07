@@ -57,7 +57,7 @@ const sizes = <String, Size>{
 
 final device = DeviceInfo.fromJson({'id': 'd1', 'code': 'T1', 'name': 'Tablet Kasir', 'tenant_name': 'BerryBrew'});
 const owner = SessionUser(id: 'u1', name: 'Rina Amelia', role: 'owner', permissions: {
-  'reports.view', 'menu.manage', 'discount.within_limit', 'discount.over_limit', 'order.void',
+  'reports.view', 'menu.manage', 'settings.manage', 'discount.within_limit', 'discount.over_limit', 'order.void',
 });
 
 /// Menu contoh + beberapa produk tambahan (nama panjang, habis) supaya grid terisi.

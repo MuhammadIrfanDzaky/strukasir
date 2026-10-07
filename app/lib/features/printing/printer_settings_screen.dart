@@ -40,6 +40,30 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     }
   }
 
+  /// Konfirmasi dulu: setelah keluar, tablet butuh email & password owner untuk dipakai lagi.
+  Future<void> _unregister(DeviceInfo device) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Keluarkan tablet?'),
+        content: Text(
+          '${device.name} (${device.code}) akan dikeluarkan dari ${device.tenantName}. Semua kasir di tablet ini '
+          'ikut keluar.\n\nData transaksi tetap tersimpan di server. Untuk memakai tablet ini lagi, '
+          'daftarkan ulang dengan email & password owner.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Keluarkan'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await _run(() => ref.read(sessionProvider.notifier).unregisterDevice());
+  }
+
   @override
   Widget build(BuildContext context) {
     final saved = ref.watch(printerProvider).value;
@@ -49,6 +73,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     final user = (ref.watch(sessionProvider).value as LoggedIn?)?.user;
     final canEditReceipt = user?.can('settings.manage') ?? false;
     final receipt = ref.watch(menuProvider).value?.menu.receipt;
+    final device = (ref.watch(sessionProvider).value as LoggedIn?)?.device;
     final testButton = OutlinedButton(
       onPressed: saved == null || _busy
           ? null
@@ -193,6 +218,32 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                   padding: const EdgeInsets.only(top: AppSpace.s4),
                   child: Text(_message!, style: AppType.body),
                 ),
+              if (canEditReceipt && device != null) ...[
+                const SizedBox(height: AppSpace.s4),
+                AppSectionCard(
+                  title: 'Tablet ini',
+                  children: [
+                    Text(
+                      '${device.name} (${device.code}) · ${device.tenantName}. Keluarkan bila tablet ini akan dipakai '
+                      'usaha lain atau tidak dipakai lagi.',
+                      style: AppType.body.copyWith(color: AppColors.inkMuted),
+                    ),
+                    const SizedBox(height: AppSpace.s3),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.danger,
+                          side: const BorderSide(color: AppColors.danger),
+                        ),
+                        onPressed: _busy ? null : () => _unregister(device),
+                        icon: const Icon(Icons.logout_rounded),
+                        label: const Text('Keluarkan tablet dari usaha'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ]),
           ),
         ),

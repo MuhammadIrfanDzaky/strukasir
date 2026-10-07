@@ -98,7 +98,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           onDestinationSelected: (i) => setState(() => _index = i),
           destinations: [
             for (final d in destinations)
-              NavigationDestination(icon: Icon(d.icon), label: d.label == 'Kelola Menu' ? 'Menu' : d.label),
+              NavigationDestination(icon: Icon(d.icon), label: switch (d.label) { 'Kelola Menu' => 'Menu', 'Pengaturan' => 'Setelan', _ => d.label }),
           ],
         ),
         ),
