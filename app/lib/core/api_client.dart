@@ -76,9 +76,11 @@ class ApiClient {
     }
 
     final data = response.data;
-    final message = data is Map && data['message'] is String
-        ? data['message'] as String
-        : 'Terjadi kesalahan (${response.statusCode}).';
+    final message = response.statusCode == 429
+        ? 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.'
+        : data is Map && data['message'] is String
+            ? data['message'] as String
+            : 'Terjadi kesalahan (${response.statusCode}).';
 
     final errors = <String, List<String>>{};
     if (data is Map && data['errors'] is Map) {

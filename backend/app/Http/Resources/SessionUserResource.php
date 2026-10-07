@@ -16,6 +16,9 @@ class SessionUserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'role' => $this->role->value,
+            // Hanya owner yang punya email (login password); kasir cukup PIN.
+            'email' => $this->email,
+            'email_verified' => $this->email === null || $this->email_verified_at !== null,
             'permissions' => collect(Permission::cases())
                 ->filter(fn (Permission $p) => Gate::forUser($this->resource)->allows($p->value))
                 ->map(fn (Permission $p) => $p->value)

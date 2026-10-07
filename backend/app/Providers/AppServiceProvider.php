@@ -47,5 +47,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Login PIN/password: ketat per IP. Lockout per akun ada di User::registerFailedAttempt().
         RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(10)->by('auth:'.$request->ip()));
+
+        // Pendaftaran usaha: cegah pembuatan kedai massal dari satu IP (salah isi form tetap leluasa).
+        RateLimiter::for('signup', fn (Request $request) => [
+            Limit::perMinute(10)->by('signup-min:'.$request->ip()),
+            Limit::perHour(5)->by('signup:'.$request->ip())->after(fn ($response) => $response->getStatusCode() === 201),
+        ]);
     }
 }

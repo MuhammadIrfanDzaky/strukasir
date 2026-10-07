@@ -13,7 +13,8 @@ class RegisterDeviceRequest extends FormRequest
             'password' => ['required', 'string', 'max:255'],
             // Kode 6 digit authenticator; wajib hanya bila owner mengaktifkan 2FA (dicek di controller).
             'otp' => ['nullable', 'string', 'max:10'],
-            'device_name' => ['required', 'string', 'max:60'],
+            // Opsional: kosong → "Tablet N".
+            'device_name' => ['nullable', 'string', 'max:60'],
             // UUID yang dibuat tablet sekali per instalasi → daftar ulang setelah timeout tidak membuat tablet ganda.
             'device_id' => ['nullable', 'uuid'],
         ];

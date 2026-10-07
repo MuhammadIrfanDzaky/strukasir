@@ -10,6 +10,7 @@ import 'features/menu_admin/menu_admin_screen.dart';
 import 'features/pos/pos_screen.dart';
 import 'features/printing/printer_settings_screen.dart';
 import 'features/reports/reports_screen.dart';
+import 'features/session/account_dialogs.dart';
 import 'features/session/session_controller.dart';
 import 'features/shift/shift_chip.dart';
 
@@ -39,6 +40,9 @@ class _Destination {
 class _HomeShellState extends ConsumerState<HomeShell> {
   late int _index = widget.initialIndex;
 
+  /// "Nanti" pada pengingat verifikasi email: sembunyikan sampai login berikutnya.
+  bool _hideVerify = false;
+
   void _logout() => ref.read(sessionProvider.notifier).logout();
 
   @override
@@ -56,7 +60,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final compact = context.isCompact;
     final short = context.isShort;
 
+    final needsVerify = user.email != null && !user.emailVerified;
+    void verifyEmail() => showDialog<bool>(context: context, builder: (_) => VerifyEmailDialog(email: user.email!));
+
     final topBar = _TopBar(
+      onVerifyEmail: needsVerify ? verifyEmail : null,
       title: destinations[index].label,
       userName: user.name,
       role: user.role,
@@ -68,6 +76,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         topBar,
+        // Layar pendek (HP landscape): tanpa banner; tetap bisa lewat menu akun.
+        if (needsVerify && !_hideVerify && !short)
+          _VerifyEmailBanner(
+            email: user.email!,
+            onVerify: verifyEmail,
+            onLater: () => setState(() => _hideVerify = true),
+          ),
         Expanded(child: destinations[index].builder(context)),
       ],
     );
@@ -137,6 +152,44 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 }
 
+class _VerifyEmailBanner extends StatelessWidget {
+  const _VerifyEmailBanner({required this.email, required this.onVerify, required this.onLater});
+
+  final String email;
+  final VoidCallback onVerify;
+  final VoidCallback onLater;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = Text(
+      'Verifikasi email $email agar bisa reset password bila lupa.',
+      style: AppType.body,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+    final buttons = [
+      TextButton(onPressed: onLater, child: const Text('Nanti')),
+      FilledButton.tonal(onPressed: onVerify, child: const Text('Verifikasi')),
+    ];
+    const icon = Icon(Icons.mark_email_unread_rounded, color: AppColors.warning);
+
+    return Container(
+      color: AppColors.warningSoft,
+      padding: const EdgeInsets.fromLTRB(AppSpace.s4, AppSpace.s2, AppSpace.s2, AppSpace.s2),
+      // Layar sempit: pesan di atas, tombol di bawah (satu baris terlalu sesak).
+      child: context.isCompact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(children: [icon, const SizedBox(width: AppSpace.s3), Expanded(child: message)]),
+                Row(mainAxisAlignment: MainAxisAlignment.end, children: buttons),
+              ],
+            )
+          : Row(children: [icon, const SizedBox(width: AppSpace.s3), Expanded(child: message), ...buttons]),
+    );
+  }
+}
+
 class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.title,
@@ -145,7 +198,11 @@ class _TopBar extends StatelessWidget {
     required this.deviceCode,
     required this.onRefresh,
     required this.onLogout,
+    this.onVerifyEmail,
   });
+
+  /// Null = email sudah terverifikasi / bukan owner.
+  final VoidCallback? onVerifyEmail;
 
   final String title;
   final String userName;
@@ -184,7 +241,11 @@ class _TopBar extends StatelessWidget {
           PopupMenuButton<String>(
             tooltip: 'Akun',
             position: PopupMenuPosition.under,
-            onSelected: (v) => v == 'refresh' ? onRefresh() : onLogout(),
+            onSelected: (v) => switch (v) {
+              'refresh' => onRefresh(),
+              'verify' => onVerifyEmail?.call(),
+              _ => onLogout(),
+            },
             itemBuilder: (_) => [
               PopupMenuItem(
                 enabled: false,
@@ -197,6 +258,11 @@ class _TopBar extends StatelessWidget {
                 ),
               ),
               const PopupMenuDivider(),
+              if (onVerifyEmail != null)
+                const PopupMenuItem(
+                  value: 'verify',
+                  child: ListTile(leading: Icon(Icons.mark_email_unread_rounded), title: Text('Verifikasi email')),
+                ),
               const PopupMenuItem(
                 value: 'refresh',
                 child: ListTile(leading: Icon(Icons.sync_rounded), title: Text('Muat ulang menu')),

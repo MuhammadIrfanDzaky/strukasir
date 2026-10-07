@@ -19,6 +19,7 @@ import 'package:berrybrew_pos/features/menu_admin/menu_admin_screen.dart';
 import 'package:berrybrew_pos/features/printing/printer_service.dart';
 import 'package:berrybrew_pos/features/printing/receipt_logo.dart';
 import 'package:berrybrew_pos/features/printing/receipt_settings_screen.dart';
+import 'package:berrybrew_pos/features/session/account_dialogs.dart';
 import 'package:berrybrew_pos/features/session/login_screen.dart';
 import 'package:berrybrew_pos/features/session/session_controller.dart';
 import 'package:berrybrew_pos/features/session/setup_screen.dart';
@@ -155,6 +156,10 @@ typedef Scenario = ({
   Future<void> Function(WidgetTester t)? act,
 });
 
+SessionUser get unverifiedOwner => SessionUser(
+    id: owner.id, name: owner.name, role: owner.role, permissions: owner.permissions,
+    email: 'rina@contoh.id', emailVerified: false);
+
 LoggedIn get loggedIn => LoggedIn('http://test', device, owner, 'token');
 
 /// Tampilkan [dialog] di atas layar kosong (dialog yang dibuka dari dalam alur).
@@ -169,6 +174,72 @@ Widget home(Session s, [int tab = 0]) => HomeShell(session: s as LoggedIn, initi
 
 final scenarios = <Scenario>[
   (name: 'setup', session: const NeedsSetup(), home: (_) => const SetupScreen(), fillCart: false, act: null),
+  (
+    name: 'daftar-usaha',
+    session: const NeedsSetup(),
+    home: (_) => const SetupScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Daftar usaha baru'));
+      await settle(t);
+      await t.ensureVisible(find.text('Lanjut'));
+      await t.tap(find.text('Lanjut')); // tampilkan semua pesan validasi
+      await settle(t);
+    },
+  ),
+  (
+    name: 'daftar-akun',
+    session: const NeedsSetup(),
+    home: (_) => const SetupScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Daftar usaha baru'));
+      await settle(t);
+      await t.enterText(find.widgetWithText(TextFormField, 'Nama usaha'), 'Kopi Senja');
+      await t.ensureVisible(find.text('Jajanan / gerobak'));
+      await t.tap(find.text('Jajanan / gerobak'));
+      await t.ensureVisible(find.text('Keduanya'));
+      await t.tap(find.text('Keduanya'));
+      await t.ensureVisible(find.text('Lanjut'));
+      await t.tap(find.text('Lanjut'));
+      await settle(t);
+      expect(find.text('Akun owner'), findsOneWidget);
+      await t.ensureVisible(find.text('Daftar & mulai'));
+      await t.tap(find.text('Daftar & mulai'));
+      await settle(t);
+    },
+  ),
+  (
+    name: 'kasir-verifikasi-email',
+    session: LoggedIn('http://test', device, unverifiedOwner, 'token'),
+    home: home,
+    fillCart: false,
+    act: null,
+  ),
+  (
+    name: 'dialog-lupa-password',
+    session: const NeedsSetup(),
+    home: (_) => dialogHost(const ForgotPasswordDialog(serverUrl: 'http://test', email: 'rina@contoh.id')),
+    fillCart: false,
+    act: null,
+  ),
+  (
+    name: 'dialog-verifikasi-email',
+    session: LoggedIn('http://test', device, unverifiedOwner, 'token'),
+    home: (_) => dialogHost(const VerifyEmailDialog(email: 'rina@contoh.id')),
+    fillCart: false,
+    act: null,
+  ),
+  (
+    name: 'masuk-owner',
+    session: const NeedsSetup(),
+    home: (_) => const SetupScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Sudah punya akun? Masuk'));
+      await settle(t);
+    },
+  ),
   (
     name: 'login',
     session: NeedsLogin('http://test', device),

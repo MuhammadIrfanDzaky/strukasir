@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\BusinessSector;
+use App\Enums\SalesMode;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +15,16 @@ class Tenant extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = ['code', 'name', 'timezone'];
+
+    protected function casts(): array
+    {
+        return [
+            'sector' => BusinessSector::class,
+            'sales_mode' => SalesMode::class,
+            'outlet_count' => 'integer',
+            'terms_accepted_at' => 'datetime',
+        ];
+    }
 
     public function plan(): BelongsTo
     {

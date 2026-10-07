@@ -23,13 +23,23 @@ class DeviceInfo {
 }
 
 class SessionUser {
-  const SessionUser({required this.id, required this.name, required this.role, required this.permissions});
+  const SessionUser({
+    required this.id,
+    required this.name,
+    required this.role,
+    required this.permissions,
+    this.email,
+    this.emailVerified = true,
+  });
 
   factory SessionUser.fromJson(Map<String, dynamic> j) => SessionUser(
         id: j['id'] as String,
         name: j['name'] as String,
         role: j['role'] as String,
         permissions: (j['permissions'] as List).cast<String>().toSet(),
+        email: j['email'] as String?,
+        // Sesi lama (sebelum ada verifikasi email) dianggap terverifikasi agar tidak mengganggu.
+        emailVerified: j['email_verified'] as bool? ?? true,
       );
 
   final String id;
@@ -37,10 +47,65 @@ class SessionUser {
   final String role;
   final Set<String> permissions;
 
+  /// Hanya owner yang punya email.
+  final String? email;
+  final bool emailVerified;
+
   bool can(String permission) => permissions.contains(permission);
 
-  Map<String, dynamic> toJson() =>
-      {'id': id, 'name': name, 'role': role, 'permissions': permissions.toList()};
+  SessionUser copyWith({bool? emailVerified}) => SessionUser(
+      id: id, name: name, role: role, permissions: permissions, email: email,
+      emailVerified: emailVerified ?? this.emailVerified);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'role': role,
+        'permissions': permissions.toList(),
+        'email': email,
+        'email_verified': emailVerified,
+      };
+}
+
+/// Isian form "Daftar usaha baru".
+class SignupData {
+  const SignupData({
+    required this.businessName,
+    required this.sector,
+    required this.salesMode,
+    required this.outletCount,
+    required this.ownerName,
+    required this.email,
+    required this.password,
+    required this.pin,
+    this.phone,
+    this.address,
+  });
+
+  final String businessName;
+  final String sector;
+  final String salesMode;
+  final int outletCount;
+  final String ownerName;
+  final String email;
+  final String password;
+  final String pin;
+  final String? phone;
+  final String? address;
+
+  Map<String, dynamic> toJson() => {
+        'business_name': businessName.trim(),
+        'sector': sector,
+        'sales_mode': salesMode,
+        'outlet_count': outletCount,
+        'owner_name': ownerName.trim(),
+        'email': email.trim(),
+        'password': password,
+        'pin': pin,
+        if (phone != null && phone!.trim().isNotEmpty) 'phone': phone!.trim(),
+        if (address != null && address!.trim().isNotEmpty) 'address': address!.trim(),
+        'terms': true,
+      };
 }
 
 class StaffMember {
@@ -101,30 +166,73 @@ class SessionController extends AsyncNotifier<Session> {
     return LoggedIn(url, device, SessionUser.fromJson(userJson), token);
   }
 
-  /// Owner mendaftarkan tablet ini ke kedainya (sekali saja).
+  /// Owner mendaftarkan tablet ini ke kedainya (sekali saja). Nama tablet kosong → server memberi "Tablet N".
   Future<void> registerDevice({
     required String serverUrl,
     required String email,
     required String password,
-    required String deviceName,
+    String? deviceName,
     String? otp,
   }) async {
-    final api = ApiClient(baseUrl: serverUrl);
-    final res = await api.post('/devices/register', data: {
+    final res = await ApiClient(baseUrl: serverUrl).post('/devices/register', data: {
       'email': email.trim(),
       'password': password,
-      'device_name': deviceName.trim(),
+      if (deviceName != null && deviceName.trim().isNotEmpty) 'device_name': deviceName.trim(),
       if (otp != null && otp.trim().isNotEmpty) 'otp': otp.trim(),
       'device_id': await _store.installId(),
     });
+    await _saveRegistration(serverUrl, res);
+  }
 
+  /// Daftar usaha baru: server membuat usaha + akun owner + tablet ini (tablet pertama),
+  /// lalu owner langsung masuk dengan PIN yang baru dibuat.
+  Future<void> signup({required String serverUrl, required SignupData data}) async {
+    final res = await ApiClient(baseUrl: serverUrl).post('/signup', data: {
+      ...data.toJson(),
+      'device_id': await _store.installId(),
+    });
+    await _saveRegistration(serverUrl, res);
+    await pinLogin(res['owner_id'] as String, data.pin);
+  }
+
+  Future<void> _saveRegistration(String serverUrl, Map<String, dynamic> res) async {
     final device = DeviceInfo.fromJson({
       ...(res['device'] as Map<String, dynamic>),
       'tenant_name': (res['tenant'] as Map<String, dynamic>)['name'],
     });
-    await _store.saveDevice(
-        serverUrl: serverUrl, token: res['token'] as String, device: device.toJson());
+    await _store.saveDevice(serverUrl: serverUrl, token: res['token'] as String, device: device.toJson());
     state = AsyncData(NeedsLogin(serverUrl, device));
+  }
+
+  /// Lupa password owner: kirim kode ke email. Respons sama walau email tidak terdaftar.
+  Future<String> forgotPassword({required String serverUrl, required String email}) async {
+    final res = await ApiClient(baseUrl: serverUrl).post('/auth/password/forgot', data: {'email': email.trim()});
+    return res['message'] as String? ?? 'Kode dikirim bila email terdaftar.';
+  }
+
+  Future<void> resetPassword({
+    required String serverUrl,
+    required String email,
+    required String code,
+    required String password,
+  }) =>
+      ApiClient(baseUrl: serverUrl).post('/auth/password/reset',
+          data: {'email': email.trim(), 'code': code.trim(), 'password': password});
+
+  /// Owner yang login meminta kode verifikasi email. Mengembalikan pesan untuk ditampilkan.
+  Future<String> sendEmailCode() async {
+    final res = await authed((api, token) => api.post('/auth/email/send', token: token));
+    return res['message'] as String? ?? 'Kode dikirim.';
+  }
+
+  Future<void> verifyEmail(String code) async {
+    await authed((api, token) => api.post('/auth/email/verify', data: {'code': code.trim()}, token: token));
+    final s = state.value;
+    if (s is LoggedIn) {
+      final user = s.user.copyWith(emailVerified: true);
+      await _store.saveUser(token: s.token, user: user.toJson());
+      state = AsyncData(LoggedIn(s.serverUrl, s.device, user, s.token));
+    }
   }
 
   Future<List<StaffMember>> staff() async {

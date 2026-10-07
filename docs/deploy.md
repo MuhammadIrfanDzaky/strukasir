@@ -38,6 +38,9 @@ Paket deploy ada di `deploy/` dan sudah diuji lokal (HTTPS, migrasi, alur kasir,
 6. **(akun) Sentry** (gratis, sentry.io): buat 2 proyek, **Laravel** (server) dan **Flutter** (app).
    Ambil DSN masing-masing. Aktifkan notifikasi email untuk error baru. Isi request (password, PIN,
    kode 2FA), data pribadi, dan screenshot tidak pernah dikirim.
+7. **(akun) Pengirim email / SMTP** (mis. Brevo atau Mailgun, paket gratis cukup): untuk kode verifikasi
+   email dan lupa password owner. Verifikasi domain pengirim (SPF/DKIM) agar email tidak masuk spam.
+   Tanpa SMTP, pendaftaran tetap jalan, tapi kode tidak terkirim (owner tidak bisa reset password sendiri).
 
 ## 2. Siapkan VPS
 
@@ -81,6 +84,8 @@ Isi `deploy/.env`:
 - `POSTGRES_PASSWORD` dan `APP_DB_PASSWORD`: acak, **hanya huruf & angka** (`openssl rand -base64 24 | tr -dc A-Za-z0-9`).
 - `BACKUP_HEARTBEAT_URL` (opsional).
 - `SENTRY_LARAVEL_DSN`: DSN proyek Laravel di Sentry (kosong = pelacak error mati).
+- `MAIL_*`: kredensial SMTP dari langkah 1.7. Uji setelah deploy: di app, **Masuk → Lupa password?**
+  dengan email owner, kode harus sampai dalam 1 menit.
 
 Isi `deploy/backup.env` sesuai pilihan penyimpanan (token Google Drive, atau kunci R2).
 
@@ -147,10 +152,11 @@ Jumlah baris harus sama dengan produksi pada saat backup dibuat. Menimpa produks
    keyAlias=berrybrew
    keyPassword=...
    ```
-2. Naikkan `version:` di `app/pubspec.yaml` (mis. `1.0.1+2`), lalu build dengan DSN proyek Flutter
-   di Sentry (tanpa `--dart-define` pun boleh: pelacak error app mati):
+2. Naikkan `version:` di `app/pubspec.yaml` (mis. `1.0.1+2`), lalu build. `API_URL` **wajib** (tanpa itu
+   layar daftar/masuk menampilkan kolom alamat server untuk development); `SENTRY_DSN` opsional
+   (tanpa itu pelacak error app mati):
    ```bash
-   cd app && flutter build apk --release --split-per-abi --dart-define=SENTRY_DSN=<dsn-flutter>
+   cd app && flutter build apk --release --split-per-abi --dart-define=API_URL=https://<domain-api> --dart-define=SENTRY_DSN=<dsn-flutter>
    ```
 3. Unggah `app-armeabi-v7a-release.apk` (tablet TablePC) ke tempat unduhan (mis. Google Drive dengan
    link publik). Isi `POS_APP_DOWNLOAD_URL` dan `POS_APP_LATEST_VERSION` di `deploy/.env`.
