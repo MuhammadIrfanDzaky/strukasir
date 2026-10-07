@@ -39,6 +39,11 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     }
   }
 
+  Future<void> _setTail(PrinterService service, int mm) async {
+    await service.setTailMm(mm);
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final saved = ref.watch(printerProvider).value;
@@ -106,6 +111,30 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                     if (compact) ...[const SizedBox(height: AppSpace.s3), testButton],
                   ]),
                   ),
+                  const SizedBox(height: AppSpace.s4),
+                  Text('Sisa kertas setelah struk', style: AppType.bodyStrong),
+                  Text(
+                    'Atur sampai kalimat terakhir pas lewat gerigi sobek. Terlalu banyak = kertas terbuang; '
+                    'terlalu sedikit = tulisan ikut tersobek. Coba dengan "Tes cetak".',
+                    style: AppType.caption.copyWith(color: AppColors.inkMuted),
+                  ),
+                  const SizedBox(height: AppSpace.s2),
+                  Row(children: [
+                    IconButton.outlined(
+                      tooltip: 'Kurangi',
+                      onPressed: service.tailMm <= 0 ? null : () => _setTail(service, service.tailMm - 1),
+                      icon: const Icon(Icons.remove_rounded),
+                    ),
+                    SizedBox(
+                      width: 72,
+                      child: Text('${service.tailMm} mm', textAlign: TextAlign.center, style: AppType.bodyStrong),
+                    ),
+                    IconButton.outlined(
+                      tooltip: 'Tambah',
+                      onPressed: service.tailMm >= 30 ? null : () => _setTail(service, service.tailMm + 1),
+                      icon: const Icon(Icons.add_rounded),
+                    ),
+                  ]),
                 ],
               ),
               if (canEditReceipt) ...[

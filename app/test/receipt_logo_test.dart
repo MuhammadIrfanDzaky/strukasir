@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:berrybrew_pos/features/printing/printer_service.dart';
 import 'package:berrybrew_pos/features/printing/receipt_logo.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
@@ -50,4 +52,38 @@ void main() {
     // ignore: avoid_print
     print('logo ${result.width}x${result.height}, ${result.png.length} byte, dibalik: ${result.inverted}');
   }, skip: input == null);
+
+  test('raster logo: hasil processLogo (PNG 1-kanal, lebar bukan kelipatan 8) tidak jadi hitam penuh', () {
+    final result = processLogo((img.encodePng(darkLogo(w: 301, h: 200)), const LogoOptions()))!;
+    final logo = decodeLogo(base64Encode(result.png))!;
+    final bytes = rasterImage(logo);
+    final widthBytes = (logo.width + 7) ~/ 8;
+
+    expect(bytes.sublist(0, 4), [0x1D, 0x76, 0x30, 0x00]);
+    expect(bytes.length, logo.height * widthBytes + 8 * ((logo.height + 63) ~/ 64));
+
+    // Hitung titik hitam = piksel gelap di gambar (bukan semua).
+    var dots = 0, dark = 0;
+    for (final b in bytes) {
+      dots += b.toRadixString(2).replaceAll('0', '').length;
+    }
+    for (final p in logo) {
+      if (p.r < 128) dark++; // PNG 1-kanal: nilai abu-abu ada di r
+    }
+    // Header ikut terhitung sedikit; selisihnya kecil.
+    expect((dots - dark).abs(), lessThan(40 * ((logo.height + 63) ~/ 64)));
+    expect(dark, inInclusiveRange(logo.width * logo.height * 0.6, logo.width * logo.height * 0.9)); // lingkaran ≈ 78%
+  });
+
+  test('raster: piksel transparan tidak dicetak', () {
+    final image = img.Image(width: 10, height: 2, numChannels: 4); // semua 0 = hitam transparan
+    image.setPixelRgba(0, 0, 0, 0, 0, 255);
+    final data = rasterImage(image).sublist(8);
+    expect(data, [0x80, 0x00, 0x00, 0x00]);
+  });
+
+  test('sisa kertas: ESC J dalam titik (8/mm), dibatasi 255', () {
+    expect(feedMm(12), [0x1B, 0x4A, 96]);
+    expect(feedMm(40), [0x1B, 0x4A, 255]);
+  });
 }

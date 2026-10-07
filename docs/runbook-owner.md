@@ -49,6 +49,7 @@ alamat, dan pesan penutup. Pratinjau di layar sama dengan hasil cetak. Ketuk **S
 | Masalah | Yang dilakukan |
 |---|---|
 | **Struk tidak keluar** | Transaksi **tetap tersimpan**. Cek printer menyala, kertas ada, dan dekat tablet. Ketuk **Cetak ulang** di pesan yang muncul, atau buka **Riwayat** → order → **Cetak ulang**. |
+| Kertas terbuang banyak / tulisan terakhir ikut tersobek | Menu **Printer** → *Sisa kertas setelah struk*: kurangi/tambah per mm, cek dengan *Tes cetak*. |
 | Printer tidak terhubung sama sekali | Menu **Printer** → *Tampilkan printer ter-pair* → pilih printer → *Tes cetak*. Bila tidak ada di daftar, pair ulang di *Pengaturan → Bluetooth* tablet. |
 | **Internet mati** | Menu tetap tampil, tapi pembayaran perlu internet. Nyalakan **hotspot HP** dan sambungkan tablet. Jangan tekan "Bayar" berkali-kali: sistem aman dari pembayaran dobel, tapi tunggu sampai sinyal kembali. |
 | "Harga menu berubah" | Menu sudah diperbarui otomatis. Periksa total lalu tekan *Bayar* lagi. |

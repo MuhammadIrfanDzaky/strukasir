@@ -24,6 +24,39 @@ img.Image? decodeLogo(String? base64) {
   }
 }
 
+/// Logo → perintah raster ESC/POS (GS v 0), dipotong per 64 baris titik supaya buffer printer murah
+/// tidak meluap. Titik hitam = piksel gelap & tidak transparan. Dibuat sendiri karena
+/// `Generator.imageRaster` (esc_pos_utils_plus 2.0.4) salah membaca PNG 1-kanal dan lebar yang
+/// bukan kelipatan 8 → logo tercetak hitam penuh.
+List<int> rasterImage(img.Image image) {
+  final widthBytes = (image.width + 7) ~/ 8;
+  final out = <int>[];
+  for (var top = 0; top < image.height; top += 64) {
+    final rows = (image.height - top).clamp(0, 64);
+    out.addAll([0x1D, 0x76, 0x30, 0x00, widthBytes & 0xFF, widthBytes >> 8, rows & 0xFF, rows >> 8]);
+    for (var y = top; y < top + rows; y++) {
+      for (var xb = 0; xb < widthBytes; xb++) {
+        var byte = 0;
+        for (var bit = 0; bit < 8; bit++) {
+          final x = xb * 8 + bit;
+          if (x >= image.width) continue;
+          final p = image.getPixel(x, y);
+          final opaque = p.a > p.maxChannelValue / 2; // gambar tanpa alfa: a = maks
+          // Abu-abu (1–2 kanal): g/b terbaca 0 → `luminance` salah (putih jadi 0.299); pakai r.
+          final light = image.numChannels <= 2 ? p.rNormalized : p.luminanceNormalized;
+          if (opaque && light < 0.5) byte |= 0x80 >> bit;
+        }
+        out.add(byte);
+      }
+    }
+  }
+  return out;
+}
+
+/// Jarak kertas setelah baris terakhir sampai gerigi sobek printer (mm). 8 titik = 1 mm.
+const int kDefaultTailMm = 12;
+List<int> feedMm(int mm) => [0x1B, 0x4A, (mm * 8).clamp(0, 255)]; // ESC J n
+
 class PrintException implements Exception {
   PrintException(this.message);
 
@@ -48,9 +81,19 @@ class PrinterService extends AsyncNotifier<SavedPrinter?> {
   static const _storage = FlutterSecureStorage();
   static const _macKey = 'printer_mac';
   static const _nameKey = 'printer_name';
+  static const _tailKey = 'printer_tail_mm';
+
+  /// Sisa kertas setelah struk (mm); diatur per tablet karena posisi gerigi tiap printer beda.
+  int tailMm = kDefaultTailMm;
+
+  Future<void> setTailMm(int mm) async {
+    tailMm = mm.clamp(0, 30);
+    await _storage.write(key: _tailKey, value: '$tailMm');
+  }
 
   @override
   Future<SavedPrinter?> build() async {
+    tailMm = int.tryParse(await _storage.read(key: _tailKey) ?? '') ?? kDefaultTailMm;
     final mac = await _storage.read(key: _macKey);
     return mac == null ? null : SavedPrinter(mac, await _storage.read(key: _nameKey) ?? mac);
   }
@@ -86,13 +129,16 @@ class PrinterService extends AsyncNotifier<SavedPrinter?> {
     final logo = decodeLogo(logoBase64);
     final bytes = <int>[...gen.reset()];
     for (var c = 0; c < copies; c++) {
-      if (logo != null) bytes.addAll(gen.imageRaster(logo));
+      if (logo != null) {
+        bytes
+          ..addAll(gen.setStyles(const PosStyles(align: PosAlign.center)))
+          ..addAll(rasterImage(logo));
+      }
       for (final line in lines) {
         bytes.addAll(gen.text(line.text, styles: PosStyles(bold: line.bold)));
       }
-      bytes
-        ..addAll(gen.feed(3))
-        ..addAll(gen.cut());
+      // Dorong kertas secukupnya sampai baris terakhir lewat gerigi sobek (tanpa baris kosong ekstra).
+      bytes.addAll(feedMm(tailMm));
     }
 
     if (!await PrintBluetoothThermal.writeBytes(bytes)) {
