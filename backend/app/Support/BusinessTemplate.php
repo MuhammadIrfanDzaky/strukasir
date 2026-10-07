@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\BusinessGroup;
 use App\Enums\BusinessSector;
 use App\Enums\Feature;
 use App\Enums\SalesMode;
@@ -24,33 +25,63 @@ final readonly class BusinessTemplate
         public array $categories,
     ) {}
 
-    public static function for(BusinessSector $sector, SalesMode $mode): self
+    public static function for(BusinessSector $sector, ?SalesMode $mode): self
     {
-        // Makan di tempat butuh nama/meja & bayar nanti; bawa pulang (mis. gerobak) cukup kasir cepat.
-        $dineIn = $mode !== SalesMode::Takeaway;
+        // Nama pelanggan & bayar nanti: makan di tempat, jasa (bayar saat ambil: laundry, bengkel),
+        // dan salon (bayar setelah layanan). Toko & apotek cukup kasir cepat.
+        [$customerName, $openBill] = match ($sector->group()) {
+            BusinessGroup::Food => [$mode !== SalesMode::Takeaway, $mode !== SalesMode::Takeaway],
+            BusinessGroup::Service, BusinessGroup::Beauty => [true, true],
+            BusinessGroup::Other => [true, false],
+            BusinessGroup::Retail, BusinessGroup::Health => [false, false],
+        };
 
-        // Varian (suhu, gula, level pedas, topping) lazim di usaha makanan & minuman.
-        $variants = in_array($sector, [BusinessSector::CoffeeShop, BusinessSector::Restaurant, BusinessSector::StreetFood], true);
+        // Varian (suhu, gula, level pedas, topping) lazim di makanan & minuman siap saji.
+        $variants = in_array($sector, [
+            BusinessSector::CoffeeShop, BusinessSector::Restaurant, BusinessSector::StreetFood, BusinessSector::Beverage,
+        ], true);
 
         return new self(
             features: [
-                Feature::CustomerName->value => $dineIn,
-                Feature::OpenBill->value => $dineIn,
+                Feature::CustomerName->value => $customerName,
+                Feature::OpenBill->value => $openBill,
                 Feature::Modifiers->value => $variants,
                 Feature::Discounts->value => true,
                 // Mati sampai owner mengisi persennya sendiri (PB1/service beda tiap daerah & usaha).
                 Feature::TaxService->value => false,
                 Feature::SplitPayment->value => true,
             ],
-            categories: match ($sector) {
-                BusinessSector::CoffeeShop => ['Kopi', 'Non Kopi', 'Makanan'],
-                BusinessSector::Restaurant, BusinessSector::StreetFood => ['Makanan', 'Minuman'],
-                BusinessSector::Bakery => ['Roti', 'Kue', 'Minuman'],
-                BusinessSector::Retail => ['Umum'],
-                BusinessSector::Service => ['Layanan'],
-                BusinessSector::Other => ['Umum'],
-            },
+            categories: self::categories($sector),
         );
+    }
+
+    /** @return list<string> kategori awal (kosong, tanpa produk contoh) */
+    private static function categories(BusinessSector $sector): array
+    {
+        return match ($sector) {
+            BusinessSector::CoffeeShop => ['Kopi', 'Non Kopi', 'Makanan'],
+            BusinessSector::Restaurant, BusinessSector::StreetFood => ['Makanan', 'Minuman'],
+            BusinessSector::Catering => ['Paket', 'Menu Satuan'],
+            BusinessSector::Bakery => ['Roti', 'Kue', 'Minuman'],
+            BusinessSector::Beverage => ['Minuman', 'Topping'],
+            BusinessSector::FrozenFood => ['Frozen Food', 'Pangan Segar'],
+            BusinessSector::Fashion => ['Pakaian', 'Aksesoris'],
+            BusinessSector::Gadget => ['Pulsa & Data', 'Aksesoris', 'Gadget'],
+            BusinessSector::PetShop => ['Makanan Hewan', 'Aksesoris'],
+            BusinessSector::Laundry => ['Kiloan', 'Satuan'],
+            BusinessSector::Workshop => ['Servis', 'Suku Cadang', 'Cuci'],
+            BusinessSector::Printing => ['Fotokopi & Cetak', 'ATK'],
+            BusinessSector::Pharmacy => ['Obat Bebas', 'Vitamin & Suplemen', 'Alat Kesehatan'],
+            BusinessSector::Optic => ['Kacamata', 'Lensa'],
+            BusinessSector::Fitness => ['Membership', 'Kelas', 'Minuman'],
+            BusinessSector::Salon => ['Potong Rambut', 'Perawatan', 'Produk'],
+            BusinessSector::Spa, BusinessSector::NailArt => ['Layanan', 'Produk'],
+            BusinessSector::Skincare => ['Skincare', 'Makeup'],
+            default => match ($sector->group()) {
+                BusinessGroup::Service, BusinessGroup::Health => ['Layanan'],
+                default => ['Umum'],
+            },
+        };
     }
 
     /**
@@ -78,9 +109,16 @@ final readonly class BusinessTemplate
         }
     }
 
-    /** Label kolom nama di kasir: "meja" hanya relevan bila ada makan di tempat. */
-    public static function customerLabelHint(?SalesMode $mode): string
+    /** Label kolom nama di kasir: "meja" hanya untuk usaha makanan yang melayani makan di tempat. */
+    public static function customerLabelHint(?BusinessSector $sector, ?SalesMode $mode): string
     {
-        return $mode === SalesMode::Takeaway ? 'Nama pelanggan' : 'Nama pelanggan / meja';
+        // Kedai lama (tanpa profil) = kedai makan seperti BerryBrew.
+        if ($sector === null) {
+            return 'Nama pelanggan / meja';
+        }
+
+        return $sector->group() === BusinessGroup::Food && $mode !== SalesMode::Takeaway
+            ? 'Nama pelanggan / meja'
+            : 'Nama pelanggan';
     }
 }

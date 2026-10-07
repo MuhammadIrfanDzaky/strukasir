@@ -33,6 +33,7 @@ class MenuController extends Controller
         $productGroups = DB::table('product_modifier_groups')->orderBy('sort')->get()->groupBy('product_id');
         $settings = TenantSetting::query()->firstOrFail();
         $features = $gate->forTenant($settings->tenant_id);
+        $tenant = Tenant::query()->find($settings->tenant_id);
         $pricing = PricingSettings::fromTenant($settings, $features[Feature::TaxService->value] ?? false);
 
         return response()->json([
@@ -46,7 +47,7 @@ class MenuController extends Controller
             ],
             'features' => $features,
             // Label kolom nama di kasir ("meja" hanya untuk usaha makan di tempat).
-            'customer_label_hint' => BusinessTemplate::customerLabelHint(Tenant::query()->find($settings->tenant_id)?->sales_mode),
+            'customer_label_hint' => BusinessTemplate::customerLabelHint($tenant?->sector, $tenant?->sales_mode),
             // Nama, alamat, penutup & logo struk; disimpan tablet bersama cache menu (struk tetap lengkap saat offline).
             'receipt' => ReceiptSettingsController::present($settings),
             'categories' => Category::query()->orderBy('sort')->orderBy('name')->get()

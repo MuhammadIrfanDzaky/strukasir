@@ -38,7 +38,7 @@ class SignupController extends Controller
 
         $data = $request->validated();
 
-        return DB::transaction(function () use ($data, $provisioner, $registrar, $context, $emailCodes) {
+        return DB::transaction(function () use ($data, $request, $provisioner, $registrar, $context, $emailCodes) {
             $tenant = $provisioner->create(
                 code: $provisioner->uniqueCode($data['business_name']),
                 name: trim($data['business_name']),
@@ -48,7 +48,11 @@ class SignupController extends Controller
                 ownerPin: $data['pin'],
                 profile: [
                     'sector' => $data['sector'],
-                    'sales_mode' => $data['sales_mode'],
+                    'sector_other' => $data['sector'] === 'other' ? trim($data['sector_other']) : null,
+                    // Usaha non makanan tidak ditanya cara jualan.
+                    'sales_mode' => $request->sector()->asksSalesMode() ? $data['sales_mode'] : null,
+                    'province_code' => $data['province_code'],
+                    'regency_code' => $data['regency_code'],
                     'outlet_count' => (int) $data['outlet_count'],
                     'phone' => isset($data['phone']) ? preg_replace('/[ \-]/', '', $data['phone']) : null,
                     'terms_accepted_at' => now(),
@@ -65,7 +69,7 @@ class SignupController extends Controller
                 $template->apply($tenant->id, $tenant->plan_id);
 
                 Audit::record('tenant.signup', $tenant, after: [
-                    'sector' => $data['sector'], 'sales_mode' => $data['sales_mode'], 'outlet_count' => (int) $data['outlet_count'],
+                    'sector' => $data['sector'], 'sales_mode' => $tenant->sales_mode?->value, 'outlet_count' => (int) $data['outlet_count'],
                     'template' => ['features' => $template->features, 'categories' => $template->categories],
                 ], user: $owner, device: $device);
                 // Kode verifikasi email langsung dikirim; gagal kirim tidak membatalkan pendaftaran

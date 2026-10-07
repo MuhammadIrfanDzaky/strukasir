@@ -23,6 +23,7 @@ import 'package:berrybrew_pos/features/session/account_dialogs.dart';
 import 'package:berrybrew_pos/features/session/login_screen.dart';
 import 'package:berrybrew_pos/features/session/session_controller.dart';
 import 'package:berrybrew_pos/features/session/setup_screen.dart';
+import 'package:berrybrew_pos/features/session/signup_options.dart';
 import 'package:berrybrew_pos/features/settings/feature_settings_screen.dart';
 import 'package:berrybrew_pos/features/shift/shift_controller.dart';
 import 'package:berrybrew_pos/home_shell.dart';
@@ -123,6 +124,71 @@ final featureSettingsJson = {
   'service_percent': 5.5,
 };
 
+/// Pilihan form daftar (sebagian kecil dari data server).
+final signupOptions = SignupOptions.fromJson({
+  'sectors': [
+    {
+      'group': 'food',
+      'label': 'Makanan & minuman',
+      'items': [
+        {'code': 'coffee_shop', 'label': 'Kafe & coffee shop', 'asks_sales_mode': true},
+        {'code': 'street_food', 'label': 'Warung & gerobak makanan', 'asks_sales_mode': true},
+      ],
+    },
+    {
+      'group': 'service',
+      'label': 'Jasa & pelayanan',
+      'items': [
+        {'code': 'laundry', 'label': 'Laundry', 'asks_sales_mode': false},
+      ],
+    },
+    {
+      'group': 'other',
+      'label': 'Lainnya',
+      'items': [
+        {'code': 'other', 'label': 'Lainnya', 'asks_sales_mode': false},
+      ],
+    },
+  ],
+  'sales_modes': [
+    {'code': 'takeaway', 'label': 'Bawa pulang saja'},
+    {'code': 'dine_in', 'label': 'Makan di tempat'},
+    {'code': 'mixed', 'label': 'Keduanya'},
+  ],
+  'regions': [
+    {
+      'code': '12',
+      'name': 'Sumatera Utara',
+      'regencies': [
+        {'code': '12.71', 'name': 'Kota Medan'},
+        {'code': '12.07', 'name': 'Kabupaten Deli Serdang'},
+      ],
+    },
+    {
+      'code': '31',
+      'name': 'DKI Jakarta',
+      'regencies': [
+        {'code': '31.71', 'name': 'Kota Administrasi Jakarta Pusat'},
+      ],
+    },
+  ],
+});
+
+/// Buka kolom pilihan [field], (opsional) ketik [search], lalu pilih [option].
+Future<void> pick(WidgetTester t, String field, String option, {String? search}) async {
+  await t.ensureVisible(find.text(field));
+  await t.tap(find.text(field));
+  await settle(t);
+  if (search != null) {
+    await t.enterText(find.byType(TextField).last, search);
+    await settle(t);
+  }
+  await t.ensureVisible(find.text(option).last);
+  await settle(t);
+  await t.tap(find.text(option).last);
+  await settle(t);
+}
+
 /// Dio palsu: jawab per path tanpa jaringan.
 Dio fakeDio() => Dio()
   ..interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
@@ -214,11 +280,13 @@ final scenarios = <Scenario>[
     act: (t) async {
       await t.tap(find.text('Daftar usaha baru'));
       await settle(t);
+      await t.enterText(find.widgetWithText(TextFormField, 'Alamat server (development)'), 'http://test');
       await t.enterText(find.widgetWithText(TextFormField, 'Nama usaha'), 'Kopi Senja');
-      await t.ensureVisible(find.text('Jajanan / gerobak'));
-      await t.tap(find.text('Jajanan / gerobak'));
+      await pick(t, 'Jenis usaha', 'Warung & gerobak makanan');
       await t.ensureVisible(find.text('Keduanya'));
       await t.tap(find.text('Keduanya'));
+      await pick(t, 'Provinsi', 'Sumatera Utara');
+      await pick(t, 'Kota / kabupaten', 'Kota Medan');
       await t.ensureVisible(find.text('Lanjut'));
       await t.tap(find.text('Lanjut'));
       await settle(t);
@@ -226,6 +294,34 @@ final scenarios = <Scenario>[
       await t.ensureVisible(find.text('Daftar & mulai'));
       await t.tap(find.text('Daftar & mulai'));
       await settle(t);
+    },
+  ),
+  (
+    name: 'daftar-pilih-jenis-usaha',
+    session: const NeedsSetup(),
+    home: (_) => const SetupScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Daftar usaha baru'));
+      await settle(t);
+      await t.enterText(find.widgetWithText(TextFormField, 'Alamat server (development)'), 'http://test');
+      await t.ensureVisible(find.text('Jenis usaha'));
+      await t.tap(find.text('Jenis usaha'));
+      await settle(t);
+    },
+  ),
+  (
+    name: 'daftar-lainnya',
+    session: const NeedsSetup(),
+    home: (_) => const SetupScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Daftar usaha baru'));
+      await settle(t);
+      await t.enterText(find.widgetWithText(TextFormField, 'Alamat server (development)'), 'http://test');
+      await pick(t, 'Jenis usaha', 'Lainnya', search: 'lain');
+      expect(find.text('Sebutkan bidang usaha'), findsOneWidget);
+      expect(find.text('Cara berjualan'), findsNothing, reason: 'hanya usaha makanan & minuman');
     },
   ),
   (
@@ -454,6 +550,7 @@ void main() {
           menuProvider.overrideWith(FakeMenu.new),
           shiftProvider.overrideWith(FakeShift.new),
           printerProvider.overrideWith(FakePrinter.new),
+          signupOptionsLoaderProvider.overrideWithValue((_) async => signupOptions),
           staffProvider.overrideWith((ref) async => const [
                 StaffMember('u1', 'Rina Amelia', 'owner'),
                 StaffMember('u2', 'Budi Santoso', 'cashier'),

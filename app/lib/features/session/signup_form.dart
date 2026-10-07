@@ -7,27 +7,20 @@ import '../../core/config.dart';
 import '../../core/theme/tokens.dart';
 import 'session_controller.dart';
 import 'setup_screen.dart';
+import 'signup_options.dart';
 
-/// Sektor usaha (kode = enum `BusinessSector` di server).
-const kSectors = [
-  ('coffee_shop', 'Kedai kopi / kafe', Icons.local_cafe_rounded),
-  ('restaurant', 'Rumah makan / resto', Icons.restaurant_rounded),
-  ('street_food', 'Jajanan / gerobak', Icons.fastfood_rounded),
-  ('bakery', 'Roti & kue', Icons.bakery_dining_rounded),
-  ('retail', 'Toko / retail', Icons.shopping_bag_rounded),
-  ('service', 'Jasa', Icons.handyman_rounded),
-  ('other', 'Lainnya', Icons.more_horiz_rounded),
-];
-
-/// Cara berjualan (kode = enum `SalesMode` di server).
-const kSalesModes = [
-  ('takeaway', 'Bawa pulang saja', Icons.shopping_basket_rounded),
-  ('dine_in', 'Makan di tempat', Icons.table_restaurant_rounded),
-  ('mixed', 'Keduanya', Icons.compare_arrows_rounded),
-];
+/// Ikon cara berjualan (kode = enum `SalesMode` di server; label dari server).
+const _salesModeIcons = {
+  'takeaway': Icons.shopping_basket_rounded,
+  'dine_in': Icons.table_restaurant_rounded,
+  'mixed': Icons.compare_arrows_rounded,
+};
 
 /// Field server yang ada di langkah 1 (usaha); sisanya di langkah 2 (akun owner).
-const _businessFields = {'business_name', 'sector', 'sales_mode', 'outlet_count', 'phone', 'address'};
+const _businessFields = {
+  'business_name', 'sector', 'sector_other', 'sales_mode', 'province_code', 'regency_code', 'outlet_count', 'phone',
+  'address',
+};
 
 /// PIN mudah ditebak: angka sama semua atau berurutan (sama dengan aturan server).
 bool weakPin(String pin) =>
@@ -51,6 +44,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   final _businessName = TextEditingController();
   final _phone = TextEditingController();
   final _address = TextEditingController();
+  final _sectorOther = TextEditingController();
   final _server = TextEditingController();
   final _ownerName = TextEditingController();
   final _email = TextEditingController();
@@ -61,6 +55,12 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   int _step = 0;
   String? _sector;
   String? _salesMode;
+  String? _province;
+  String? _regency;
+
+  /// Pilihan jenis usaha & wilayah dari server (dimuat saat pertama dibutuhkan).
+  SignupOptions? _options;
+  bool _loadingOptions = false;
   int _outlets = 1;
   bool _terms = false;
   bool _showPassword = false;
@@ -71,7 +71,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
 
   @override
   void dispose() {
-    for (final c in [_businessName, _phone, _address, _server, _ownerName, _email, _password, _pin, _pin2]) {
+    for (final c in [_businessName, _phone, _address, _sectorOther, _server, _ownerName, _email, _password, _pin, _pin2]) {
       c.dispose();
     }
     super.dispose();
@@ -79,10 +79,92 @@ class _SignupFormState extends ConsumerState<SignupForm> {
 
   String? _serverError(String field) => _serverErrors[field];
 
+  String get _serverUrl => ServerUrlField.needed ? _server.text.trim() : kApiUrl;
+
+  SectorOption? get _sectorOption => _options?.sector(_sector);
+  bool get _asksSalesMode => _sectorOption?.asksSalesMode ?? false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Build produksi: alamat server sudah tertanam, jadi pilihan langsung dimuat.
+    if (!ServerUrlField.needed) _ensureOptions();
+  }
+
+  /// Muat pilihan sekali. Build development butuh alamat server diisi dulu.
+  Future<SignupOptions?> _ensureOptions() async {
+    if (_options != null) return _options;
+    if (Uri.tryParse(_serverUrl)?.host.isEmpty ?? true) {
+      setState(() => _error = 'Isi alamat server dulu.');
+      return null;
+    }
+    setState(() {
+      _loadingOptions = true;
+      _error = null;
+    });
+    try {
+      final options = await ref.read(signupOptionsLoaderProvider)(_serverUrl);
+      if (mounted) setState(() => _options = options);
+      return options;
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+      return null;
+    } finally {
+      if (mounted) setState(() => _loadingOptions = false);
+    }
+  }
+
+  Future<void> _pickSector() async {
+    final options = await _ensureOptions();
+    if (options == null || !mounted) return;
+    final code = await showOptionPicker<String>(
+      context,
+      title: 'Jenis usaha',
+      searchHint: 'Cari jenis usaha, mis. laundry',
+      selected: _sector,
+      items: [for (final s in options.sectors) PickerItem(s.code, s.label, group: s.group)],
+    );
+    if (code != null) setState(() => _sector = code);
+  }
+
+  Future<void> _pickProvince() async {
+    final options = await _ensureOptions();
+    if (options == null || !mounted) return;
+    final code = await showOptionPicker<String>(
+      context,
+      title: 'Provinsi',
+      searchHint: 'Cari provinsi',
+      selected: _province,
+      items: [for (final p in options.provinces) PickerItem(p.code, p.name)],
+    );
+    if (code != null && code != _province) {
+      setState(() {
+        _province = code;
+        _regency = null; // kota/kabupaten harus dipilih ulang
+      });
+    }
+  }
+
+  Future<void> _pickRegency() async {
+    final province = _options?.province(_province);
+    if (province == null) return;
+    final regencies = [...province.children]..sort((a, b) => a.name.compareTo(b.name));
+    final code = await showOptionPicker<String>(
+      context,
+      title: 'Kota / kabupaten',
+      searchHint: 'Cari kota atau kabupaten',
+      selected: _regency,
+      items: [for (final r in regencies) PickerItem(r.code, r.name)],
+    );
+    if (code != null) setState(() => _regency = code);
+  }
+
   void _next() {
     setState(() => _submitted = true);
     final ok = _businessForm.currentState!.validate();
-    if (!ok || _sector == null || _salesMode == null) return;
+    if (!ok || _sector == null || (_asksSalesMode && _salesMode == null) || _province == null || _regency == null) {
+      return;
+    }
     setState(() {
       _step = 1;
       _submitted = false;
@@ -100,11 +182,14 @@ class _SignupFormState extends ConsumerState<SignupForm> {
     });
     try {
       await ref.read(sessionProvider.notifier).signup(
-            serverUrl: ServerUrlField.needed ? _server.text.trim() : kApiUrl,
+            serverUrl: _serverUrl,
             data: SignupData(
               businessName: _businessName.text,
               sector: _sector!,
-              salesMode: _salesMode!,
+              sectorOther: _sector == 'other' ? _sectorOther.text : null,
+              salesMode: _asksSalesMode ? _salesMode : null,
+              provinceCode: _province!,
+              regencyCode: _regency!,
               outletCount: _outlets,
               phone: _phone.text,
               address: _address.text,
@@ -158,6 +243,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             onBack: widget.onBack,
           ),
           const SizedBox(height: AppSpace.s5),
+          if (ServerUrlField.needed) ...[ServerUrlField(controller: _server), const SizedBox(height: AppSpace.s3)],
           TextFormField(
             controller: _businessName,
             decoration: const InputDecoration(
@@ -171,49 +257,55 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             onChanged: (_) => _serverErrors.remove('business_name'),
           ),
           const SizedBox(height: AppSpace.s3),
-          _label('Jenis usaha'),
-          Wrap(
-            spacing: AppSpace.s2,
-            runSpacing: AppSpace.s2,
-            children: [
-              for (final (code, label, icon) in kSectors)
-                ChoiceChip(
-                  avatar: Icon(icon, size: 18),
-                  label: Text(label),
-                  showCheckmark: false,
-                  selected: _sector == code,
-                  onSelected: (_) => setState(() => _sector = code),
-                ),
-            ],
+          PickerField(
+            label: 'Jenis usaha',
+            icon: Icons.category_rounded,
+            value: _sectorOption?.label,
+            loading: _loadingOptions,
+            onTap: _pickSector,
+            errorText: _serverError('sector') ?? (_submitted && _sector == null ? 'Pilih jenis usaha' : null),
           ),
-          if (_submitted && _sector == null) _choiceError('Pilih jenis usaha'),
-          if (_serverError('sector') != null) _choiceError(_serverError('sector')!),
-          const SizedBox(height: AppSpace.s4),
-          _label('Cara berjualan'),
-          Wrap(
-            spacing: AppSpace.s2,
-            runSpacing: AppSpace.s2,
-            children: [
-              for (final (code, label, icon) in kSalesModes)
-                ChoiceChip(
-                  avatar: Icon(icon, size: 18),
-                  label: Text(label),
-                  showCheckmark: false,
-                  selected: _salesMode == code,
-                  onSelected: (_) => setState(() => _salesMode = code),
-                ),
-            ],
-          ),
-          if (_submitted && _salesMode == null) _choiceError('Pilih cara berjualan'),
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpace.s2),
-            child: Text(
-              'Fitur & kategori awal disiapkan sesuai pilihan ini, mis. "Bawa pulang saja" tanpa nomor meja. '
-              'Bisa diubah kapan saja di Pengaturan → Fitur.',
-              style: AppType.caption.copyWith(color: AppColors.inkMuted),
+          if (_sector == 'other') ...[
+            const SizedBox(height: AppSpace.s3),
+            TextFormField(
+              controller: _sectorOther,
+              decoration: const InputDecoration(
+                labelText: 'Sebutkan bidang usaha',
+                hintText: 'mis. Rental PS, Toko mainan',
+                prefixIcon: Icon(Icons.edit_note_rounded),
+              ),
+              maxLength: 60,
+              validator: (v) => (v?.trim().isNotEmpty ?? false) ? _serverError('sector_other') : 'Wajib diisi',
             ),
-          ),
-          if (_serverError('sales_mode') != null) _choiceError(_serverError('sales_mode')!),
+          ],
+          if (_asksSalesMode) ...[
+            const SizedBox(height: AppSpace.s4),
+            _label('Cara berjualan'),
+            Wrap(
+              spacing: AppSpace.s2,
+              runSpacing: AppSpace.s2,
+              children: [
+                for (final (code, label) in _options!.salesModes)
+                  ChoiceChip(
+                    avatar: Icon(_salesModeIcons[code] ?? Icons.storefront_rounded, size: 18),
+                    label: Text(label),
+                    showCheckmark: false,
+                    selected: _salesMode == code,
+                    onSelected: (_) => setState(() => _salesMode = code),
+                  ),
+              ],
+            ),
+            if (_submitted && _salesMode == null) _choiceError('Pilih cara berjualan'),
+            if (_serverError('sales_mode') != null) _choiceError(_serverError('sales_mode')!),
+          ],
+          if (_sector != null)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpace.s2),
+              child: Text(
+                'Fitur & kategori awal disiapkan sesuai pilihan ini. Bisa diubah kapan saja di Pengaturan → Fitur.',
+                style: AppType.caption.copyWith(color: AppColors.inkMuted),
+              ),
+            ),
           const SizedBox(height: AppSpace.s4),
           Row(
             children: [
@@ -232,10 +324,30 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             ],
           ),
           const SizedBox(height: AppSpace.s4),
+          PickerField(
+            label: 'Provinsi',
+            icon: Icons.map_rounded,
+            value: _options?.province(_province)?.name,
+            loading: _loadingOptions,
+            onTap: _pickProvince,
+            errorText: _serverError('province_code') ?? (_submitted && _province == null ? 'Pilih provinsi' : null),
+          ),
+          const SizedBox(height: AppSpace.s3),
+          PickerField(
+            label: 'Kota / kabupaten',
+            icon: Icons.location_city_rounded,
+            value: _options?.province(_province)?.children.where((r) => r.code == _regency).firstOrNull?.name,
+            enabled: _province != null,
+            onTap: _pickRegency,
+            errorText: _serverError('regency_code') ??
+                (_submitted && _province != null && _regency == null ? 'Pilih kota / kabupaten' : null),
+          ),
+          const SizedBox(height: AppSpace.s3),
           TextFormField(
             controller: _address,
             decoration: const InputDecoration(
-              labelText: 'Alamat (opsional)',
+              labelText: 'Detail alamat (opsional)',
+              hintText: 'Jalan, nomor, kelurahan',
               helperText: 'Tercetak di bawah nama usaha pada struk',
               helperMaxLines: 2,
               prefixIcon: Icon(Icons.place_rounded),
@@ -288,7 +400,6 @@ class _SignupFormState extends ConsumerState<SignupForm> {
               }),
             ),
             const SizedBox(height: AppSpace.s5),
-            if (ServerUrlField.needed) ...[ServerUrlField(controller: _server), const SizedBox(height: AppSpace.s3)],
             TextFormField(
               controller: _ownerName,
               decoration: const InputDecoration(labelText: 'Nama Anda', prefixIcon: Icon(Icons.person_rounded)),

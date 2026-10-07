@@ -34,7 +34,7 @@ class TenantProvisioner
             $tenant = new Tenant(['code' => $code, 'name' => $name, 'timezone' => 'Asia/Jakarta']);
             $tenant->plan_id = Plan::where('code', $planCode)->firstOrFail()->id;
             // Profil usaha (pendaftaran mandiri): di luar $fillable, diisi eksplisit di sini saja.
-            foreach (['sector', 'sales_mode', 'outlet_count', 'phone', 'terms_accepted_at'] as $key) {
+            foreach (['sector', 'sector_other', 'sales_mode', 'outlet_count', 'phone', 'province_code', 'regency_code', 'terms_accepted_at'] as $key) {
                 if (array_key_exists($key, $profile)) {
                     $tenant->{$key} = $profile[$key];
                 }

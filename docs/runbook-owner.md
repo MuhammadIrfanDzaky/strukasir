@@ -86,14 +86,15 @@ ikut berubah. Mematikan fitur tidak menghapus data.
 
 Saat daftar, fitur & kategori awal disiapkan otomatis (bisa diubah kapan saja):
 
-| Pilihan saat daftar | Disiapkan |
+| Jenis usaha saat daftar | Disiapkan |
 |---|---|
-| Cara jualan **Bawa pulang saja** | Tanpa nama pelanggan/meja & Open Bill (kasir cepat) |
-| **Makan di tempat** / **Keduanya** | Nama pelanggan / meja wajib, Open Bill aktif |
-| Kedai kopi, rumah makan, jajanan | Varian produk aktif (suhu, gula, level pedas, topping) |
-| Roti & kue, toko, jasa, lainnya | Tanpa varian |
+| **Makanan & minuman**, cara jualan *Bawa pulang saja* | Tanpa nama pelanggan/meja & Open Bill (kasir cepat) |
+| **Makanan & minuman**, *Makan di tempat* / *Keduanya* | Nama pelanggan / meja wajib, Open Bill aktif |
+| Kafe, restoran, warung/gerobak, minuman | Varian produk aktif (suhu, gula, level pedas, topping) |
+| **Jasa** (laundry, bengkel, dll.) & **Kecantikan** (salon, spa, dll.) | Nama pelanggan wajib, Open Bill aktif (bayar saat ambil / setelah layanan) |
+| **Retail** & **Kesehatan** (toko, apotek, dll.) | Tanpa nama pelanggan & Open Bill (kasir cepat) |
 | Semua | Diskon & bayar beberapa metode aktif; pajak & service mati sampai persen diisi |
-| Kategori awal | Kopi/Non Kopi/Makanan, Makanan/Minuman, Roti/Kue/Minuman, Umum, atau Layanan (masih kosong) |
+| Kategori awal | Sesuai jenis usaha, mis. laundry: Kiloan/Satuan; apotek: Obat Bebas/Vitamin & Suplemen/Alat Kesehatan (masih kosong) |
 
 ## Kelola menu (owner)
 

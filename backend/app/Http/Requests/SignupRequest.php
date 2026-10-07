@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\BusinessSector;
 use App\Enums\SalesMode;
+use App\Support\Regions;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -36,7 +37,20 @@ class SignupRequest extends FormRequest
             // Usaha
             'business_name' => ['required', 'string', 'max:80'],
             'sector' => ['required', Rule::enum(BusinessSector::class)],
-            'sales_mode' => ['required', Rule::enum(SalesMode::class)],
+            // "Lainnya" → wajib sebutkan (bahan template baru).
+            'sector_other' => ['nullable', 'required_if:sector,other', 'string', 'max:60'],
+            // Hanya usaha makanan & minuman yang ditanya cara berjualan; selain itu diabaikan.
+            'sales_mode' => [Rule::requiredIf(fn () => $this->sector()?->asksSalesMode() ?? false), 'nullable', Rule::enum(SalesMode::class)],
+            'province_code' => ['required', 'string', function (string $attribute, mixed $value, Closure $fail) {
+                if (! is_string($value) || ! Regions::provinceExists($value)) {
+                    $fail('Pilih provinsi dari daftar.');
+                }
+            }],
+            'regency_code' => ['required', 'string', function (string $attribute, mixed $value, Closure $fail) {
+                if (! is_string($value) || ! Regions::regencyIn((string) $this->input('province_code'), $value)) {
+                    $fail('Pilih kota/kabupaten di provinsi tersebut.');
+                }
+            }],
             'outlet_count' => ['required', 'integer', 'between:1,999'],
             'phone' => ['nullable', 'string', 'regex:/^\+?[0-9 \-]{8,20}$/'],
             'address' => ['nullable', 'string', 'max:300'],
@@ -48,9 +62,16 @@ class SignupRequest extends FormRequest
         ];
     }
 
+    public function sector(): ?BusinessSector
+    {
+        return BusinessSector::tryFrom((string) $this->input('sector'));
+    }
+
     public function messages(): array
     {
         return [
+            'sector_other.required_if' => 'Sebutkan bidang usaha Anda.',
+            'sales_mode.required' => 'Pilih cara berjualan.',
             'email.unique' => 'Email ini sudah terdaftar. Pilih "Masuk" untuk mendaftarkan tablet ke usaha yang sudah ada.',
             'terms.accepted' => 'Setujui syarat & ketentuan untuk melanjutkan.',
             'phone.regex' => 'Nomor HP tidak valid.',

@@ -178,7 +178,7 @@ class EmailCodeTest extends TestCase
         $payload = fn (string $email) => [
             'owner_name' => 'Wahyu', 'email' => $email, 'password' => 'rahasia123', 'pin' => '482915',
             'business_name' => 'Kopi Senja', 'sector' => 'coffee_shop', 'sales_mode' => 'takeaway',
-            'outlet_count' => 1, 'terms' => true, 'device_id' => (string) Str::uuid(),
+            'outlet_count' => 1, 'province_code' => '12', 'regency_code' => '12.71', 'terms' => true, 'device_id' => (string) Str::uuid(),
         ];
 
         $this->api('POST', '/api/v1/signup', null, $payload('a@contoh.id'))->assertCreated();

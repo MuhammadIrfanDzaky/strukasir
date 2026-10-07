@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\ReceiptSettingsController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\ShiftController;
 use App\Http\Controllers\Api\V1\SignupController;
+use App\Http\Controllers\Api\V1\SignupOptionsController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -27,6 +28,7 @@ Route::prefix('v1')->group(function () {
     Route::post('devices/register', DeviceRegistrationController::class)->middleware('throttle:auth');
     // Publik: pendaftaran usaha baru (tablet ini otomatis jadi tablet pertama).
     Route::post('signup', SignupController::class)->middleware('throttle:signup');
+    Route::get('signup/options', SignupOptionsController::class); // jenis usaha & wilayah untuk form daftar
     // Publik: lupa password owner (kode 6 digit ke email).
     Route::post('auth/password/forgot', [PasswordResetController::class, 'forgot'])->middleware('throttle:auth');
     Route::post('auth/password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:auth');

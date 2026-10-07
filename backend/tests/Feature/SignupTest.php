@@ -38,6 +38,8 @@ class SignupTest extends TestCase
             'sector' => 'coffee_shop',
             'sales_mode' => 'dine_in',
             'outlet_count' => 2,
+            'province_code' => '12',
+            'regency_code' => '12.71',
             'phone' => '0812-3456-7890',
             'address' => "Jl. Mawar No. 1\nMedan",
             'terms' => true,
@@ -62,6 +64,7 @@ class SignupTest extends TestCase
         $this->assertSame(BusinessSector::CoffeeShop, $tenant->sector);
         $this->assertSame(SalesMode::DineIn, $tenant->sales_mode);
         $this->assertSame([2, '081234567890'], [$tenant->outlet_count, $tenant->phone]);
+        $this->assertSame(['12', '12.71', null], [$tenant->province_code, $tenant->regency_code, $tenant->sector_other]);
         $this->assertNotNull($tenant->terms_accepted_at);
         $this->assertSame('standard', $tenant->plan->code);
 
@@ -219,5 +222,68 @@ class SignupTest extends TestCase
 
         $this->api('PUT', '/api/v1/settings/features', $owner, ['features' => ['customer_name' => true, 'open_bill' => true]])->assertOk();
         $this->api('GET', '/api/v1/menu', $owner)->assertJsonPath('features.open_bill', true);
+    }
+
+    // ─────────────── jenis usaha berkelompok & wilayah ───────────────
+
+    public function test_options_list_grouped_sectors_sales_modes_and_regions(): void
+    {
+        $res = $this->api('GET', '/api/v1/signup/options')->assertOk();
+
+        $this->assertSame(['food', 'retail', 'service', 'health', 'beauty', 'other'], array_column($res->json('sectors'), 'group'));
+        $food = collect($res->json('sectors.0.items'))->keyBy('code');
+        $this->assertTrue($food['coffee_shop']['asks_sales_mode']);
+        $this->assertFalse(collect($res->json('sectors.2.items'))->firstWhere('code', 'laundry')['asks_sales_mode']);
+        $this->assertCount(30, collect($res->json('sectors'))->flatMap(fn ($g) => $g['items']));
+        $this->assertSame(['takeaway', 'dine_in', 'mixed'], array_column($res->json('sales_modes'), 'code'));
+
+        $regions = $res->json('regions');
+        $this->assertCount(38, $regions);
+        $this->assertSame(514, collect($regions)->sum(fn ($p) => count($p['regencies'])));
+    }
+
+    public function test_other_sector_needs_description(): void
+    {
+        $this->signup(['sector' => 'other', 'sales_mode' => null])->assertJsonValidationErrors('sector_other');
+
+        $res = $this->signup(['sector' => 'other', 'sector_other' => 'Rental PS', 'sales_mode' => null])->assertCreated();
+        $tenant = Tenant::findOrFail($res->json('tenant.id'));
+        $this->assertSame(['Rental PS', null], [$tenant->sector_other, $tenant->sales_mode]);
+    }
+
+    public function test_sales_mode_only_for_food_businesses(): void
+    {
+        $this->signup(['sector' => 'restaurant', 'sales_mode' => null])->assertJsonValidationErrors('sales_mode');
+
+        // Laundry: cara jualan diabaikan walau terkirim.
+        $res = $this->signup(['sector' => 'laundry', 'sales_mode' => 'dine_in'])->assertCreated();
+        $this->assertNull(Tenant::findOrFail($res->json('tenant.id'))->sales_mode);
+    }
+
+    public function test_region_must_exist_and_match_province(): void
+    {
+        $this->signup(['province_code' => '99'])->assertJsonValidationErrors('province_code');
+        $this->signup(['regency_code' => '31.71'])->assertJsonValidationErrors('regency_code'); // Jakarta Pusat ≠ Sumut
+        $this->signup(['province_code' => null, 'regency_code' => null])->assertJsonValidationErrors(['province_code', 'regency_code']);
+    }
+
+    public function test_laundry_template_names_customers_and_pays_later(): void
+    {
+        $menu = $this->menuAfterSignup(['sector' => 'laundry', 'sales_mode' => null]);
+
+        $this->assertTrue($menu->json('features.customer_name'));
+        $this->assertTrue($menu->json('features.open_bill'), 'bayar saat ambil cucian');
+        $this->assertFalse($menu->json('features.modifiers'));
+        $this->assertSame(['Kiloan', 'Satuan'], array_column($menu->json('categories'), 'name'));
+        $menu->assertJsonPath('customer_label_hint', 'Nama pelanggan');
+    }
+
+    public function test_pharmacy_template_is_fast_checkout(): void
+    {
+        $menu = $this->menuAfterSignup(['sector' => 'pharmacy', 'sales_mode' => null]);
+
+        $this->assertFalse($menu->json('features.customer_name'));
+        $this->assertFalse($menu->json('features.open_bill'));
+        $this->assertSame(['Obat Bebas', 'Vitamin & Suplemen', 'Alat Kesehatan'], array_column($menu->json('categories'), 'name'));
     }
 }

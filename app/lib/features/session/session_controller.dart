@@ -72,7 +72,10 @@ class SignupData {
   const SignupData({
     required this.businessName,
     required this.sector,
-    required this.salesMode,
+    this.sectorOther,
+    this.salesMode,
+    required this.provinceCode,
+    required this.regencyCode,
     required this.outletCount,
     required this.ownerName,
     required this.email,
@@ -84,7 +87,14 @@ class SignupData {
 
   final String businessName;
   final String sector;
-  final String salesMode;
+
+  /// Isian "Lainnya, sebutkan".
+  final String? sectorOther;
+
+  /// Null untuk usaha non makanan (tidak ditanya).
+  final String? salesMode;
+  final String provinceCode;
+  final String regencyCode;
   final int outletCount;
   final String ownerName;
   final String email;
@@ -96,7 +106,10 @@ class SignupData {
   Map<String, dynamic> toJson() => {
         'business_name': businessName.trim(),
         'sector': sector,
-        'sales_mode': salesMode,
+        if (sectorOther != null && sectorOther!.trim().isNotEmpty) 'sector_other': sectorOther!.trim(),
+        if (salesMode != null) 'sales_mode': salesMode,
+        'province_code': provinceCode,
+        'regency_code': regencyCode,
         'outlet_count': outletCount,
         'owner_name': ownerName.trim(),
         'email': email.trim(),
