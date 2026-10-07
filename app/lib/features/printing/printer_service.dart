@@ -53,8 +53,10 @@ List<int> rasterImage(img.Image image) {
   return out;
 }
 
-/// Jarak kertas setelah baris terakhir sampai gerigi sobek printer (mm). 8 titik = 1 mm.
-const int kDefaultTailMm = 12;
+/// Sisa kertas setelah baris terakhir sampai gerigi sobek (mm), ketetapan untuk semua struk.
+/// Gerigi printer 58 mm ±12 mm dari kepala cetak, jadi margin atas struk berikutnya juga ±12 mm.
+/// 8 titik = 1 mm.
+const int kTailMm = 12;
 List<int> feedMm(int mm) => [0x1B, 0x4A, (mm * 8).clamp(0, 255)]; // ESC J n
 
 class PrintException implements Exception {
@@ -81,19 +83,9 @@ class PrinterService extends AsyncNotifier<SavedPrinter?> {
   static const _storage = FlutterSecureStorage();
   static const _macKey = 'printer_mac';
   static const _nameKey = 'printer_name';
-  static const _tailKey = 'printer_tail_mm';
-
-  /// Sisa kertas setelah struk (mm); diatur per tablet karena posisi gerigi tiap printer beda.
-  int tailMm = kDefaultTailMm;
-
-  Future<void> setTailMm(int mm) async {
-    tailMm = mm.clamp(0, 30);
-    await _storage.write(key: _tailKey, value: '$tailMm');
-  }
 
   @override
   Future<SavedPrinter?> build() async {
-    tailMm = int.tryParse(await _storage.read(key: _tailKey) ?? '') ?? kDefaultTailMm;
     final mac = await _storage.read(key: _macKey);
     return mac == null ? null : SavedPrinter(mac, await _storage.read(key: _nameKey) ?? mac);
   }
@@ -138,7 +130,7 @@ class PrinterService extends AsyncNotifier<SavedPrinter?> {
         bytes.addAll(gen.text(line.text, styles: PosStyles(bold: line.bold)));
       }
       // Dorong kertas secukupnya sampai baris terakhir lewat gerigi sobek (tanpa baris kosong ekstra).
-      bytes.addAll(feedMm(tailMm));
+      bytes.addAll(feedMm(kTailMm));
     }
 
     if (!await PrintBluetoothThermal.writeBytes(bytes)) {

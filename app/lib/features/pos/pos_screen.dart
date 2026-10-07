@@ -76,6 +76,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             );
 
         final short = context.isShort;
+        final gridPad = context.isCompact ? AppSpace.s3 : AppSpace.s4;
+        final gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: context.isCompact ? 180 : 210,
+          mainAxisExtent: short ? 100 : (context.isCompact ? 104 : 116),
+          crossAxisSpacing: context.isCompact ? AppSpace.s2 : AppSpace.s3,
+          mainAxisSpacing: context.isCompact ? AppSpace.s2 : AppSpace.s3,
+        );
+        Widget tile(MenuProduct p) => _ProductTile(product: p, onTap: () => _pick(s.menu, p));
         final catalog = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -155,18 +163,35 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                               ? 'Menu masih kosong. Owner bisa menambah produk di Kelola Menu.'
                               : 'Kategori ini masih kosong. Owner bisa menambah produk di Kelola Menu.',
                         )
-                  : GridView.builder(
-                      padding: EdgeInsets.all(context.isCompact ? AppSpace.s3 : AppSpace.s4),
-                      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: context.isCompact ? 180 : 210,
-                        mainAxisExtent: short ? 100 : (context.isCompact ? 104 : 116),
-                        crossAxisSpacing: context.isCompact ? AppSpace.s2 : AppSpace.s3,
-                        mainAxisSpacing: context.isCompact ? AppSpace.s2 : AppSpace.s3,
-                      ),
-                      itemCount: products.length,
-                      itemBuilder: (_, i) =>
-                          _ProductTile(product: products[i], onTap: () => _pick(s.menu, products[i])),
-                    ),
+                  : categoryId == null && !searching
+                      // "Semua": dikelompokkan per kategori dengan judul, supaya tetap ada pembeda.
+                      ? CustomScrollView(
+                          slivers: [
+                            for (final (i, c) in categories.indexed)
+                              if (s.menu.productsIn(c.id).isNotEmpty) ...[
+                                SliverPadding(
+                                  padding: EdgeInsets.fromLTRB(gridPad, i == 0 ? gridPad : AppSpace.s2, gridPad, 0),
+                                  sliver: SliverToBoxAdapter(
+                                    child: _CategoryHeader(c.name, s.menu.productsIn(c.id).length),
+                                  ),
+                                ),
+                                SliverPadding(
+                                  padding: EdgeInsets.fromLTRB(gridPad, AppSpace.s2, gridPad, gridPad),
+                                  sliver: SliverGrid.builder(
+                                    gridDelegate: gridDelegate,
+                                    itemCount: s.menu.productsIn(c.id).length,
+                                    itemBuilder: (_, j) => tile(s.menu.productsIn(c.id)[j]),
+                                  ),
+                                ),
+                              ],
+                          ],
+                        )
+                      : GridView.builder(
+                          padding: EdgeInsets.all(gridPad),
+                          gridDelegate: gridDelegate,
+                          itemCount: products.length,
+                          itemBuilder: (_, i) => tile(products[i]),
+                        ),
             ),
           ],
         );
@@ -297,6 +322,40 @@ class _CartBar extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Judul kelompok di tab "Semua": garis aksen + nama kategori + jumlah produk + garis pembatas.
+class _CategoryHeader extends StatelessWidget {
+  const _CategoryHeader(this.name, this.count);
+
+  final String name;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.smAll),
+        ),
+        const SizedBox(width: AppSpace.s2),
+        // Lebar nama dibatasi (bukan Flexible) supaya garis pembatas memenuhi sisa baris.
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 240),
+          child: Text(name.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppType.bodyStrong.copyWith(color: AppColors.ink, letterSpacing: 0.6)),
+        ),
+        const SizedBox(width: AppSpace.s2),
+        Text('$count', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+        const SizedBox(width: AppSpace.s3),
+        const Expanded(child: Divider(height: 1, color: AppColors.line)),
+      ],
     );
   }
 }
