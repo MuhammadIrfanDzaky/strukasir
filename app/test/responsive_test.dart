@@ -267,6 +267,13 @@ final scenarios = <Scenario>[
     act: null,
   ),
   (
+    name: 'dialog-pin-keluarkan-tablet',
+    session: NeedsLogin('http://test', device),
+    home: (_) => dialogHost(const PinDialog(member: StaffMember('u1', 'Rina Amelia', 'owner'), unregister: true)),
+    fillCart: false,
+    act: null,
+  ),
+  (
     name: 'login-pin',
     session: NeedsLogin('http://test', device),
     home: (s) => LoginScreen(session: s as NeedsLogin),

@@ -242,6 +242,17 @@ class SessionController extends AsyncNotifier<Session> {
     await _forgetDevice();
   }
 
+  /// Dari layar pilih nama (belum login): owner memasukkan PIN untuk mengeluarkan tablet dari
+  /// usaha dan kembali ke layar Selamat datang. Sesi owner tidak disimpan di tablet.
+  Future<void> unregisterWithOwnerPin(String ownerId, String pin) async {
+    final s = _requireDevice();
+    final api = ApiClient(baseUrl: s.serverUrl);
+    final res =
+        await api.post('/auth/pin', data: {'user_id': ownerId, 'pin': pin}, token: await _store.deviceToken());
+    await api.post('/devices/current/unregister', token: res['token'] as String);
+    await _forgetDevice();
+  }
+
   Future<List<StaffMember>> staff() async {
     final s = _requireDevice();
     try {

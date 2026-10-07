@@ -31,6 +31,14 @@ class LoginScreen extends ConsumerWidget {
       ),
     ]);
 
+    // Kembali ke layar awal (Daftar / Masuk) — mis. tablet dipakai usaha lain. Butuh PIN owner.
+    final leave = TextButton.icon(
+      style: TextButton.styleFrom(foregroundColor: AppColors.onInkMuted, padding: EdgeInsets.zero),
+      onPressed: () => _leave(context, ref, staff.value ?? const []),
+      icon: const Icon(Icons.logout_rounded, size: 18),
+      label: const Text('Ganti usaha / keluarkan tablet'),
+    );
+
     final brand = stacked
         ? Container(
             color: AppColors.ink,
@@ -45,6 +53,7 @@ class LoginScreen extends ConsumerWidget {
                     style: AppType.titleLg.copyWith(color: AppColors.onInk), maxLines: 2, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: AppSpace.s1),
                 device,
+                leave,
               ]),
             ),
           )
@@ -65,6 +74,8 @@ class LoginScreen extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis),
                 const SizedBox(height: AppSpace.s2),
                 device,
+                const SizedBox(height: AppSpace.s3),
+                leave,
               ]),
             ),
           );
@@ -136,6 +147,43 @@ class LoginScreen extends ConsumerWidget {
   }
 }
 
+Future<void> _leave(BuildContext context, WidgetRef ref, List<StaffMember> members) async {
+  final owner = members.where((m) => m.role == 'owner').firstOrNull;
+  if (owner == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Daftar staf belum termuat. Ketuk muat ulang, lalu coba lagi.')));
+    return;
+  }
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Keluarkan tablet dari usaha?'),
+      content: const SizedBox(
+        width: 420,
+        child: Text(
+          'Tablet kembali ke layar awal (Daftar usaha baru / Masuk) dan semua kasir di tablet ini keluar. '
+          'Data transaksi tetap tersimpan di server.\n\nDibutuhkan PIN owner.',
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Lanjut'),
+        ),
+      ],
+    ),
+  );
+  if (ok == true && context.mounted) {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PinDialog(member: owner, unregister: true),
+    );
+  }
+}
+
 class _StaffCard extends StatelessWidget {
   const _StaffCard({required this.member, required this.onTap, this.width = 196});
 
@@ -175,9 +223,12 @@ class _StaffCard extends StatelessWidget {
 }
 
 class PinDialog extends ConsumerStatefulWidget {
-  const PinDialog({super.key, required this.member});
+  const PinDialog({super.key, required this.member, this.unregister = false});
 
   final StaffMember member;
+
+  /// True = PIN owner dipakai untuk mengeluarkan tablet dari usaha, bukan untuk login.
+  final bool unregister;
 
   @override
   ConsumerState<PinDialog> createState() => _PinDialogState();
@@ -196,7 +247,10 @@ class _PinDialogState extends ConsumerState<PinDialog> {
       _error = null;
     });
     try {
-      await ref.read(sessionProvider.notifier).pinLogin(widget.member.id, _pin);
+      final session = ref.read(sessionProvider.notifier);
+      widget.unregister
+          ? await session.unregisterWithOwnerPin(widget.member.id, _pin)
+          : await session.pinLogin(widget.member.id, _pin);
       if (mounted) Navigator.of(context).pop();
     } on ApiException catch (e) {
       setState(() {
@@ -291,6 +345,8 @@ class _PinDialogState extends ConsumerState<PinDialog> {
         ],
       );
 
+  String get _prompt => widget.unregister ? 'PIN owner untuk mengeluarkan tablet' : 'Masukkan PIN';
+
   @override
   Widget build(BuildContext context) {
     final cancel = TextButton(onPressed: _busy ? null : () => Navigator.of(context).pop(), child: const Text('Batal'));
@@ -307,7 +363,7 @@ class _PinDialogState extends ConsumerState<PinDialog> {
                   AppAvatar(widget.member.name, size: 44),
                   const SizedBox(height: AppSpace.s2),
                   Text(widget.member.name, style: AppType.title, textAlign: TextAlign.center),
-                  Text('Masukkan PIN', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+                  Text(_prompt, style: AppType.caption.copyWith(color: AppColors.inkMuted), textAlign: TextAlign.center),
                   const SizedBox(height: AppSpace.s2),
                   _dots(),
                   _errorLine(),
@@ -333,7 +389,7 @@ class _PinDialogState extends ConsumerState<PinDialog> {
             AppAvatar(widget.member.name, size: 56),
             const SizedBox(height: AppSpace.s3),
             Text(widget.member.name, style: AppType.titleLg, textAlign: TextAlign.center),
-            Text('Masukkan PIN', style: AppType.body.copyWith(color: AppColors.inkMuted)),
+            Text(_prompt, style: AppType.body.copyWith(color: AppColors.inkMuted), textAlign: TextAlign.center),
             const SizedBox(height: AppSpace.s4),
             _dots(),
             _errorLine(),
