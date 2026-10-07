@@ -50,7 +50,9 @@ class _CartPanelState extends ConsumerState<CartPanel> {
   }
 
   /// Nama pelanggan / meja wajib sebelum Cek pesanan, Open Bill, atau Bayar.
+  /// Fitur "Nama pelanggan / meja" dimatikan → kolom disembunyikan dan tidak wajib.
   bool _requireLabel() {
+    if (!(ref.read(menuProvider).value?.menu.customerNameOn ?? true)) return true;
     if (ref.read(cartProvider).customerLabel.trim().isNotEmpty) return true;
     setState(() => _labelError = 'Isi nama pelanggan / meja dulu');
     _labelFocus.requestFocus();
@@ -82,7 +84,10 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 children: [
                   const Icon(Icons.person_outline_rounded, size: 20, color: AppColors.inkMuted),
                   const SizedBox(width: AppSpace.s2),
-                  Expanded(child: Text(cart.customerLabel.trim(), style: AppType.title)),
+                  Expanded(
+                    child: Text(cart.customerLabel.trim().isEmpty ? 'Pesanan' : cart.customerLabel.trim(),
+                        style: AppType.title),
+                  ),
                   AppBadge('$count item'),
                 ],
               ),
@@ -182,6 +187,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         (menu?.feature('discounts') ?? false) &&
         ((user?.can('discount.within_limit') ?? false) || (user?.can('discount.over_limit') ?? false));
     final openBill = menu?.feature('open_bill') ?? false;
+    final askLabel = menu?.customerNameOn ?? true;
     final canAct = !_busy && !cart.isEmpty;
 
     if (_label.text != cart.customerLabel) _label.text = cart.customerLabel;
@@ -384,7 +390,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 padding: EdgeInsets.zero,
                 children: [
                   header,
-                  labelField,
+                  if (askLabel) labelField,
                   if (cart.isEmpty)
                     const SizedBox(height: 220, child: empty)
                   else
@@ -399,7 +405,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   header,
-                  labelField,
+                  if (askLabel) labelField,
                   Expanded(
                     child: cart.isEmpty
                         ? empty

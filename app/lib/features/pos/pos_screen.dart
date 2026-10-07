@@ -28,7 +28,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   String? _query;
 
   Future<void> _pick(Menu menu, MenuProduct product) async {
-    final selection = ModifierSelection(product, menu.groupsFor(product));
+    final selection = ModifierSelection(product, menu.modifiersOn ? menu.groupsFor(product) : const []);
     final ok =
         selection.groups.isEmpty ||
         (await showDialog<bool>(

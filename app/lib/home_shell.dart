@@ -54,7 +54,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       if (user.can('reports.view')) _Destination('Laporan', Icons.bar_chart_rounded, (_) => const ReportsScreen()),
       if (user.can('menu.manage'))
         _Destination('Kelola Menu', Icons.restaurant_menu_rounded, (_) => const MenuAdminScreen()),
-      _Destination('Printer', Icons.print_rounded, (_) => const PrinterSettingsScreen()),
+      // Printer untuk semua; Fitur & Struk hanya owner (lihat PrinterSettingsScreen).
+      _Destination('Pengaturan', Icons.settings_rounded, (_) => const PrinterSettingsScreen()),
     ];
     final index = _index.clamp(0, destinations.length - 1);
     final compact = context.isCompact;

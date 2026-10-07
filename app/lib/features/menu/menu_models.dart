@@ -197,6 +197,12 @@ class Menu {
 
   bool feature(String key) => features[key] ?? false;
 
+  /// Nama pelanggan / meja wajib (Pengaturan → Fitur). Server lama tanpa kunci ini = wajib.
+  bool get customerNameOn => features['customer_name'] ?? true;
+
+  /// Varian produk aktif; mati → produk langsung masuk keranjang tanpa dialog pilihan.
+  bool get modifiersOn => features['modifiers'] ?? true;
+
   MenuProduct? product(String id) => products.where((p) => p.id == id).firstOrNull;
   final List<MenuProduct> products;
   final List<MenuModifierGroup> modifierGroups;

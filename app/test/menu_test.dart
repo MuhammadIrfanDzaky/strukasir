@@ -81,6 +81,15 @@ void main() {
     test('grup modifier mengikuti urutan produk', () {
       expect(menu.groupsFor(americano).map((g) => g.name), ['Suhu', 'Tambahan']);
     });
+
+    test('fitur nama pelanggan & varian: default aktif, ikut pengaturan kedai', () {
+      Menu withFeatures(Map<String, bool> f) => Menu.fromJson({...menuJson, 'features': f});
+
+      expect(withFeatures({}).customerNameOn, isTrue, reason: 'server lama tanpa kunci = tetap wajib');
+      expect(withFeatures({}).modifiersOn, isTrue);
+      final off = withFeatures({'customer_name': false, 'modifiers': false});
+      expect([off.customerNameOn, off.modifiersOn], [false, false]);
+    });
   });
 
   group('ModifierSelection', () {

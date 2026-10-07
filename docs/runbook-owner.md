@@ -26,7 +26,7 @@ Untuk menambah pesanan atau membayar, ketuk **Open Bill** di atas keranjang dan 
 - pelanggan pesan lagi → tambah produk, lalu ketuk **Simpan Bill**;
 - pelanggan selesai → ketuk **Bayar** (Close Bill), struk tercetak.
 
-**Logo & teks struk (owner)**: menu **Printer** → **Atur struk & logo**. Pilih gambar logo (otomatis diubah
+**Logo & teks struk (owner)**: menu **Pengaturan** → **Atur struk & logo**. Pilih gambar logo (otomatis diubah
 jadi hitam-putih; ketuk *Balik warna* atau geser *Ketebalan* bila hasilnya kurang pas), isi nama kedai,
 alamat, dan pesan penutup. Pratinjau di layar sama dengan hasil cetak. Ketuk **Simpan**.
 
@@ -49,7 +49,7 @@ alamat, dan pesan penutup. Pratinjau di layar sama dengan hasil cetak. Ketuk **S
 | Masalah | Yang dilakukan |
 |---|---|
 | **Struk tidak keluar** | Transaksi **tetap tersimpan**. Cek printer menyala, kertas ada, dan dekat tablet. Ketuk **Cetak ulang** di pesan yang muncul, atau buka **Riwayat** → order → **Cetak ulang**. |
-| Printer tidak terhubung sama sekali | Menu **Printer** → *Tampilkan printer ter-pair* → pilih printer → *Tes cetak*. Bila tidak ada di daftar, pair ulang di *Pengaturan → Bluetooth* tablet. |
+| Printer tidak terhubung sama sekali | Menu **Pengaturan** → *Tampilkan printer ter-pair* → pilih printer → *Tes cetak*. Bila tidak ada di daftar, pair ulang di *Pengaturan → Bluetooth* tablet. |
 | **Internet mati** | Menu tetap tampil, tapi pembayaran perlu internet. Nyalakan **hotspot HP** dan sambungkan tablet. Jangan tekan "Bayar" berkali-kali: sistem aman dari pembayaran dobel, tapi tunggu sampai sinyal kembali. |
 | "Harga menu berubah" | Menu sudah diperbarui otomatis. Periksa total lalu tekan *Bayar* lagi. |
 | "Akun terkunci" | Terjadi setelah 5× PIN salah. Tunggu 5 menit. |
@@ -70,6 +70,18 @@ per metode bayar, per kasir, produk terlaris (dengan laba), dan void.
 - **Laba kotor** = penjualan − pajak − modal (HPP). Modal diambil dari harga modal produk **saat transaksi**,
   jadi mengubah modal tidak mengubah laporan lama. Bila muncul peringatan "belum punya harga modal",
   isi modal produk tersebut di Kelola Menu.
+
+## Fitur (owner)
+
+Menu **Pengaturan → Atur fitur**: nyalakan hanya yang dipakai supaya layar kasir ringkas. Semua tablet
+ikut berubah. Mematikan fitur tidak menghapus data.
+
+- **Nama pelanggan / meja**: mati → kolom nama hilang dari kasir (cocok untuk gerobak / takeaway).
+  Open Bill butuh fitur ini, jadi ikut mati.
+- **Open Bill**: tidak bisa dimatikan selama masih ada bill yang belum dibayar.
+- **Varian produk**: mati → produk langsung masuk keranjang tanpa pilihan suhu/gula/tambahan.
+- **Diskon**, **Bayar dengan beberapa metode**: tombolnya hilang dari kasir saat dimatikan.
+- **Pajak & service**: isi persen (mis. PB1 10%, service 5%); 0 = tidak dipungut.
 
 ## Kelola menu (owner)
 

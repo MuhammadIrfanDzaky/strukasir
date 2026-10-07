@@ -9,7 +9,7 @@
 - **Last audit:** 2026-10-07
 - **Gates open:** 6 kompetensi blocking (#5, 6, 27, 44, 46, 48); semua security check blocking PASS/n/a
   — hampir semuanya menunggu server produksi & akun (lihat docs/deploy.md); #6 menunggu keputusan owner
-- **Checkpoint terakhir:** endpoint publik `POST /signup` (pendaftaran mandiri) + kolom profil usaha di `tenants` — 2026-10-07. M6 deploy (paket produksi diuji lokal: HTTPS, alur kasir, backup + restore) — 2026-10-03. M1 printer: menunggu printer tersedia di lokasi.
+- **Checkpoint terakhir:** `GET/PUT /settings/features` (owner, `settings.manage`): override fitur per kedai dalam batas paket, aturan ketergantungan, audit (`FeatureSettingsTest`) — 2026-10-07. Sebelumnya endpoint publik `POST /signup` (pendaftaran mandiri) + kolom profil usaha di `tenants` — 2026-10-07. M6 deploy (paket produksi diuji lokal: HTTPS, alur kasir, backup + restore) — 2026-10-03. M1 printer: menunggu printer tersedia di lokasi.
 
 Konteks: STRUKASIR, POS Android (Flutter) + Laravel 12 API + PostgreSQL; klien pertama kedai kopi BerryBrew, dengan fondasi
 multi-tenant agar bisa dijual sebagai subscription. Plan lengkap: lihat `docs/` (menyusul) dan catatan plan.

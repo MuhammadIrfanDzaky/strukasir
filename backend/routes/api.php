@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\DeviceRegistrationController;
 use App\Http\Controllers\Api\V1\EmailVerificationController;
+use App\Http\Controllers\Api\V1\FeatureSettingsController;
 use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\ModifierGroupController;
 use App\Http\Controllers\Api\V1\OrderController;
@@ -63,8 +64,11 @@ Route::prefix('v1')->group(function () {
         Route::get('reports/summary', [ReportController::class, 'summary'])
             ->middleware('can:'.Permission::ReportsView->value);
 
-        Route::put('settings/receipt', [ReceiptSettingsController::class, 'update'])
-            ->middleware('can:'.Permission::SettingsManage->value);
+        Route::middleware('can:'.Permission::SettingsManage->value)->group(function () {
+            Route::put('settings/receipt', [ReceiptSettingsController::class, 'update']);
+            Route::get('settings/features', [FeatureSettingsController::class, 'show']);
+            Route::put('settings/features', [FeatureSettingsController::class, 'update']);
+        });
 
         Route::middleware('can:'.Permission::MenuManage->value)->group(function () {
             Route::apiResource('categories', CategoryController::class)->only(['store', 'update', 'destroy']);

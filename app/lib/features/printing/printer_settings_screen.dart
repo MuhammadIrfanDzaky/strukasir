@@ -7,6 +7,7 @@ import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import 'printer_service.dart';
 import '../menu/menu_controller.dart';
+import '../settings/feature_settings_screen.dart';
 import '../session/session_controller.dart';
 import 'receipt_format.dart';
 import 'receipt_settings_screen.dart';
@@ -109,6 +110,28 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                 ],
               ),
               if (canEditReceipt) ...[
+                const SizedBox(height: AppSpace.s4),
+                AppSectionCard(
+                  title: 'Fitur',
+                  children: [
+                    Text(
+                      'Nyalakan/matikan modul sesuai cara berjualan: nama pelanggan/meja, Open Bill, varian, '
+                      'diskon, pajak & service, bayar dengan beberapa metode.',
+                      style: AppType.body.copyWith(color: AppColors.inkMuted),
+                    ),
+                    const SizedBox(height: AppSpace.s3),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                          builder: (_) => const FeatureSettingsScreen(),
+                        )),
+                        icon: const Icon(Icons.toggle_on_rounded),
+                        label: const Text('Atur fitur'),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: AppSpace.s4),
                 AppSectionCard(
                   title: 'Struk',

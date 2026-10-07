@@ -23,6 +23,7 @@ import 'package:berrybrew_pos/features/session/account_dialogs.dart';
 import 'package:berrybrew_pos/features/session/login_screen.dart';
 import 'package:berrybrew_pos/features/session/session_controller.dart';
 import 'package:berrybrew_pos/features/session/setup_screen.dart';
+import 'package:berrybrew_pos/features/settings/feature_settings_screen.dart';
 import 'package:berrybrew_pos/features/shift/shift_controller.dart';
 import 'package:berrybrew_pos/home_shell.dart';
 import 'package:berrybrew_pos/main.dart' show appBuilder;
@@ -106,11 +107,29 @@ final reportJson = {
   ],
 };
 
+Map<String, dynamic> _f(String key, String label, String desc, {bool on = true, bool available = true, String? requires}) =>
+    {'key': key, 'label': label, 'description': desc, 'available': available, 'enabled': on, 'requires': requires};
+
+final featureSettingsJson = {
+  'features': [
+    _f('customer_name', 'Nama pelanggan / meja', 'Nama pelanggan / nomor meja wajib diisi di setiap order'),
+    _f('open_bill', 'Open Bill (bayar nanti)', 'Simpan order dan bayar nanti (struk belum bayar)', requires: 'customer_name'),
+    _f('modifiers', 'Varian produk', 'Varian & modifier produk (hot/cold, gula, extra shot)'),
+    _f('discounts', 'Diskon', 'Diskon manual per item / per order', on: false),
+    _f('tax_service', 'Pajak & service', 'Pajak dan service charge'),
+    _f('split_payment', 'Bayar dengan beberapa metode', 'Satu order dibayar dengan beberapa metode', on: false, available: false),
+  ],
+  'tax_percent': 10,
+  'service_percent': 5.5,
+};
+
 /// Dio palsu: jawab per path tanpa jaringan.
 Dio fakeDio() => Dio()
   ..interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
     final path = o.path;
-    final data = path.startsWith('/orders')
+    final data = path.startsWith('/settings/features')
+        ? {'data': featureSettingsJson}
+        : path.startsWith('/orders')
         ? {'data': [order(), order(status: 'open'), order(status: 'void')]}
         : path.startsWith('/reports')
             ? {'data': reportJson}
@@ -361,6 +380,7 @@ final scenarios = <Scenario>[
       await settle(t);
     },
   ),
+  (name: 'pengaturan-fitur', session: loggedIn, home: (_) => const FeatureSettingsScreen(), fillCart: false, act: null),
   (
     name: 'pengaturan-struk',
     session: loggedIn,
