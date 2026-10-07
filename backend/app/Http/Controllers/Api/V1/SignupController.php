@@ -11,6 +11,7 @@ use App\Services\DeviceRegistrar;
 use App\Services\EmailCodes;
 use App\Services\TenantProvisioner;
 use App\Support\Audit;
+use App\Support\BusinessTemplate;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -59,8 +60,13 @@ class SignupController extends Controller
                 $owner = User::query()->where('role', Role::Owner)->firstOrFail();
                 [$device, $token] = $registrar->register($tenant, $data['device_id'] ?? null, $data['device_name'] ?? null);
 
+                // Titik awal sesuai jenis usaha & cara jualan (fitur + kategori kosong); bisa diubah owner.
+                $template = BusinessTemplate::for($tenant->sector, $tenant->sales_mode);
+                $template->apply($tenant->id, $tenant->plan_id);
+
                 Audit::record('tenant.signup', $tenant, after: [
                     'sector' => $data['sector'], 'sales_mode' => $data['sales_mode'], 'outlet_count' => (int) $data['outlet_count'],
+                    'template' => ['features' => $template->features, 'categories' => $template->categories],
                 ], user: $owner, device: $device);
                 // Kode verifikasi email langsung dikirim; gagal kirim tidak membatalkan pendaftaran
                 // (owner bisa minta ulang dari app).

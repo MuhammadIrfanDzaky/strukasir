@@ -90,6 +90,11 @@ void main() {
       final off = withFeatures({'customer_name': false, 'modifiers': false});
       expect([off.customerNameOn, off.modifiersOn], [false, false]);
     });
+
+    test('label kolom nama mengikuti cara jualan (default: dengan meja)', () {
+      expect(Menu.fromJson(menuJson).customerLabelHint, 'Nama pelanggan / meja');
+      expect(Menu.fromJson({...menuJson, 'customer_label_hint': 'Nama pelanggan'}).customerLabelHint, 'Nama pelanggan');
+    });
   });
 
   group('ModifierSelection', () {

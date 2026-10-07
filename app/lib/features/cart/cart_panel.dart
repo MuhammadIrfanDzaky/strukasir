@@ -54,7 +54,8 @@ class _CartPanelState extends ConsumerState<CartPanel> {
   bool _requireLabel() {
     if (!(ref.read(menuProvider).value?.menu.customerNameOn ?? true)) return true;
     if (ref.read(cartProvider).customerLabel.trim().isNotEmpty) return true;
-    setState(() => _labelError = 'Isi nama pelanggan / meja dulu');
+    final hint = ref.read(menuProvider).value?.menu.customerLabelHint ?? 'Nama pelanggan / meja';
+    setState(() => _labelError = 'Isi ${hint.toLowerCase()} dulu');
     _labelFocus.requestFocus();
     return false;
   }
@@ -246,7 +247,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.done,
             decoration: InputDecoration(
-              labelText: 'Nama pelanggan / meja *',
+              labelText: '${menu?.customerLabelHint ?? 'Nama pelanggan / meja'} *',
               isDense: true,
               prefixIcon: const Icon(Icons.person_outline_rounded),
               errorText: _labelError,

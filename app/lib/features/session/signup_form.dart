@@ -205,6 +205,14 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             ],
           ),
           if (_submitted && _salesMode == null) _choiceError('Pilih cara berjualan'),
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpace.s2),
+            child: Text(
+              'Fitur & kategori awal disiapkan sesuai pilihan ini, mis. "Bawa pulang saja" tanpa nomor meja. '
+              'Bisa diubah kapan saja di Pengaturan → Fitur.',
+              style: AppType.caption.copyWith(color: AppColors.inkMuted),
+            ),
+          ),
           if (_serverError('sales_mode') != null) _choiceError(_serverError('sales_mode')!),
           const SizedBox(height: AppSpace.s4),
           Row(

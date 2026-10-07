@@ -83,6 +83,17 @@ ikut berubah. Mematikan fitur tidak menghapus data.
 - **Diskon**, **Bayar dengan beberapa metode**: tombolnya hilang dari kasir saat dimatikan.
 - **Pajak & service**: isi persen (mis. PB1 10%, service 5%); 0 = tidak dipungut.
 
+Saat daftar, fitur & kategori awal disiapkan otomatis (bisa diubah kapan saja):
+
+| Pilihan saat daftar | Disiapkan |
+|---|---|
+| Cara jualan **Bawa pulang saja** | Tanpa nama pelanggan/meja & Open Bill (kasir cepat) |
+| **Makan di tempat** / **Keduanya** | Nama pelanggan / meja wajib, Open Bill aktif |
+| Kedai kopi, rumah makan, jajanan | Varian produk aktif (suhu, gula, level pedas, topping) |
+| Roti & kue, toko, jasa, lainnya | Tanpa varian |
+| Semua | Diskon & bayar beberapa metode aktif; pajak & service mati sampai persen diisi |
+| Kategori awal | Kopi/Non Kopi/Makanan, Makanan/Minuman, Roti/Kue/Minuman, Umum, atau Layanan (masih kosong) |
+
 ## Kelola menu (owner)
 
 - **Kode, modal, favorit**: ketuk produk di **Kelola Menu**. Isi *Kode produk* (mis. BB03), *Modal (HPP)*

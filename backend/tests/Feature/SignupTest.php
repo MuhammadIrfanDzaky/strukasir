@@ -7,12 +7,15 @@ use App\Enums\SalesMode;
 use App\Http\Requests\SignupRequest;
 use App\Models\AuditLog;
 use App\Models\Device;
+use App\Models\Plan;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\User;
 use Database\Seeders\FeatureSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /** Pendaftaran mandiri usaha baru + tablet pertama. */
@@ -159,5 +162,62 @@ class SignupTest extends TestCase
 
         $tenantId = Tenant::query()->sole()->id;
         $this->assertSame(1, $this->tenancy()->run($tenantId, fn () => Device::count()));
+    }
+
+    // ─────────────── template jenis usaha ───────────────
+
+    private function menuAfterSignup(array $override): TestResponse
+    {
+        $res = $this->signup($override + ['device_id' => (string) Str::uuid()])->assertCreated();
+        $token = $res->json('token');
+        $user = $this->api('POST', '/api/v1/auth/pin', $token, ['user_id' => $res->json('owner_id'), 'pin' => '482915'])->json('token');
+
+        return $this->api('GET', '/api/v1/menu', $user)->assertOk();
+    }
+
+    public function test_street_food_takeaway_gets_fast_cashier_template(): void
+    {
+        $menu = $this->menuAfterSignup(['sector' => 'street_food', 'sales_mode' => 'takeaway']);
+
+        $this->assertEquals( // urutan kunci tidak penting
+            ['customer_name' => false, 'open_bill' => false, 'modifiers' => true, 'discounts' => true, 'tax_service' => false, 'split_payment' => true],
+            collect($menu->json('features'))->only(['customer_name', 'open_bill', 'modifiers', 'discounts', 'tax_service', 'split_payment'])->all(),
+        );
+        $this->assertSame(['Makanan', 'Minuman'], array_column($menu->json('categories'), 'name'));
+        $this->assertSame([], $menu->json('products'), 'kategori awal kosong, tanpa produk contoh');
+        $menu->assertJsonPath('customer_label_hint', 'Nama pelanggan');
+    }
+
+    public function test_coffee_shop_dine_in_gets_table_service_template(): void
+    {
+        $menu = $this->menuAfterSignup(['sector' => 'coffee_shop', 'sales_mode' => 'dine_in']);
+
+        $this->assertTrue($menu->json('features.customer_name'));
+        $this->assertTrue($menu->json('features.open_bill'));
+        $this->assertTrue($menu->json('features.modifiers'));
+        $this->assertFalse($menu->json('features.tax_service'), 'pajak menunggu owner mengisi persen');
+        $this->assertSame(['Kopi', 'Non Kopi', 'Makanan'], array_column($menu->json('categories'), 'name'));
+        $menu->assertJsonPath('customer_label_hint', 'Nama pelanggan / meja');
+    }
+
+    public function test_retail_has_no_variants_and_template_never_exceeds_plan(): void
+    {
+        $plan = Plan::where('code', 'standard')->firstOrFail();
+        DB::table('plan_features')->where('plan_id', $plan->id)->where('feature_key', 'split_payment')->delete();
+
+        $menu = $this->menuAfterSignup(['sector' => 'retail', 'sales_mode' => 'mixed']);
+
+        $this->assertFalse($menu->json('features.modifiers'));
+        $this->assertFalse($menu->json('features.split_payment') ?? false, 'template tidak menyalakan fitur di luar paket');
+        $this->assertSame(['Umum'], array_column($menu->json('categories'), 'name'));
+    }
+
+    public function test_owner_can_change_template_choices_later(): void
+    {
+        $res = $this->signup(['sector' => 'street_food', 'sales_mode' => 'takeaway'])->assertCreated();
+        $owner = $this->api('POST', '/api/v1/auth/pin', $res->json('token'), ['user_id' => $res->json('owner_id'), 'pin' => '482915'])->json('token');
+
+        $this->api('PUT', '/api/v1/settings/features', $owner, ['features' => ['customer_name' => true, 'open_bill' => true]])->assertOk();
+        $this->api('GET', '/api/v1/menu', $owner)->assertJsonPath('features.open_bill', true);
     }
 }

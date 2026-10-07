@@ -163,6 +163,7 @@ class Menu {
     required this.pricing,
     required this.cashierDiscountLimitBp,
     required this.features,
+    this.customerLabelHint = 'Nama pelanggan / meja',
     required this.categories,
     required this.products,
     required this.modifierGroups,
@@ -174,6 +175,7 @@ class Menu {
         pricing: PricingSettings.fromJson(j['pricing'] as Map<String, dynamic>),
         cashierDiscountLimitBp: (j['pricing'] as Map<String, dynamic>)['cashier_discount_limit_bp'] as int,
         features: (j['features'] as Map<String, dynamic>).map((k, v) => MapEntry(k, v as bool)),
+        customerLabelHint: j['customer_label_hint'] as String? ?? 'Nama pelanggan / meja',
         categories: (j['categories'] as List)
             .cast<Map<String, dynamic>>()
             .map(MenuCategory.fromJson)
@@ -193,6 +195,9 @@ class Menu {
   final PricingSettings pricing;
   final int cashierDiscountLimitBp;
   final Map<String, bool> features;
+
+  /// Label kolom nama di kasir sesuai cara jualan ("Nama pelanggan" untuk bawa pulang saja).
+  final String customerLabelHint;
   final List<MenuCategory> categories;
 
   bool feature(String key) => features[key] ?? false;

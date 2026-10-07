@@ -9,7 +9,9 @@ use App\Models\Category;
 use App\Models\Modifier;
 use App\Models\ModifierGroup;
 use App\Models\Product;
+use App\Models\Tenant;
 use App\Models\TenantSetting;
+use App\Support\BusinessTemplate;
 use App\Support\Pricing\PricingSettings;
 use App\Support\Tenancy\FeatureGate;
 use Illuminate\Http\JsonResponse;
@@ -43,6 +45,8 @@ class MenuController extends Controller
                 'cashier_discount_limit_bp' => $settings->cashier_discount_limit_bp,
             ],
             'features' => $features,
+            // Label kolom nama di kasir ("meja" hanya untuk usaha makan di tempat).
+            'customer_label_hint' => BusinessTemplate::customerLabelHint(Tenant::query()->find($settings->tenant_id)?->sales_mode),
             // Nama, alamat, penutup & logo struk; disimpan tablet bersama cache menu (struk tetap lengkap saat offline).
             'receipt' => ReceiptSettingsController::present($settings),
             'categories' => Category::query()->orderBy('sort')->orderBy('name')->get()
