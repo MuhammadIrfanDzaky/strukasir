@@ -29,7 +29,8 @@ class PricingServiceTest extends TestCase
         $result = (new PricingService)->calculate(
             $case['items'],
             $case['order_discount'],
-            new PricingSettings($s['service_bp'], $s['tax_bp'], $s['rounding_unit']),
+            new PricingSettings($s['service_bp'], $s['tax_bp'], $s['rounding_unit'],
+                $s['service_inclusive'] ?? false, $s['tax_inclusive'] ?? false),
         );
 
         $this->assertSame($case['expected'], $result->toArray());

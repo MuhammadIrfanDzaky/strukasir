@@ -573,6 +573,10 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
   late final _name = TextEditingController(text: widget.group?.name);
   late bool _required = (widget.group?.minSelect ?? 0) > 0;
   late int _max = widget.group?.maxSelect ?? 1;
+
+  /// Satu pilihan boleh lebih dari sekali (mis. Extra shot x2), maks. [_maxQty] per pilihan.
+  late bool _allowQty = widget.group?.allowQuantity ?? false;
+  late int _maxQty = (widget.group?.maxQuantity ?? 1) < 2 ? 3 : widget.group!.maxQuantity;
   late final List<_OptionRow> _rows = widget.group == null
       ? [_OptionRow()]
       : [for (final m in widget.group!.activeModifiers) _OptionRow(id: m.id, name: m.name, price: m.priceDelta)];
@@ -599,6 +603,8 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
         name: _name.text,
         minSelect: _required ? 1 : 0,
         maxSelect: _max,
+        allowQuantity: _allowQty,
+        maxQuantity: _maxQty,
         modifiers: [
           for (final r in _rows)
             {if (r.id != null) 'id': r.id, 'name': r.name.text.trim(), 'price_delta': parseRupiah(r.price.text) ?? 0},
@@ -640,13 +646,35 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
                 value: _required,
                 onChanged: (v) => setState(() => _required = v),
               ),
+              SwitchListTile(
+                title: const Text('Boleh pilih lebih dari 1 (jumlah)'),
+                subtitle: Text('Mis. Extra shot x2. Cocok untuk grup Tambahan.',
+                    style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+                value: _allowQty,
+                onChanged: (v) => setState(() {
+                  _allowQty = v;
+                  if (!v && _max > _rows.length) _max = _rows.length;
+                }),
+              ),
+              if (_allowQty)
+                Row(children: [
+                  const Expanded(child: Text('Maksimal per pilihan')),
+                  IconButton(
+                      onPressed: _maxQty > 2 ? () => setState(() => _maxQty--) : null,
+                      icon: const Icon(Icons.remove_rounded)),
+                  Text('$_maxQty', style: AppType.title),
+                  IconButton(
+                      onPressed: _maxQty < 20 ? () => setState(() => _maxQty++) : null,
+                      icon: const Icon(Icons.add_rounded)),
+                ]),
               Row(children: [
-                const Expanded(child: Text('Maksimal dipilih')),
+                // Grup berjumlah: batas total jumlah di grup (mis. maks. 3 tambahan per minuman).
+                Expanded(child: Text(_allowQty ? 'Maksimal total jumlah' : 'Maksimal dipilih')),
                 IconButton(
                     onPressed: _max > 1 ? () => setState(() => _max--) : null, icon: const Icon(Icons.remove_rounded)),
                 Text('$_max', style: AppType.title),
                 IconButton(
-                    onPressed: _max < _rows.length ? () => setState(() => _max++) : null,
+                    onPressed: _max < (_allowQty ? 20 : _rows.length) ? () => setState(() => _max++) : null,
                     icon: const Icon(Icons.add_rounded)),
               ]),
               const Divider(),
@@ -670,7 +698,7 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
                       onPressed: _rows.length > 1
                           ? () => setState(() {
                                 _rows.removeAt(i);
-                                if (_max > _rows.length) _max = _rows.length;
+                                if (!_allowQty && _max > _rows.length) _max = _rows.length;
                               })
                           : null,
                       icon: const Icon(Icons.close_rounded),

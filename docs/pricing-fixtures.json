@@ -5,6 +5,9 @@
     "subtotal = jumlah net baris (setelah diskon item).",
     "Diskon order persen = floor(subtotal x bp / 10000); nominal <= subtotal. base = subtotal - diskon order.",
     "service = half-up(base x service_bp / 10000); tax = half-up((base + service) x tax_bp / 10000).",
+    "Harga termasuk pajak (tax_inclusive): pajak_dalam = half-up(base x tax_bp / (10000 + tax_bp)); sisa = base - pajak_dalam. Tanpa: sisa = base.",
+    "Service termasuk (service_inclusive): service = half-up(sisa x service_bp / (10000 + service_bp)), tidak menambah total; tanpa: service = half-up(sisa x service_bp / 10000), ditambahkan.",
+    "Pajak tambahan: termasuk pajak = half-up(service_ditambahkan x tax_bp / 10000); tidak = half-up((sisa + service_ditambahkan) x tax_bp / 10000). Sebelum pembulatan = base + service_ditambahkan + pajak_tambahan.",
     "Pembulatan ke rounding_unit terdekat (half-up); rounding = grand_total - (base + service + tax).",
     "Dipakai oleh backend (Tests\\Unit\\PricingServiceTest) DAN app Flutter (test/pricing_test.dart)."
   ],
@@ -91,6 +94,46 @@
       "order_discount": null,
       "expected": {"lines": [0], "subtotal": 0, "item_discount_total": 13000, "order_discount": 0,
         "discount_total": 13000, "service_total": 0, "tax_total": 0, "rounding": 0, "grand_total": 0}
+    },
+    {
+      "name": "harga termasuk pajak 10% (tanpa service): total = harga menu",
+      "settings": {"service_bp": 0, "tax_bp": 1000, "rounding_unit": 0, "service_inclusive": false, "tax_inclusive": true},
+      "items": [{"unit_price": 11000, "qty": 1}],
+      "order_discount": null,
+      "expected": {"lines": [11000], "subtotal": 11000, "item_discount_total": 0, "order_discount": 0,
+        "discount_total": 0, "service_total": 0, "tax_total": 1000, "rounding": 0, "grand_total": 11000}
+    },
+    {
+      "name": "harga termasuk pajak 10% & service 5%",
+      "settings": {"service_bp": 500, "tax_bp": 1000, "rounding_unit": 0, "service_inclusive": true, "tax_inclusive": true},
+      "items": [{"unit_price": 13000, "qty": 1}, {"unit_price": 15000, "qty": 1}],
+      "order_discount": null,
+      "expected": {"lines": [13000, 15000], "subtotal": 28000, "item_discount_total": 0, "order_discount": 0,
+        "discount_total": 0, "service_total": 1212, "tax_total": 2545, "rounding": 0, "grand_total": 28000}
+    },
+    {
+      "name": "pajak termasuk harga, service 5% ditambahkan (pajak atas service ikut ditambahkan)",
+      "settings": {"service_bp": 500, "tax_bp": 1000, "rounding_unit": 0, "service_inclusive": false, "tax_inclusive": true},
+      "items": [{"unit_price": 13000, "qty": 1}],
+      "order_discount": null,
+      "expected": {"lines": [13000], "subtotal": 13000, "item_discount_total": 0, "order_discount": 0,
+        "discount_total": 0, "service_total": 591, "tax_total": 1241, "rounding": 0, "grand_total": 13650}
+    },
+    {
+      "name": "service termasuk harga, pajak 11% ditambahkan",
+      "settings": {"service_bp": 500, "tax_bp": 1100, "rounding_unit": 0, "service_inclusive": true, "tax_inclusive": false},
+      "items": [{"unit_price": 13000, "qty": 1}],
+      "order_discount": null,
+      "expected": {"lines": [13000], "subtotal": 13000, "item_discount_total": 0, "order_discount": 0,
+        "discount_total": 0, "service_total": 619, "tax_total": 1430, "rounding": 0, "grand_total": 14430}
+    },
+    {
+      "name": "termasuk pajak + diskon order 10% + pembulatan 500",
+      "settings": {"service_bp": 0, "tax_bp": 1000, "rounding_unit": 500, "service_inclusive": false, "tax_inclusive": true},
+      "items": [{"unit_price": 23000, "qty": 2}],
+      "order_discount": {"type": "percent", "value": 1000},
+      "expected": {"lines": [46000], "subtotal": 46000, "item_discount_total": 0, "order_discount": 4600,
+        "discount_total": 4600, "service_total": 0, "tax_total": 3764, "rounding": 100, "grand_total": 41500}
     }
   ]
 }

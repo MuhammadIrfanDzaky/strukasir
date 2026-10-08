@@ -47,6 +47,8 @@ class MenuModifierGroup {
     required this.minSelect,
     required this.maxSelect,
     required this.modifiers,
+    this.allowQuantity = false,
+    this.maxQuantity = 1,
   });
 
   factory MenuModifierGroup.fromJson(Map<String, dynamic> j) => MenuModifierGroup(
@@ -54,6 +56,8 @@ class MenuModifierGroup {
         name: j['name'] as String,
         minSelect: j['min_select'] as int,
         maxSelect: j['max_select'] as int,
+        allowQuantity: j['allow_quantity'] as bool? ?? false,
+        maxQuantity: j['max_quantity'] as int? ?? 1,
         modifiers: (j['modifiers'] as List)
             .cast<Map<String, dynamic>>()
             .map(MenuModifier.fromJson)
@@ -66,12 +70,19 @@ class MenuModifierGroup {
   final int maxSelect;
   final List<MenuModifier> modifiers;
 
+  /// Satu opsi boleh dipilih lebih dari sekali (mis. Extra shot x2), maks. [maxQuantity] per opsi.
+  /// Untuk grup ini [maxSelect] = batas total jumlah di grup.
+  final bool allowQuantity;
+  final int maxQuantity;
+
   bool get required => minSelect > 0;
 
   List<MenuModifier> get activeModifiers => modifiers.where((m) => m.active).toList();
 
   /// Keterangan aturan pilih untuk kasir, mis. "Wajib pilih 1" / "Opsional, maks 2".
   String get rule {
+    // Grup berjumlah: batasnya total jumlah (mis. 2 Extra shot + 1 Sirup = 3).
+    if (allowQuantity) return minSelect > 0 ? 'Pilih $minSelect–$maxSelect (total)' : 'Opsional, maks $maxSelect (total)';
     if (minSelect == maxSelect) return 'Wajib pilih $minSelect';
     if (minSelect > 0) return 'Pilih $minSelect–$maxSelect';
     return maxSelect == 1 ? 'Opsional' : 'Opsional, maks $maxSelect';

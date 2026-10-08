@@ -177,12 +177,14 @@ class CartController extends Notifier<CartState> {
           );
       final modifiers = [
         for (final m in (raw['modifiers'] as List).cast<Map<String, dynamic>>())
-          MenuModifier(
-            id: m['modifier_id'] as String? ?? '',
-            name: m['name'] as String,
-            priceDelta: m['price_delta'] as int,
-            active: true,
-          ),
+          // Tambahan berjumlah (qty > 1) diulang, sama seperti saat dipilih di kasir.
+          for (var i = 0; i < (m['qty'] as int? ?? 1); i++)
+            MenuModifier(
+              id: m['modifier_id'] as String? ?? '',
+              name: m['name'] as String,
+              priceDelta: m['price_delta'] as int,
+              active: true,
+            ),
       ];
       lines.add(CartLine(
         id: raw['id'] as String,
@@ -208,6 +210,14 @@ class CartController extends Notifier<CartState> {
   void _update(String lineId, CartLine Function(CartLine) f) =>
       state = state.copyWith(lines: [for (final l in state.lines) l.id == lineId ? f(l) : l]);
 
-  static bool _sameIds(List<String> a, List<String> b) =>
-      a.length == b.length && (a.toSet()..removeAll(b)).isEmpty;
+  /// Sama persis termasuk jumlah (Extra shot x1 ≠ x2), tanpa peduli urutan.
+  static bool _sameIds(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    final x = [...a]..sort();
+    final y = [...b]..sort();
+    for (var i = 0; i < x.length; i++) {
+      if (x[i] != y[i]) return false;
+    }
+    return true;
+  }
 }

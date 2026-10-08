@@ -155,4 +155,24 @@ class MenuTest extends TestCase
         $names = collect($this->api('GET', '/api/v1/menu', $this->ownerToken)->json('products'))->pluck('id');
         $this->assertFalse($names->contains($otherIds['product']));
     }
+
+    public function test_quantity_group_settings_are_saved_and_published(): void
+    {
+        $this->api('POST', '/api/v1/modifier-groups', $this->ownerToken, [
+            'name' => 'Tambahan', 'min_select' => 0, 'max_select' => 4, 'allow_quantity' => true, 'max_quantity' => 3,
+            'modifiers' => [['name' => 'Extra shot', 'price_delta' => 5000]],
+        ])->assertCreated();
+        $this->api('POST', '/api/v1/modifier-groups', $this->ownerToken, [
+            'name' => 'Gula', 'min_select' => 0, 'max_select' => 1, 'allow_quantity' => false, 'max_quantity' => 9,
+            'modifiers' => [['name' => 'Less sugar', 'price_delta' => 0]],
+        ])->assertCreated();
+        $this->api('POST', '/api/v1/modifier-groups', $this->ownerToken, [
+            'name' => 'X', 'min_select' => 0, 'max_select' => 1, 'allow_quantity' => true, 'max_quantity' => 21,
+            'modifiers' => [['name' => 'Y', 'price_delta' => 0]],
+        ])->assertJsonValidationErrors('max_quantity');
+
+        $groups = collect($this->api('GET', '/api/v1/menu', $this->ownerToken)->json('modifier_groups'))->keyBy('name');
+        $this->assertSame([true, 3], [$groups['Tambahan']['allow_quantity'], $groups['Tambahan']['max_quantity']]);
+        $this->assertSame([false, 1], [$groups['Gula']['allow_quantity'], $groups['Gula']['max_quantity']], 'grup biasa: maks 1');
+    }
 }

@@ -11,7 +11,7 @@ class ModifierGroup extends Model
 {
     use BelongsToTenant, HasUuids;
 
-    protected $fillable = ['name', 'min_select', 'max_select', 'sort'];
+    protected $fillable = ['name', 'min_select', 'max_select', 'sort', 'allow_quantity', 'max_quantity'];
 
     protected function casts(): array
     {

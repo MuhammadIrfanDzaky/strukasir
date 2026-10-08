@@ -46,6 +46,7 @@ class OrderResource extends JsonResource
                     'group_name' => $m->group_name,
                     'name' => $m->name,
                     'price_delta' => $m->price_delta,
+                    'qty' => $m->qty,
                 ]),
             ]),
             'order_discount' => $this->order_discount_type
@@ -57,6 +58,9 @@ class OrderResource extends JsonResource
             // Tarif saat transaksi (basis poin, 1000 = 10%); null untuk order lama.
             'service_bp' => $this->service_bp,
             'tax_bp' => $this->tax_bp,
+            // Harga sudah termasuk service / pajak (tidak menambah total).
+            'service_inclusive' => (bool) $this->service_inclusive,
+            'tax_inclusive' => (bool) $this->tax_inclusive,
             'rounding' => $this->rounding,
             'grand_total' => $this->grand_total,
             'paid_total' => $this->paid_total,

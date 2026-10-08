@@ -21,13 +21,9 @@ class UpsertOrderRequest extends FormRequest
             'items.*.product_id' => ['required', 'uuid'],
             'items.*.qty' => ['required', 'integer', 'min:1', 'max:999'],
             'items.*.note' => ['nullable', 'string', 'max:120'],
-            // Unik per item, bukan antar item: `distinct` pada items.*.modifier_ids.* membandingkan
-            // semua item sekaligus, sehingga dua produk dengan pilihan "Cold" yang sama ditolak.
-            'items.*.modifier_ids' => ['present', 'array', 'max:20', function (string $attribute, mixed $value, \Closure $fail) {
-                if (is_array($value) && count($value) !== count(array_unique($value, SORT_REGULAR))) {
-                    $fail('Pilihan modifier tidak boleh dobel dalam satu item.');
-                }
-            }],
+            // ID yang sama diulang = jumlah (Extra shot x2 → dua kali ID-nya). Hanya boleh untuk grup
+            // berjumlah; aturan per grup dicek di OrderService.
+            'items.*.modifier_ids' => ['present', 'array', 'max:60'],
             'items.*.modifier_ids.*' => ['uuid'],
             'items.*.discount' => ['nullable', 'array:type,value'],
             'items.*.discount.type' => ['required_with:items.*.discount', 'in:amount,percent'],

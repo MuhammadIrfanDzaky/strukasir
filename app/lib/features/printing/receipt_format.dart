@@ -103,7 +103,11 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
   for (final item in items) {
     final qty = item['qty'] as int;
     final unit = (item['unit_price'] as int) + (item['modifiers_total'] as int);
-    final options = (item['modifiers'] as List).cast<Map<String, dynamic>>().map((m) => m['name']).join(', ');
+    // Tambahan berjumlah: "Extra shot x2" (huruf x biasa: aman di semua printer thermal).
+    final options = (item['modifiers'] as List)
+        .cast<Map<String, dynamic>>()
+        .map((m) => (m['qty'] as int? ?? 1) > 1 ? '${m['name']} x${m['qty']}' : '${m['name']}')
+        .join(', ');
     out.addAll(_bold(wrap(options.isEmpty ? item['name'] as String : '${item['name']} $options')));
     if (item['note'] != null) out.addAll(_plain(wrap('  * ${item['note']}')));
     out.addAll(_plain(leftRight('  $qty x ${rupiah(unit)}', rupiah(qty * unit))));
@@ -122,10 +126,12 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
   if (orderDiscount > 0) out.addAll(_plain(leftRight('  Diskon', '-${rupiah(orderDiscount)}')));
   // Persen tarif saat transaksi, supaya pelanggan tahu besarnya (order lama tanpa tarif: label saja).
   if ((order['service_total'] as int) > 0) {
-    out.addAll(_plain(leftRight('  ${withRate('Service', order['service_bp'] as int?)}', rupiah(order['service_total'] as int))));
+    final label = withRate('Service', order['service_bp'] as int?, included: order['service_inclusive'] == true);
+    out.addAll(_plain(leftRight('  $label', rupiah(order['service_total'] as int))));
   }
   if ((order['tax_total'] as int) > 0) {
-    out.addAll(_plain(leftRight('  ${withRate('Pajak', order['tax_bp'] as int?)}', rupiah(order['tax_total'] as int))));
+    final label = withRate('Pajak', order['tax_bp'] as int?, included: order['tax_inclusive'] == true);
+    out.addAll(_plain(leftRight('  $label', rupiah(order['tax_total'] as int))));
   }
   if ((order['rounding'] as int) != 0) out.addAll(_plain(leftRight('  Pembulatan', rupiah(order['rounding'] as int))));
   out.addAll(_bold(leftRight('  Total', rupiah(order['grand_total'] as int))));

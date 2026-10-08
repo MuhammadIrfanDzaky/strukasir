@@ -43,6 +43,8 @@ class MenuController extends Controller
                 'service_bp' => $pricing->serviceBp,
                 'tax_bp' => $pricing->taxBp,
                 'rounding_unit' => $pricing->roundingUnit,
+                'service_inclusive' => $pricing->serviceInclusive,
+                'tax_inclusive' => $pricing->taxInclusive,
                 'cashier_discount_limit_bp' => $settings->cashier_discount_limit_bp,
             ],
             'features' => $features,
@@ -72,6 +74,8 @@ class MenuController extends Controller
                 'name' => $g->name,
                 'min_select' => $g->min_select,
                 'max_select' => $g->max_select,
+                'allow_quantity' => $g->allow_quantity,
+                'max_quantity' => $g->allow_quantity ? $g->max_quantity : 1,
                 'sort' => $g->sort,
                 'modifiers' => $g->modifiers->map(fn (Modifier $m) => [
                     'id' => $m->id, 'name' => $m->name, 'price_delta' => $m->price_delta,

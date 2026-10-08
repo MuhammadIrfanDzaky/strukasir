@@ -129,4 +129,23 @@ void main() {
     expect(withRate('Pajak', null), 'Pajak');
     expect(withRate('Pajak', 0), 'Pajak');
   });
+
+  test('tambahan berjumlah tercetak dengan jumlahnya', () {
+    final o = order();
+    final items = (o['items'] as List).cast<Map<String, dynamic>>();
+    items[0] = {
+      ...items[0],
+      'modifiers': [
+        {'group_name': 'Tambahan', 'name': 'Extra shot', 'price_delta': 5000, 'qty': 2},
+      ],
+    };
+    final text = customerReceipt({...o, 'items': items}).map((l) => l.text).join(' | ');
+    expect(text, contains('Extra shot x2'));
+  });
+
+  test('harga termasuk pajak: struk menulis "Termasuk pajak 10%"', () {
+    final o = {...order(), 'tax_total': 4673, 'tax_bp': 1000, 'tax_inclusive': true};
+    final text = customerReceipt(o).map((l) => l.text).join(' | ');
+    expect(text, contains('Termasuk pajak 10%'));
+  });
 }

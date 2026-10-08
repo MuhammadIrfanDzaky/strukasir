@@ -82,7 +82,9 @@ ikut berubah. Mematikan fitur tidak menghapus data.
 - **Open Bill**: tidak bisa dimatikan selama masih ada bill yang belum dibayar.
 - **Varian produk**: mati → produk langsung masuk keranjang tanpa pilihan suhu/gula/tambahan.
 - **Diskon**, **Bayar dengan beberapa metode**: tombolnya hilang dari kasir saat dimatikan.
-- **Pajak & service**: isi persen (mis. PB1 10%, service 5%); 0 = tidak dipungut.
+- **Pajak & service**: isi persen (mis. PB1 10%, service 5%); 0 = tidak dipungut. Untuk tiap tarif yang
+  diisi, pilih **Harga menu sudah termasuk pajak / service**: nyala = total sama dengan harga menu dan
+  struk menulis "Termasuk pajak 10%"; mati = ditambahkan di atas harga. Persen ikut tercetak di struk.
 
 Saat daftar, fitur & kategori awal disiapkan otomatis (bisa diubah kapan saja):
 
@@ -100,6 +102,9 @@ Saat daftar, fitur & kategori awal disiapkan otomatis (bisa diubah kapan saja):
 
 - **Kode, modal, favorit**: ketuk produk di **Kelola Menu**. Isi *Kode produk* (mis. BB03), *Modal (HPP)*
   (margin langsung terlihat), dan nyalakan *Favorit* agar produk muncul di filter **Favorit** layar kasir.
+- **Tambahan berjumlah** (mis. Extra shot x2): Kelola Menu → grup pilihan → nyalakan *Boleh pilih lebih
+  dari 1 (jumlah)*, atur *Maksimal per pilihan* dan *Maksimal total jumlah*. Di kasir, pilihan grup ini
+  memakai tombol − jumlah +.
 - **Cari**: kotak cari di Kelola Menu dan ikon cari di layar kasir mencari nama atau kode produk.
 - **Import CSV** (pindah dari POS lain / isi menu banyak sekaligus): **Kelola Menu** → **Import CSV**.
   Judul kolom minimal *Nama Produk* dan *Harga Jual*; opsional *Kategori*, *Kode Produk*, *Modal*, *Aktif*,

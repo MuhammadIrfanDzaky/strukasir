@@ -254,6 +254,38 @@ class OrderTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('items.0.modifier_ids');
     }
 
+    public function test_quantity_group_allows_repeating_an_option(): void
+    {
+        $this->inShop(fn () => ModifierGroup::query()->where('name', 'Tambahan')
+            ->update(['allow_quantity' => true, 'max_quantity' => 2]));
+
+        // Americano 13.000 + Cold 2.000 + Extra shot 5.000 x2.
+        $res = $this->saveOrder((string) Str::uuid(), [$this->item($this->americano, [$this->cold, $this->shot, $this->shot])], 25000)
+            ->assertOk()->assertJsonPath('data.grand_total', 25000);
+        $shot = collect($res->json('data.items.0.modifiers'))->firstWhere('name', 'Extra shot');
+        $this->assertSame([5000, 2], [$shot['price_delta'], $shot['qty']]);
+
+        // Lebih dari maks. per opsi → ditolak.
+        $this->saveOrder((string) Str::uuid(), [$this->item($this->americano, [$this->cold, $this->shot, $this->shot, $this->shot])], 30000)
+            ->assertUnprocessable()->assertJsonValidationErrors('items.0.modifier_ids');
+    }
+
+    public function test_repeating_option_in_normal_group_is_rejected(): void
+    {
+        $this->saveOrder((string) Str::uuid(), [$this->item($this->americano, [$this->cold, $this->shot, $this->shot])], 25000)
+            ->assertUnprocessable()->assertJsonValidationErrors('items.0.modifier_ids');
+    }
+
+    public function test_quantity_counts_toward_group_maximum(): void
+    {
+        // Tambahan: maks. total 2, tiap opsi maks. 5 → 3 shot tetap ditolak oleh batas total grup.
+        $this->inShop(fn () => ModifierGroup::query()->where('name', 'Tambahan')
+            ->update(['allow_quantity' => true, 'max_quantity' => 5]));
+
+        $this->saveOrder((string) Str::uuid(), [$this->item($this->americano, [$this->cold, $this->shot, $this->shot, $this->shot])], 30000)
+            ->assertUnprocessable()->assertJsonValidationErrors('items.0.modifier_ids');
+    }
+
     public function test_modifier_of_another_product_is_rejected(): void
     {
         $this->saveOrder((string) Str::uuid(), [$this->item($this->latte, [$this->shot])], 25000)

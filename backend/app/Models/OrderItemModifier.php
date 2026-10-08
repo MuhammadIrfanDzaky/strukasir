@@ -16,6 +16,6 @@ class OrderItemModifier extends Model
 
     protected function casts(): array
     {
-        return ['price_delta' => 'integer'];
+        return ['price_delta' => 'integer', 'qty' => 'integer'];
     }
 }

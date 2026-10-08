@@ -35,6 +35,8 @@ class FeatureSettingsController extends Controller
             'features.*' => ['boolean'],
             'tax_percent' => ['sometimes', 'numeric', 'between:0,100', 'decimal:0,2'],
             'service_percent' => ['sometimes', 'numeric', 'between:0,100', 'decimal:0,2'],
+            'tax_inclusive' => ['sometimes', 'boolean'],
+            'service_inclusive' => ['sometimes', 'boolean'],
         ]);
 
         $tenantId = $context->id();
@@ -67,7 +69,8 @@ class FeatureSettingsController extends Controller
         }
 
         $settings = TenantSetting::query()->firstOrFail();
-        $before = ['features' => $current, 'tax_bp' => $settings->tax_rate_bp, 'service_bp' => $settings->service_rate_bp];
+        $before = ['features' => $current, 'tax_bp' => $settings->tax_rate_bp, 'service_bp' => $settings->service_rate_bp,
+            'tax_inclusive' => $settings->tax_inclusive, 'service_inclusive' => $settings->service_inclusive];
 
         DB::transaction(function () use ($data, $tenantId, $settings) {
             foreach ($data['features'] ?? [] as $key => $enabled) {
@@ -86,6 +89,11 @@ class FeatureSettingsController extends Controller
                     $settings->{"{$prefix}_enabled"} = $bp > 0;
                 }
             }
+            foreach (['tax_inclusive', 'service_inclusive'] as $flag) {
+                if (array_key_exists($flag, $data)) {
+                    $settings->{$flag} = (bool) $data[$flag];
+                }
+            }
             $settings->save();
         });
 
@@ -93,6 +101,7 @@ class FeatureSettingsController extends Controller
         $after = $this->present($gate, $tenantId);
         Audit::record('settings.features_updated', $settings, before: $before, after: [
             'features' => $gate->forTenant($tenantId), 'tax_bp' => $settings->tax_rate_bp, 'service_bp' => $settings->service_rate_bp,
+            'tax_inclusive' => $settings->tax_inclusive, 'service_inclusive' => $settings->service_inclusive,
         ]);
 
         return response()->json(['data' => $after]);
@@ -125,6 +134,8 @@ class FeatureSettingsController extends Controller
                 ])->values(),
             'tax_percent' => $settings->tax_rate_bp / 100,
             'service_percent' => $settings->service_rate_bp / 100,
+            'tax_inclusive' => (bool) $settings->tax_inclusive,
+            'service_inclusive' => (bool) $settings->service_inclusive,
         ];
     }
 }

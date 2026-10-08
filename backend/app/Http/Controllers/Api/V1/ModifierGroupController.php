@@ -86,6 +86,8 @@ class ModifierGroupController extends Controller
             'name' => $group->name,
             'min_select' => $group->min_select,
             'max_select' => $group->max_select,
+            'allow_quantity' => $group->allow_quantity,
+            'max_quantity' => $group->max_quantity,
             'modifiers' => $group->modifiers()->get(['name', 'price_delta', 'active'])->toArray(),
         ];
     }

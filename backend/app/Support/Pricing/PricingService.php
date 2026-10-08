@@ -10,6 +10,10 @@ use InvalidArgumentException;
  *
  * Urutan: baris (diskon item) → subtotal → diskon order → service → pajak → pembulatan.
  * Semua integer rupiah; persen dalam basis poin (1000 = 10%).
+ *
+ * Harga "termasuk pajak" / "termasuk service" (diatur terpisah): bagian itu dihitung mundur dari harga
+ * menu dan TIDAK menambah total; bagian yang tidak termasuk ditambahkan seperti biasa. Pajak selalu
+ * dikenakan atas (harga bersih + service).
  */
 class PricingService
 {
@@ -36,9 +40,8 @@ class PricingService
         $orderDiscountAmount = self::discount($subtotal, $orderDiscount, 'order_discount');
         $base = $subtotal - $orderDiscountAmount;
 
-        $service = self::halfUp($base * $settings->serviceBp, 10000);
-        $tax = self::halfUp(($base + $service) * $settings->taxBp, 10000);
-        $beforeRounding = $base + $service + $tax;
+        [$service, $tax, $added] = self::serviceAndTax($base, $settings);
+        $beforeRounding = $base + $added;
 
         $grand = $settings->roundingUnit > 0
             ? self::halfUp($beforeRounding, $settings->roundingUnit) * $settings->roundingUnit
@@ -56,7 +59,38 @@ class PricingService
             grandTotal: $grand,
             serviceBp: $settings->serviceBp,
             taxBp: $settings->taxBp,
+            serviceInclusive: $settings->serviceInclusive,
+            taxInclusive: $settings->taxInclusive,
         );
+    }
+
+    /**
+     * @return array{0: int, 1: int, 2: int} [service, pajak, tambahan di atas harga menu]
+     */
+    private static function serviceAndTax(int $base, PricingSettings $s): array
+    {
+        $S = $s->serviceBp;
+        $T = $s->taxBp;
+
+        // Pajak yang sudah ada di dalam harga menu.
+        $taxIncluded = $s->taxInclusive ? self::halfUp($base * $T, 10000 + $T) : 0;
+        $afterTax = $base - $taxIncluded;
+
+        if ($s->serviceInclusive) {
+            $serviceIncluded = self::halfUp($afterTax * $S, 10000 + $S);
+            $serviceAdded = 0;
+        } else {
+            $serviceIncluded = 0;
+            $serviceAdded = self::halfUp($afterTax * $S, 10000);
+        }
+
+        // Pajak tambahan: harga sudah termasuk pajak → hanya atas service yang ditambahkan;
+        // tidak termasuk → atas seluruh (harga + service tambahan).
+        $taxAdded = $s->taxInclusive
+            ? self::halfUp($serviceAdded * $T, 10000)
+            : self::halfUp(($afterTax + $serviceAdded) * $T, 10000);
+
+        return [$serviceIncluded + $serviceAdded, $taxIncluded + $taxAdded, $serviceAdded + $taxAdded];
     }
 
     /** @param  array{type: string, value: int}|null  $discount */

@@ -2,6 +2,7 @@
 /// (docs/pricing-fixtures.json), jadi total di tablet = total yang dihitung server.
 ///
 /// Urutan: baris (diskon item) → subtotal → diskon order → service → pajak → pembulatan.
+/// Harga "termasuk pajak/service" (terpisah per kedai): bagian itu dihitung mundur dan tidak menambah total.
 library;
 
 class Discount {
@@ -21,17 +22,29 @@ class Discount {
 enum DiscountType { amount, percent }
 
 class PricingSettings {
-  const PricingSettings({this.serviceBp = 0, this.taxBp = 0, this.roundingUnit = 0});
+  const PricingSettings({
+    this.serviceBp = 0,
+    this.taxBp = 0,
+    this.roundingUnit = 0,
+    this.serviceInclusive = false,
+    this.taxInclusive = false,
+  });
 
   factory PricingSettings.fromJson(Map<String, dynamic> j) => PricingSettings(
         serviceBp: j['service_bp'] as int,
         taxBp: j['tax_bp'] as int,
         roundingUnit: j['rounding_unit'] as int,
+        serviceInclusive: j['service_inclusive'] as bool? ?? false,
+        taxInclusive: j['tax_inclusive'] as bool? ?? false,
       );
 
   final int serviceBp;
   final int taxBp;
   final int roundingUnit;
+
+  /// Harga di menu sudah termasuk service / pajak.
+  final bool serviceInclusive;
+  final bool taxInclusive;
 }
 
 class PricingLine {
@@ -111,9 +124,17 @@ PricingResult calculatePrice(List<PricingLine> items, Discount? orderDiscount, P
   final orderDisc = _discount(subtotal, orderDiscount);
   final base = subtotal - orderDisc;
 
-  final service = _halfUp(base * s.serviceBp, 10000);
-  final tax = _halfUp((base + service) * s.taxBp, 10000);
-  final beforeRounding = base + service + tax;
+  // Sama persis dengan PricingService::serviceAndTax (lihat docs/pricing-fixtures.json).
+  final taxIncluded = s.taxInclusive ? _halfUp(base * s.taxBp, 10000 + s.taxBp) : 0;
+  final afterTax = base - taxIncluded;
+  final serviceIncluded = s.serviceInclusive ? _halfUp(afterTax * s.serviceBp, 10000 + s.serviceBp) : 0;
+  final serviceAdded = s.serviceInclusive ? 0 : _halfUp(afterTax * s.serviceBp, 10000);
+  final taxAdded = s.taxInclusive
+      ? _halfUp(serviceAdded * s.taxBp, 10000)
+      : _halfUp((afterTax + serviceAdded) * s.taxBp, 10000);
+  final service = serviceIncluded + serviceAdded;
+  final tax = taxIncluded + taxAdded;
+  final beforeRounding = base + serviceAdded + taxAdded;
   final grand = s.roundingUnit > 0
       ? _halfUp(beforeRounding, s.roundingUnit) * s.roundingUnit
       : beforeRounding;

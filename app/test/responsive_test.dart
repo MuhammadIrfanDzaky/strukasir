@@ -121,6 +121,8 @@ final featureSettingsJson = {
     _f('split_payment', 'Bayar dengan beberapa metode', 'Satu order dibayar dengan beberapa metode', on: false, available: false),
   ],
   'tax_percent': 10,
+  'tax_inclusive': true,
+  'service_inclusive': false,
   'service_percent': 5.5,
 };
 

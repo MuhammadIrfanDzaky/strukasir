@@ -413,6 +413,62 @@ class ModifierDialog extends StatefulWidget {
   State<ModifierDialog> createState() => _ModifierDialogState();
 }
 
+/// Satu opsi di grup berjumlah: nama + harga, lalu − jumlah +.
+class _QuantityOption extends StatelessWidget {
+  const _QuantityOption({required this.selection, required this.group, required this.modifier, required this.onChanged});
+
+  final ModifierSelection selection;
+  final MenuModifierGroup group;
+  final MenuModifier modifier;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final n = selection.count(group, modifier);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(modifier.name, style: n > 0 ? AppType.bodyStrong : AppType.body),
+                if (modifier.priceDelta > 0)
+                  Text('+${rupiah(modifier.priceDelta)}', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+              ],
+            ),
+          ),
+          IconButton.outlined(
+            tooltip: 'Kurangi ${modifier.name}',
+            onPressed: n == 0
+                ? null
+                : () {
+                    selection.decrement(group, modifier);
+                    onChanged();
+                  },
+            icon: const Icon(Icons.remove_rounded),
+          ),
+          SizedBox(
+            width: 40,
+            child: Text('$n', textAlign: TextAlign.center, style: AppType.title.copyWith(color: n > 0 ? AppColors.primary : null)),
+          ),
+          IconButton.outlined(
+            tooltip: 'Tambah ${modifier.name}',
+            onPressed: selection.canIncrement(group, modifier)
+                ? () {
+                    selection.increment(group, modifier);
+                    onChanged();
+                  }
+                : null,
+            icon: const Icon(Icons.add_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ModifierDialogState extends State<ModifierDialog> {
   ModifierSelection get s => widget.selection;
 
@@ -437,18 +493,22 @@ class _ModifierDialogState extends State<ModifierDialog> {
                   children: [Text(g.name, style: AppType.title), AppBadge(g.rule)],
                 ),
               ),
-              Wrap(
-                spacing: AppSpace.s2,
-                runSpacing: AppSpace.s2,
-                children: [
-                  for (final m in g.activeModifiers)
-                    FilterChip(
-                      label: Text(m.priceDelta > 0 ? '${m.name}  +${rupiah(m.priceDelta)}' : m.name),
-                      selected: s.isSelected(g, m),
-                      onSelected: (_) => setState(() => s.toggle(g, m)),
-                    ),
-                ],
-              ),
+              if (g.allowQuantity)
+                // Grup berjumlah: tiap opsi punya tombol − jumlah +.
+                for (final m in g.activeModifiers) _QuantityOption(selection: s, group: g, modifier: m, onChanged: () => setState(() {}))
+              else
+                Wrap(
+                  spacing: AppSpace.s2,
+                  runSpacing: AppSpace.s2,
+                  children: [
+                    for (final m in g.activeModifiers)
+                      FilterChip(
+                        label: Text(m.priceDelta > 0 ? '${m.name}  +${rupiah(m.priceDelta)}' : m.name),
+                        selected: s.isSelected(g, m),
+                        onSelected: (_) => setState(() => s.toggle(g, m)),
+                      ),
+                  ],
+                ),
               if (s.errorFor(g) case final error?)
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpace.s1),

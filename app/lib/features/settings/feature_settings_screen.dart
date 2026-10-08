@@ -55,6 +55,10 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
   final Map<String, bool> _on = {};
   final _tax = TextEditingController();
   final _service = TextEditingController();
+
+  /// Harga di menu sudah termasuk pajak / service (diatur terpisah).
+  bool _taxInclusive = false;
+  bool _serviceInclusive = false;
   String? _loadError;
   String? _error;
   Map<String, String> _fieldErrors = {};
@@ -94,6 +98,8 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
         ..addAll({for (final o in options) o.key: o.enabled});
       _tax.text = _percent(data['tax_percent'] as num);
       _service.text = _percent(data['service_percent'] as num);
+      _taxInclusive = data['tax_inclusive'] as bool? ?? false;
+      _serviceInclusive = data['service_inclusive'] as bool? ?? false;
     });
   }
 
@@ -160,7 +166,12 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
           token: token,
           data: {
             'features': _on,
-            if (_on['tax_service'] ?? false) ...{'tax_percent': tax, 'service_percent': service},
+            if (_on['tax_service'] ?? false) ...{
+              'tax_percent': tax,
+              'service_percent': service,
+              'tax_inclusive': _taxInclusive,
+              'service_inclusive': _serviceInclusive,
+            },
           }));
       _apply(res['data'] as Map<String, dynamic>);
       await ref.read(menuProvider.notifier).refresh();
@@ -274,18 +285,41 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
           isDense: true,
         );
     final formatters = [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))];
-    final tax = TextField(
-      controller: _tax,
-      decoration: deco('Pajak (PB1)', 'tax_percent'),
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: formatters,
-    );
-    final service = TextField(
-      controller: _service,
-      decoration: deco('Service', 'service_percent'),
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: formatters,
-    );
+    bool positive(TextEditingController c) => (_parsePercent(c.text) ?? 0) > 0;
+    // Saklar "termasuk harga" hanya untuk tarif yang diisi (tidak semua kedai memungut service).
+    Widget inclusive(String label, bool value, ValueChanged<bool> onChanged) => SwitchListTile(
+          value: value,
+          onChanged: _busy ? null : onChanged,
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: Text(label, style: AppType.body),
+          subtitle: Text(
+            value ? 'Total = harga menu; struk menulis "Termasuk …"' : 'Ditambahkan di atas harga menu',
+            style: AppType.caption.copyWith(color: AppColors.inkMuted),
+          ),
+        );
+    final tax = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      TextField(
+        controller: _tax,
+        decoration: deco('Pajak (PB1)', 'tax_percent'),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: formatters,
+        onChanged: (_) => setState(() {}),
+      ),
+      if (positive(_tax))
+        inclusive('Harga menu sudah termasuk pajak', _taxInclusive, (v) => setState(() => _taxInclusive = v)),
+    ]);
+    final service = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      TextField(
+        controller: _service,
+        decoration: deco('Service', 'service_percent'),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: formatters,
+        onChanged: (_) => setState(() {}),
+      ),
+      if (positive(_service))
+        inclusive('Harga menu sudah termasuk service', _serviceInclusive, (v) => setState(() => _serviceInclusive = v)),
+    ]);
     // Layar sempit: kolom bertumpuk supaya label & tanda % tidak terpotong.
     final compact = context.isCompact;
     return Padding(

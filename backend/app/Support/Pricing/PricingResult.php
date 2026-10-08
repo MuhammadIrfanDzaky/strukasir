@@ -21,6 +21,8 @@ final readonly class PricingResult
         // Tarif yang dipakai (basis poin), disimpan di order agar struk menampilkan persen saat transaksi.
         public int $serviceBp = 0,
         public int $taxBp = 0,
+        public bool $serviceInclusive = false,
+        public bool $taxInclusive = false,
     ) {}
 
     public function discountTotal(): int

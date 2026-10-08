@@ -168,4 +168,25 @@ class FeatureSettingsTest extends TestCase
         $this->save(['tax_percent' => 11])->assertOk();
         $this->api('GET', '/api/v1/orders/'.$order->json('data.id'), $cashier)->assertJsonPath('data.tax_bp', 1000);
     }
+
+    public function test_tax_inclusive_prices_keep_menu_price_as_total(): void
+    {
+        $this->save(['tax_percent' => 10, 'tax_inclusive' => true])->assertOk()
+            ->assertJsonPath('data.tax_inclusive', true)->assertJsonPath('data.service_inclusive', false);
+        $this->api('GET', '/api/v1/menu', $this->owner)
+            ->assertJsonPath('pricing.tax_inclusive', true)->assertJsonPath('pricing.service_inclusive', false);
+
+        $category = $this->api('POST', '/api/v1/categories', $this->owner, ['name' => 'Kopi'])->json('id');
+        $productId = $this->api('POST', '/api/v1/products', $this->owner, ['category_id' => $category, 'name' => 'Americano', 'price' => 11000])->json('id');
+        $cashier = $this->pinLogin($this->shop);
+        $this->api('POST', '/api/v1/shifts/open', $cashier, ['opening_cash' => 0])->assertSuccessful();
+
+        $order = $this->api('PUT', '/api/v1/orders/'.Str::uuid(), $cashier, [
+            'customer_label' => 'Meja 1',
+            'expected_total' => 11000,
+            'items' => [['id' => (string) Str::uuid(), 'product_id' => $productId, 'qty' => 1, 'modifier_ids' => []]],
+        ])->assertSuccessful();
+
+        $this->assertSame([11000, 1000, true], [$order->json('data.grand_total'), $order->json('data.tax_total'), $order->json('data.tax_inclusive')]);
+    }
 }

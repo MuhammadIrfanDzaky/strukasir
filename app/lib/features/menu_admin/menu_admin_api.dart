@@ -58,9 +58,18 @@ class MenuAdminApi {
     required int minSelect,
     required int maxSelect,
     required List<Map<String, dynamic>> modifiers,
+    bool allowQuantity = false,
+    int maxQuantity = 1,
   }) =>
       _write((api, token) {
-        final data = {'name': name.trim(), 'min_select': minSelect, 'max_select': maxSelect, 'modifiers': modifiers};
+        final data = {
+          'name': name.trim(),
+          'min_select': minSelect,
+          'max_select': maxSelect,
+          'allow_quantity': allowQuantity,
+          'max_quantity': allowQuantity ? maxQuantity : 1,
+          'modifiers': modifiers,
+        };
         return id == null
             ? api.post('/modifier-groups', data: data, token: token)
             : api.put('/modifier-groups/$id', data: data, token: token);

@@ -21,7 +21,11 @@ String percentBp(int bp) {
 }
 
 /// "Pajak 10%" — label dengan persen bila tarif diketahui (order lama: tanpa persen).
-String withRate(String label, int? bp) => bp == null || bp <= 0 ? label : '$label ${percentBp(bp)}';
+/// [included] = harga sudah termasuk → "Termasuk Pajak 10%" (tidak menambah total).
+String withRate(String label, int? bp, {bool included = false}) {
+  final text = bp == null || bp <= 0 ? label : '$label ${percentBp(bp)}';
+  return included ? 'Termasuk ${text[0].toLowerCase()}${text.substring(1)}' : text;
+}
 
 /// Parse input kasir ("13.000", "13000", "Rp 13.000") ke integer. Null jika tidak valid.
 int? parseRupiah(String input) {

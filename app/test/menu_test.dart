@@ -32,6 +32,7 @@ final menuJson = <String, dynamic>{
     },
     {
       'id': 'g3', 'name': 'Tambahan', 'min_select': 0, 'max_select': 2, 'sort': 2,
+      'allow_quantity': true, 'max_quantity': 2,
       'modifiers': [
         {'id': 'shot', 'name': 'Extra shot', 'price_delta': 5000, 'active': true, 'sort': 0},
         {'id': 'oat', 'name': 'Oat milk', 'price_delta': 6000, 'active': true, 'sort': 1},
@@ -120,6 +121,30 @@ void main() {
         ..toggle(grp('g3'), mod('g3', 'syrup'));
       expect(s.selectedIn(grp('g3')), ['shot', 'oat']);
       expect(s.unitPrice, 13000 + 5000 + 6000);
+    });
+
+    test('grup berjumlah: Extra shot x2, dibatasi maks. per opsi & total grup', () {
+      final g = grp('g3');
+      final shot = mod('g3', 'shot');
+      final s = select()
+        ..increment(g, shot)
+        ..increment(g, shot);
+      expect(s.count(g, shot), 2);
+      expect(s.chosen.map((m) => m.id), ['hot', 'shot', 'shot'], reason: 'ID diulang = jumlah (format API)');
+      expect(s.unitPrice, 13000 + 2 * 5000);
+      expect(s.canIncrement(g, shot), isFalse, reason: 'maks. 2 per opsi');
+      expect(s.canIncrement(g, mod('g3', 'oat')), isFalse, reason: 'total grup sudah 2');
+
+      s.decrement(g, shot);
+      expect(s.count(g, shot), 1);
+      expect(s.canIncrement(g, mod('g3', 'oat')), isTrue);
+      expect(g.rule, 'Opsional, maks 2 (total)');
+    });
+
+    test('ringkasan pilihan menggabungkan jumlah', () {
+      final shot = mod('g3', 'shot');
+      expect(modifierSummary([mod('g1', 'cold'), shot, shot]), 'Cold, Extra shot ×2');
+      expect(modifierSummary([shot, shot], times: 'x'), 'Extra shot x2');
     });
 
     test('pilihan nonaktif tidak bisa dipilih', () {

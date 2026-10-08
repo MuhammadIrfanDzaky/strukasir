@@ -5,6 +5,7 @@ import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../menu/menu_controller.dart';
+import '../menu/modifier_selection.dart';
 import '../session/session_controller.dart';
 import 'cart_controller.dart';
 import 'checkout_flow.dart';
@@ -109,7 +110,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                             Text(l.product.name, style: AppType.bodyStrong),
                             if (l.modifiers.isNotEmpty)
                               Text(
-                                l.modifiers.map((m) => m.name).join(', '),
+                                modifierSummary(l.modifiers),
                                 style: AppType.caption.copyWith(color: AppColors.inkMuted),
                               ),
                             if (l.note != null && l.note!.isNotEmpty)
@@ -135,8 +136,12 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               AppSummaryRow('Subtotal', rupiah(totals.subtotal)),
               if (totals.orderDiscount > 0)
                 AppSummaryRow('Diskon', '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
-              if (totals.serviceTotal > 0) AppSummaryRow(withRate('Service', pricing?.serviceBp), rupiah(totals.serviceTotal)),
-              if (totals.taxTotal > 0) AppSummaryRow(withRate('Pajak', pricing?.taxBp), rupiah(totals.taxTotal)),
+              if (totals.serviceTotal > 0)
+                AppSummaryRow(withRate('Service', pricing?.serviceBp, included: pricing?.serviceInclusive ?? false),
+                    rupiah(totals.serviceTotal)),
+              if (totals.taxTotal > 0)
+                AppSummaryRow(withRate('Pajak', pricing?.taxBp, included: pricing?.taxInclusive ?? false),
+                    rupiah(totals.taxTotal)),
               if (totals.rounding != 0) AppSummaryRow('Pembulatan', rupiah(totals.rounding)),
               AppSummaryRow('Total', rp(totals.grandTotal), emphasis: true),
             ],
@@ -264,7 +269,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           final l = cart.lines[i];
           final discount = totals.lineDiscounts.length > i ? totals.lineDiscounts[i] : 0;
           final meta = [
-            ...l.modifiers.map((m) => m.name),
+            if (l.modifiers.isNotEmpty) modifierSummary(l.modifiers),
             if (l.note != null && l.note!.isNotEmpty) '“${l.note}”',
           ].join(' · ');
           return InkWell(
@@ -318,8 +323,12 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           AppSummaryRow('Subtotal', rupiah(totals.subtotal)),
           if (totals.orderDiscount > 0)
             AppSummaryRow('Diskon', '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
-          if (totals.serviceTotal > 0) AppSummaryRow(withRate('Service', menu?.pricing.serviceBp), rupiah(totals.serviceTotal)),
-          if (totals.taxTotal > 0) AppSummaryRow(withRate('Pajak', menu?.pricing.taxBp), rupiah(totals.taxTotal)),
+          if (totals.serviceTotal > 0)
+            AppSummaryRow(withRate('Service', menu?.pricing.serviceBp, included: menu?.pricing.serviceInclusive ?? false),
+                rupiah(totals.serviceTotal)),
+          if (totals.taxTotal > 0)
+            AppSummaryRow(withRate('Pajak', menu?.pricing.taxBp, included: menu?.pricing.taxInclusive ?? false),
+                rupiah(totals.taxTotal)),
           if (totals.rounding != 0) AppSummaryRow('Pembulatan', rupiah(totals.rounding)),
           if (canDiscount && !cart.isEmpty)
             Align(

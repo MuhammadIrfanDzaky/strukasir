@@ -89,6 +89,8 @@ class OrderService
                 'tax_total' => $result->taxTotal,
                 'service_bp' => $result->serviceBp,
                 'tax_bp' => $result->taxBp,
+                'service_inclusive' => $result->serviceInclusive,
+                'tax_inclusive' => $result->taxInclusive,
                 'rounding' => $result->rounding,
                 'grand_total' => $result->grandTotal,
             ])->save();
@@ -282,22 +284,41 @@ class OrderService
             }
 
             if ($modifiersOn) {
+                // ID diulang = jumlah opsi itu (mis. Extra shot x2).
+                $counts = array_count_values(array_map('strval', $item['modifier_ids']));
+
                 foreach ($product->modifierGroups as $group) {
-                    $picked = $group->modifiers->whereIn('id', $item['modifier_ids']);
+                    $picked = $group->modifiers->whereIn('id', array_keys($counts));
                     if ($isNew && $picked->contains(fn ($m) => ! $m->active)) {
                         throw ValidationException::withMessages(["{$field}.modifier_ids" => "Pilihan {$group->name} tidak tersedia."]);
                     }
-                    if ($picked->count() < $group->min_select || $picked->count() > $group->max_select) {
+                    $total = 0;
+                    foreach ($picked as $m) {
+                        $qty = $counts[$m->id];
+                        if ($qty > 1 && ! $group->allow_quantity) {
+                            throw ValidationException::withMessages(["{$field}.modifier_ids" => "{$m->name} hanya bisa dipilih satu kali."]);
+                        }
+                        if ($qty > $group->max_quantity && $group->allow_quantity) {
+                            throw ValidationException::withMessages([
+                                "{$field}.modifier_ids" => "{$m->name} maksimal {$group->max_quantity}x.",
+                            ]);
+                        }
+                        $total += $qty;
+                    }
+                    if ($total < $group->min_select || $total > $group->max_select) {
                         throw ValidationException::withMessages([
                             "{$field}.modifier_ids" => "{$product->name}: pilihan {$group->name} harus {$group->min_select}–{$group->max_select}.",
                         ]);
                     }
                     foreach ($picked as $m) {
-                        $chosen[] = ['modifier_id' => $m->id, 'group_name' => $group->name, 'name' => $m->name, 'price_delta' => $m->price_delta];
+                        $chosen[] = [
+                            'modifier_id' => $m->id, 'group_name' => $group->name, 'name' => $m->name,
+                            'price_delta' => $m->price_delta, 'qty' => $counts[$m->id],
+                        ];
                     }
                 }
 
-                if (count($chosen) !== count($item['modifier_ids'])) {
+                if (array_sum(array_column($chosen, 'qty')) !== count($item['modifier_ids'])) {
                     throw ValidationException::withMessages(["{$field}.modifier_ids" => 'Pilihan tidak sesuai dengan produk.']);
                 }
             }
@@ -308,7 +329,7 @@ class OrderService
                 'qty' => $item['qty'],
                 'note' => $item['note'] ?? null,
                 'modifiers' => $chosen,
-                'modifiers_total' => array_sum(array_column($chosen, 'price_delta')),
+                'modifiers_total' => array_sum(array_map(fn (array $m) => $m['price_delta'] * $m['qty'], $chosen)),
                 'discount' => $item['discount'] ?? null,
             ];
         }
