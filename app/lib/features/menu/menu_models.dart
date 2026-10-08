@@ -229,6 +229,12 @@ class Menu {
       .where((p) => p.categoryId == categoryId && (includeInactive || p.active))
       .toList();
 
+  /// Produk aktif di kategori, urut abjad (tanpa beda huruf besar/kecil) — urutan di layar kasir.
+  List<MenuProduct> productsByName(String categoryId) => sortByName(productsIn(categoryId));
+
+  static List<MenuProduct> sortByName(Iterable<MenuProduct> products) =>
+      [...products]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
   List<MenuModifierGroup> groupsFor(MenuProduct product) => [
         for (final id in product.modifierGroupIds)
           ...modifierGroups.where((g) => g.id == id),

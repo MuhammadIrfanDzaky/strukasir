@@ -49,7 +49,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           AppErrorState(title: 'Menu gagal dimuat', message: '$e', onRetry: () => ref.invalidate(menuProvider)),
       data: (s) {
         final categories = s.menu.activeCategories;
-        final all = [for (final c in categories) ...s.menu.productsIn(c.id)];
+        // Kasir: produk urut abjad di "Semua" (per kategori), per kategori, favorit, dan hasil cari.
+        final byCategory = {for (final c in categories) c.id: s.menu.productsByName(c.id)};
+        final all = [for (final c in categories) ...byCategory[c.id]!];
         final hasFavorites = all.any((p) => p.favorite);
         // Kategori yang dipilih bisa hilang setelah menu diperbarui → kembali ke Semua.
         final categoryId = (_categoryId == _favorites && hasFavorites) || categories.any((c) => c.id == _categoryId)
@@ -57,11 +59,11 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             : null;
         final searching = _query != null && _query!.trim().isNotEmpty;
         final products = searching
-            ? all.where((p) => p.matches(_query!)).toList()
+            ? Menu.sortByName(all.where((p) => p.matches(_query!)))
             : switch (categoryId) {
                 null => all,
-                _favorites => all.where((p) => p.favorite).toList(),
-                final id => s.menu.productsIn(id),
+                _favorites => Menu.sortByName(all.where((p) => p.favorite)),
+                final id => byCategory[id] ?? const <MenuProduct>[],
               };
 
         Widget chip(String label, String? id, {IconData? icon}) => Padding(
@@ -168,19 +170,19 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       ? CustomScrollView(
                           slivers: [
                             for (final (i, c) in categories.indexed)
-                              if (s.menu.productsIn(c.id).isNotEmpty) ...[
+                              if (byCategory[c.id]!.isNotEmpty) ...[
                                 SliverPadding(
                                   padding: EdgeInsets.fromLTRB(gridPad, i == 0 ? gridPad : AppSpace.s2, gridPad, 0),
                                   sliver: SliverToBoxAdapter(
-                                    child: _CategoryHeader(c.name, s.menu.productsIn(c.id).length),
+                                    child: _CategoryHeader(c.name, byCategory[c.id]!.length),
                                   ),
                                 ),
                                 SliverPadding(
                                   padding: EdgeInsets.fromLTRB(gridPad, AppSpace.s2, gridPad, gridPad),
                                   sliver: SliverGrid.builder(
                                     gridDelegate: gridDelegate,
-                                    itemCount: s.menu.productsIn(c.id).length,
-                                    itemBuilder: (_, j) => tile(s.menu.productsIn(c.id)[j]),
+                                    itemCount: byCategory[c.id]!.length,
+                                    itemBuilder: (_, j) => tile(byCategory[c.id]![j]),
                                   ),
                                 ),
                               ],

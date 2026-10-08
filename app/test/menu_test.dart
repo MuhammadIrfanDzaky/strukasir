@@ -92,6 +92,20 @@ void main() {
       expect([off.customerNameOn, off.modifiersOn], [false, false]);
     });
 
+    test('produk di kasir urut abjad tanpa beda huruf besar/kecil', () {
+      final m = Menu.fromJson({
+        ...menuJson,
+        'products': [
+          for (final (i, n) in ['Sanger', 'americano', 'Cafe Latte', 'Air Mineral'].indexed)
+            {
+              'id': 'x$i', 'category_id': 'c1', 'name': n, 'price': 1000,
+              'active': true, 'sold_out': false, 'sort': i, 'modifier_group_ids': [],
+            },
+        ],
+      });
+      expect(m.productsByName('c1').map((p) => p.name), ['Air Mineral', 'americano', 'Cafe Latte', 'Sanger']);
+    });
+
     test('label kolom nama mengikuti cara jualan (default: dengan meja)', () {
       expect(Menu.fromJson(menuJson).customerLabelHint, 'Nama pelanggan / meja');
       expect(Menu.fromJson({...menuJson, 'customer_label_hint': 'Nama pelanggan'}).customerLabelHint, 'Nama pelanggan');
