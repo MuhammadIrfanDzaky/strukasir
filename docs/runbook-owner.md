@@ -62,9 +62,9 @@ alamat, dan pesan penutup. Pratinjau di layar sama dengan hasil cetak. Ketuk **S
 | "Perbarui aplikasi" | Ketuk *Unduh versi terbaru*, pasang, lalu buka lagi. |
 | Selisih kas di tutup shift | Cocokkan dengan **Laporan** (per metode bayar) dan riwayat void hari itu. |
 
-## Laporan (owner)
+## Dashboard (owner)
 
-Menu **Laporan** → *Hari ini / 7 hari / Bulan ini*: penjualan, **laba kotor** & HPP, rata-rata per order,
+Menu **Dashboard** (di HP: *Laporan*) → *Hari ini / 7 hari / 30 hari / Bulan ini*. Angka utama menunjukkan naik/turun dibanding periode sebelumnya yang sama panjang; grafik: tren harian, jam ramai, hari tersibuk, metode bayar, kategori, produk terlaris, kasir. Sentuh grafik untuk angka persisnya. Sebelumnya: menu Laporan → *Hari ini / 7 hari / Bulan ini*: penjualan, **laba kotor** & HPP, rata-rata per order,
 per metode bayar, per kasir, produk terlaris (dengan laba), dan void.
 **Cocokkan total QRIS** dengan mutasi di aplikasi merchant QRIS minimal seminggu sekali.
 

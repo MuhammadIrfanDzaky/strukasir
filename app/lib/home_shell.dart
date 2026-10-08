@@ -51,7 +51,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final destinations = [
       _Destination('Kasir', Icons.point_of_sale_rounded, (_) => const PosScreen()),
       _Destination('Riwayat', Icons.receipt_long_rounded, (_) => const HistoryScreen()),
-      if (user.can('reports.view')) _Destination('Laporan', Icons.bar_chart_rounded, (_) => const ReportsScreen()),
+      if (user.can('reports.view')) _Destination('Dashboard', Icons.insights_rounded, (_) => const ReportsScreen()),
       if (user.can('menu.manage'))
         _Destination('Kelola Menu', Icons.restaurant_menu_rounded, (_) => const MenuAdminScreen()),
       // Printer untuk semua; Fitur & Struk hanya owner (lihat PrinterSettingsScreen).
@@ -98,7 +98,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           onDestinationSelected: (i) => setState(() => _index = i),
           destinations: [
             for (final d in destinations)
-              NavigationDestination(icon: Icon(d.icon), label: switch (d.label) { 'Kelola Menu' => 'Menu', 'Pengaturan' => 'Setelan', _ => d.label }),
+              NavigationDestination(icon: Icon(d.icon), label: switch (d.label) { 'Kelola Menu' => 'Menu', 'Pengaturan' => 'Setelan', 'Dashboard' => 'Laporan', _ => d.label }),
           ],
         ),
         ),

@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\Payment;
 use App\Models\Product;
+use App\Services\ReportService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -193,6 +194,40 @@ class ShiftVoidReportTest extends TestCase
             ->assertJsonPath('data.top_products.0.name', 'Teh')
             ->assertJsonPath('data.top_products.0.qty', 3)
             ->assertJsonPath('data.by_cashier.0.name', 'Kasir');
+    }
+
+    public function test_dashboard_breakdowns_by_hour_weekday_category_and_previous_period(): void
+    {
+        $this->travelTo(now()->setTimezone('Asia/Jakarta')->setTime(10, 15)->utc());
+        $this->openShift();
+        $this->sell($this->latte, 2);        // 40.000 jam 10 WIB
+        $this->sell($this->tea, 1);          // 10.000
+
+        $today = now()->setTimezone('Asia/Jakarta');
+        $date = $today->toDateString();
+        $res = $this->api('GET', "/api/v1/reports/summary?from={$date}&to={$date}", $this->owner)->assertOk();
+
+        $hourly = collect($res->json('data.hourly'));
+        $this->assertCount(24, $hourly);
+        $this->assertSame(['orders' => 2, 'sales' => 50000], collect($hourly->firstWhere('hour', 10))->only(['orders', 'sales'])->all(),
+            'jam memakai zona waktu kedai, bukan UTC');
+        $this->assertSame(50000, $hourly->sum('sales'));
+
+        $weekday = collect($res->json('data.weekday'));
+        $this->assertCount(7, $weekday);
+        $this->assertSame(50000, $weekday->firstWhere('day', $today->isoWeekday())['sales']);
+
+        $res->assertJsonPath('data.by_category.0.name', 'Minuman')->assertJsonPath('data.by_category.0.revenue', 50000);
+
+        // Periode sebelumnya = hari kemarin (panjang sama), belum ada penjualan.
+        $res->assertJsonPath('data.previous.to', $today->copy()->subDay()->toDateString())
+            ->assertJsonPath('data.previous.sales', 0);
+    }
+
+    public function test_previous_period_has_same_length(): void
+    {
+        $this->assertSame(['2026-09-24', '2026-09-30'], ReportService::previousRange('2026-10-01', '2026-10-07'));
+        $this->assertSame(['2026-09-30', '2026-09-30'], ReportService::previousRange('2026-10-01', '2026-10-01'));
     }
 
     public function test_report_is_owner_only_and_follows_feature(): void

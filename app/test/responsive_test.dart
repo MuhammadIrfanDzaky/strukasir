@@ -102,10 +102,18 @@ final reportJson = {
     {'qty': 120, 'name': 'Kopi Susu Gula Aren', 'revenue': 2160000, 'profit': 1080000},
     {'qty': 96, 'name': 'Es Kopi Susu Berry Spesial Ukuran Jumbo', 'revenue': 2208000},
   ],
-  'daily': [
-    {'date': '2026-10-05', 'orders': 60, 'sales': 1900000},
-    {'date': '2026-10-06', 'orders': 58, 'sales': 1820000},
+  'from': '2026-09-30',
+  'to': '2026-10-06',
+  'daily': [{'date': '2026-09-30', 'orders': 58, 'sales': 1787886}, {'date': '2026-10-01', 'orders': 60, 'sales': 1843164}, {'date': '2026-10-02', 'orders': 50, 'sales': 1565119}, {'date': '2026-10-03', 'orders': 51, 'sales': 1584965}, {'date': '2026-10-04', 'orders': 66, 'sales': 2029801}, {'date': '2026-10-05', 'orders': 77, 'sales': 2400255}, {'date': '2026-10-06', 'orders': 54, 'sales': 1656457}],
+  'hourly': [{'hour': 0, 'orders': 0, 'sales': 0}, {'hour': 1, 'orders': 0, 'sales': 0}, {'hour': 2, 'orders': 0, 'sales': 0}, {'hour': 3, 'orders': 0, 'sales': 0}, {'hour': 4, 'orders': 0, 'sales': 0}, {'hour': 5, 'orders': 0, 'sales': 0}, {'hour': 6, 'orders': 0, 'sales': 0}, {'hour': 7, 'orders': 3, 'sales': 93000}, {'hour': 8, 'orders': 8, 'sales': 248000}, {'hour': 9, 'orders': 12, 'sales': 372000}, {'hour': 10, 'orders': 20, 'sales': 620000}, {'hour': 11, 'orders': 16, 'sales': 496000}, {'hour': 12, 'orders': 14, 'sales': 434000}, {'hour': 13, 'orders': 10, 'sales': 310000}, {'hour': 14, 'orders': 11, 'sales': 341000}, {'hour': 15, 'orders': 15, 'sales': 465000}, {'hour': 16, 'orders': 18, 'sales': 558000}, {'hour': 17, 'orders': 22, 'sales': 682000}, {'hour': 18, 'orders': 19, 'sales': 589000}, {'hour': 19, 'orders': 24, 'sales': 744000}, {'hour': 20, 'orders': 21, 'sales': 651000}, {'hour': 21, 'orders': 12, 'sales': 372000}, {'hour': 22, 'orders': 5, 'sales': 155000}, {'hour': 23, 'orders': 0, 'sales': 0}],
+  'weekday': [{'day': 1, 'orders': 48, 'sales': 1488000}, {'day': 2, 'orders': 52, 'sales': 1612000}, {'day': 3, 'orders': 50, 'sales': 1550000}, {'day': 4, 'orders': 55, 'sales': 1705000}, {'day': 5, 'orders': 63, 'sales': 1953000}, {'day': 6, 'orders': 78, 'sales': 2418000}, {'day': 7, 'orders': 66, 'sales': 2046000}],
+  'by_category': [
+    {'name': 'Coffee', 'qty': 260, 'revenue': 7400000},
+    {'name': 'Non Coffee', 'qty': 110, 'revenue': 3100000},
+    {'name': 'Snacks', 'qty': 95, 'revenue': 1650000},
+    {'name': 'Manual Brew', 'qty': 25, 'revenue': 695000},
   ],
+  'previous': {'from': '2026-09-23', 'to': '2026-09-29', 'orders': 380, 'sales': 11900000, 'average': 31315, 'gross_profit': 6900000},
 };
 
 Map<String, dynamic> _f(String key, String label, String desc, {bool on = true, bool available = true, String? requires}) =>
@@ -465,6 +473,18 @@ final scenarios = <Scenario>[
     act: null,
   ),
   (name: 'laporan', session: loggedIn, home: (s) => home(s, 2), fillCart: false, act: null),
+  (
+    name: 'dashboard-7-hari',
+    session: loggedIn,
+    home: (s) => home(s, 2),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('7 hari'));
+      await settle(t);
+      await t.scrollUntilVisible(find.text('Produk terlaris'), 300, scrollable: find.byType(Scrollable).last);
+      await settle(t);
+    },
+  ),
   (name: 'kelola-menu', session: loggedIn, home: (s) => home(s, 3), fillCart: false, act: null),
   (
     name: 'form-produk',

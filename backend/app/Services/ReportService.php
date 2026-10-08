@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Tenant;
+use App\Support\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -55,6 +58,23 @@ class ReportService
         $daily = $paid()->groupBy('business_date')->orderBy('business_date')
             ->selectRaw('business_date, count(*) as orders, sum(grand_total) as sales')->get();
 
+        // Jam & hari dihitung dari waktu bayar di zona waktu kedai (paid_at disimpan UTC).
+        $tz = Tenant::query()->whereKey(app(TenantContext::class)->id())->value('timezone') ?: 'Asia/Jakarta';
+        $local = "((orders.paid_at at time zone 'UTC') at time zone ?)";
+        $hourly = $paid()->selectRaw("extract(hour from {$local})::int as h, count(*) as orders, sum(grand_total) as sales", [$tz])
+            ->groupByRaw('1')->get()->keyBy('h');
+        // ISO: 1 = Senin … 7 = Minggu.
+        $weekday = $paid()->selectRaw("extract(isodow from {$local})::int as d, count(*) as orders, sum(grand_total) as sales", [$tz])
+            ->groupByRaw('1')->get()->keyBy('d');
+
+        // Omzet per kategori produk (nilai baris setelah diskon item); produk terhapus → "Lainnya".
+        $byCategory = $paidItems()
+            ->leftJoin('products', 'products.id', '=', 'order_items.product_id')
+            ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->groupBy('categories.name')
+            ->selectRaw("coalesce(categories.name, 'Lainnya') as name, sum(order_items.qty) as qty, sum(order_items.line_total) as revenue")
+            ->orderByDesc('revenue')->get();
+
         $orders = (int) $totals->orders;
         $sales = (int) $totals->sales;
 
@@ -87,6 +107,45 @@ class ReportService
             'daily' => $daily->map(fn ($r) => [
                 'date' => (string) $r->business_date, 'orders' => (int) $r->orders, 'sales' => (int) $r->sales,
             ]),
+            // Lengkap 24 jam / 7 hari (nol bila sepi) supaya grafik tidak perlu mengisi celah.
+            'hourly' => collect(range(0, 23))->map(fn (int $h) => [
+                'hour' => $h, 'orders' => (int) ($hourly[$h]->orders ?? 0), 'sales' => (int) ($hourly[$h]->sales ?? 0),
+            ]),
+            'weekday' => collect(range(1, 7))->map(fn (int $d) => [
+                'day' => $d, 'orders' => (int) ($weekday[$d]->orders ?? 0), 'sales' => (int) ($weekday[$d]->sales ?? 0),
+            ]),
+            'by_category' => $byCategory->map(fn ($r) => [
+                'name' => $r->name, 'qty' => (int) $r->qty, 'revenue' => (int) $r->revenue,
+            ]),
+            // Periode sebelumnya dengan panjang sama (mis. 7 hari sebelumnya) untuk naik/turun di dashboard.
+            'previous' => $this->totals(...self::previousRange($from, $to)),
+        ];
+    }
+
+    /** @return array{0: string, 1: string} */
+    public static function previousRange(string $from, string $to): array
+    {
+        $start = CarbonImmutable::parse($from);
+        $days = $start->diffInDays(CarbonImmutable::parse($to)) + 1;
+
+        return [$start->subDays($days)->toDateString(), $start->subDay()->toDateString()];
+    }
+
+    /** Angka ringkas untuk perbandingan: transaksi, penjualan, rata-rata, laba kotor. */
+    private function totals(string $from, string $to): array
+    {
+        $t = DB::table('orders')->where('status', 'paid')->whereBetween('business_date', [$from, $to])
+            ->selectRaw('count(*) as orders, coalesce(sum(grand_total),0) as sales, coalesce(sum(tax_total),0) as tax')->first();
+        $cost = (int) DB::table('order_items')->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->where('orders.status', 'paid')->whereBetween('orders.business_date', [$from, $to])
+            ->sum(DB::raw('coalesce(order_items.unit_cost * order_items.qty, 0)'));
+        $orders = (int) $t->orders;
+        $sales = (int) $t->sales;
+
+        return [
+            'from' => $from, 'to' => $to, 'orders' => $orders, 'sales' => $sales,
+            'average' => $orders > 0 ? intdiv($sales, $orders) : 0,
+            'gross_profit' => $sales - (int) $t->tax - $cost,
         ];
     }
 }
