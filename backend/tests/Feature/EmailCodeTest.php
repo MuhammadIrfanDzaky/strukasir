@@ -5,12 +5,9 @@ namespace Tests\Feature;
 use App\Mail\EmailCodeMail;
 use App\Models\AuditLog;
 use App\Models\EmailCode;
-use App\Models\User;
 use App\Services\EmailCodes;
-use Database\Seeders\FeatureSeeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /** Verifikasi email & reset password owner lewat kode 6 digit. */
@@ -170,24 +167,6 @@ class EmailCodeTest extends TestCase
         $reset = $this->sentCode(EmailCodes::RESET_PASSWORD);
 
         $this->api('POST', '/api/v1/auth/email/verify', $token, ['code' => $reset])->assertUnprocessable();
-    }
-
-    public function test_signup_sends_verification_email_and_survives_mail_failure(): void
-    {
-        $this->seed(FeatureSeeder::class);
-        $payload = fn (string $email) => [
-            'owner_name' => 'Wahyu', 'email' => $email, 'password' => 'rahasia123', 'pin' => '482915',
-            'business_name' => 'Kopi Senja', 'sector' => 'coffee_shop', 'sales_mode' => 'takeaway',
-            'outlet_count' => 1, 'province_code' => '12', 'regency_code' => '12.71', 'terms' => true, 'device_id' => (string) Str::uuid(),
-        ];
-
-        $this->api('POST', '/api/v1/signup', null, $payload('a@contoh.id'))->assertCreated();
-        Mail::assertSent(EmailCodeMail::class, fn (EmailCodeMail $m) => $m->hasTo('a@contoh.id') && $m->purpose === EmailCodes::VERIFY_EMAIL);
-
-        // Server email mati: pendaftaran tetap berhasil.
-        Mail::shouldReceive('to')->andThrow(new \RuntimeException('SMTP down'));
-        $this->api('POST', '/api/v1/signup', null, $payload('b@contoh.id'))->assertCreated();
-        $this->assertNotNull(User::query()->where('email', 'b@contoh.id')->first());
     }
 
     public function test_email_body_contains_code_and_no_links(): void

@@ -8,7 +8,7 @@ use App\Http\Requests\SignupRequest;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\DeviceRegistrar;
-use App\Services\EmailCodes;
+use App\Services\SignupCodes;
 use App\Services\TenantProvisioner;
 use App\Support\Audit;
 use App\Support\BusinessTemplate;
@@ -28,7 +28,7 @@ class SignupController extends Controller
         TenantProvisioner $provisioner,
         DeviceRegistrar $registrar,
         TenantContext $context,
-        EmailCodes $emailCodes,
+        SignupCodes $signupCodes,
     ): JsonResponse {
         if (! Plan::where('code', 'standard')->exists()) {
             report(new \RuntimeException('Paket "standard" belum ada: jalankan FeatureSeeder.'));
@@ -38,7 +38,15 @@ class SignupController extends Controller
 
         $data = $request->validated();
 
-        return DB::transaction(function () use ($data, $request, $provisioner, $registrar, $context, $emailCodes) {
+        return DB::transaction(function () use ($data, $request, $provisioner, $registrar, $context, $signupCodes) {
+            // Email harus terbukti milik pendaftar sebelum usaha dibuat.
+            if (! $signupCodes->consume($data['email'], trim($data['email_code']))) {
+                return response()->json([
+                    'message' => 'Kode verifikasi salah atau sudah kedaluwarsa.',
+                    'errors' => ['email_code' => ['Kode salah atau sudah kedaluwarsa. Minta kode baru bila perlu.']],
+                ], 422);
+            }
+
             $tenant = $provisioner->create(
                 code: $provisioner->uniqueCode($data['business_name']),
                 name: trim($data['business_name']),
@@ -60,8 +68,9 @@ class SignupController extends Controller
                 receiptHeader: isset($data['address']) ? trim($data['address']) ?: null : null,
             );
 
-            return $context->run($tenant->id, function () use ($tenant, $data, $registrar, $emailCodes) {
+            return $context->run($tenant->id, function () use ($tenant, $data, $registrar) {
                 $owner = User::query()->where('role', Role::Owner)->firstOrFail();
+                $owner->forceFill(['email_verified_at' => now()])->save();
                 [$device, $token] = $registrar->register($tenant, $data['device_id'] ?? null, $data['device_name'] ?? null);
 
                 // Titik awal sesuai jenis usaha & cara jualan (fitur + kategori kosong); bisa diubah owner.
@@ -72,10 +81,6 @@ class SignupController extends Controller
                     'sector' => $data['sector'], 'sales_mode' => $tenant->sales_mode?->value, 'outlet_count' => (int) $data['outlet_count'],
                     'template' => ['features' => $template->features, 'categories' => $template->categories],
                 ], user: $owner, device: $device);
-                // Kode verifikasi email langsung dikirim; gagal kirim tidak membatalkan pendaftaran
-                // (owner bisa minta ulang dari app).
-                $emailCodes->send($owner, EmailCodes::VERIFY_EMAIL);
-
                 Audit::record('device.registered', $device, after: ['code' => $device->code, 'name' => $device->name],
                     user: $owner, device: $device);
 

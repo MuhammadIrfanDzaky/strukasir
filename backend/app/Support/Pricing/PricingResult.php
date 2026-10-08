@@ -18,6 +18,9 @@ final readonly class PricingResult
         public int $taxTotal,
         public int $rounding,
         public int $grandTotal,
+        // Tarif yang dipakai (basis poin), disimpan di order agar struk menampilkan persen saat transaksi.
+        public int $serviceBp = 0,
+        public int $taxBp = 0,
     ) {}
 
     public function discountTotal(): int

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\BusinessSector;
 use App\Enums\SalesMode;
 use App\Http\Requests\SignupRequest;
+use App\Mail\EmailCodeMail;
 use App\Models\AuditLog;
 use App\Models\Device;
 use App\Models\Plan;
@@ -13,6 +14,8 @@ use App\Models\TenantSetting;
 use App\Models\User;
 use Database\Seeders\FeatureSeeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
@@ -49,7 +52,23 @@ class SignupTest extends TestCase
 
     private function signup(array $override = [])
     {
-        return $this->api('POST', '/api/v1/signup', null, $this->payload($override));
+        $payload = $this->payload($override);
+        if (! array_key_exists('email_code', $override) && is_string($payload['email'] ?? null)) {
+            $payload['email_code'] = $this->signupCode($payload['email']);
+        }
+
+        return $this->api('POST', '/api/v1/signup', null, $payload);
+    }
+
+    /** Kode verifikasi email yang valid (langsung di DB, tanpa kirim email). */
+    private function signupCode(string $email, string $code = '135790'): string
+    {
+        DB::table('signup_codes')->insert([
+            'id' => (string) Str::uuid7(), 'email' => strtolower(trim($email)), 'code_hash' => Hash::make($code),
+            'expires_at' => now()->addMinutes(15), 'created_at' => now()->subMinutes(5),
+        ]);
+
+        return $code;
     }
 
     public function test_signup_creates_tenant_owner_settings_and_first_device(): void
@@ -285,5 +304,61 @@ class SignupTest extends TestCase
         $this->assertFalse($menu->json('features.customer_name'));
         $this->assertFalse($menu->json('features.open_bill'));
         $this->assertSame(['Obat Bebas', 'Vitamin & Suplemen', 'Alat Kesehatan'], array_column($menu->json('categories'), 'name'));
+    }
+
+    // ─────────────── verifikasi email sebelum daftar ───────────────
+
+    public function test_email_code_is_sent_before_signup_and_marks_owner_verified(): void
+    {
+        Mail::fake();
+        $this->api('POST', '/api/v1/signup/email-code', null, ['email' => 'Baru@Contoh.id', 'owner_name' => 'Wahyu'])->assertOk();
+        $mail = Mail::sent(EmailCodeMail::class)->last();
+        $this->assertTrue($mail->hasTo('baru@contoh.id'));
+        $this->assertSame('Wahyu', $mail->name);
+
+        $res = $this->signup(['email' => 'baru@contoh.id', 'email_code' => $mail->code])->assertCreated();
+
+        $this->tenancy()->run($res->json('tenant.id'), function () {
+            $this->assertNotNull(User::query()->sole()->email_verified_at, 'email sudah terbukti saat daftar');
+        });
+        Mail::assertSentCount(1); // tidak ada email verifikasi kedua setelah masuk
+    }
+
+    public function test_signup_rejects_missing_wrong_or_used_code(): void
+    {
+        $this->signup(['email_code' => null])->assertJsonValidationErrors('email_code');
+
+        $this->signupCode('wahyu@contoh.id');
+        $this->signup(['email_code' => '000000'])->assertUnprocessable()->assertJsonValidationErrors('email_code');
+        $this->assertSame(0, Tenant::count());
+
+        // Kode untuk email lain tidak berlaku.
+        $this->signupCode('lain@contoh.id', '246802');
+        $this->signup(['email_code' => '246802'])->assertJsonValidationErrors('email_code');
+
+        $this->signup(['email_code' => '135790'])->assertCreated();
+        $this->assertSame(1, Tenant::count());
+    }
+
+    public function test_email_code_endpoint_rules(): void
+    {
+        Mail::fake();
+        $this->signup()->assertCreated();
+
+        // Email sudah terdaftar → tidak dikirim.
+        $this->api('POST', '/api/v1/signup/email-code', null, ['email' => 'wahyu@contoh.id'])
+            ->assertJsonValidationErrors('email');
+        $this->api('POST', '/api/v1/signup/email-code', null, ['email' => 'bukan email'])->assertJsonValidationErrors('email');
+
+        $this->api('POST', '/api/v1/signup/email-code', null, ['email' => 'x@contoh.id'])->assertOk();
+        $this->api('POST', '/api/v1/signup/email-code', null, ['email' => 'x@contoh.id'])->assertStatus(429);
+        Mail::assertSentCount(1);
+    }
+
+    public function test_email_code_reports_mail_failure(): void
+    {
+        Mail::shouldReceive('to')->andThrow(new \RuntimeException('SMTP down'));
+
+        $this->api('POST', '/api/v1/signup/email-code', null, ['email' => 'x@contoh.id'])->assertStatus(503);
     }
 }

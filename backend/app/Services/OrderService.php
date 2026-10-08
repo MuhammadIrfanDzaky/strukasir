@@ -87,6 +87,8 @@ class OrderService
                 'discount_total' => $result->discountTotal(),
                 'service_total' => $result->serviceTotal,
                 'tax_total' => $result->taxTotal,
+                'service_bp' => $result->serviceBp,
+                'tax_bp' => $result->taxBp,
                 'rounding' => $result->rounding,
                 'grand_total' => $result->grandTotal,
             ])->save();

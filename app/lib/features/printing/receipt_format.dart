@@ -120,8 +120,13 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
     ..add(PrintLine('Total Qty: ${items.fold<int>(0, (s, i) => s + (i['qty'] as int))}'))
     ..addAll(_plain(leftRight('  Sub Total', rupiah(order['subtotal'] as int))));
   if (orderDiscount > 0) out.addAll(_plain(leftRight('  Diskon', '-${rupiah(orderDiscount)}')));
-  if ((order['service_total'] as int) > 0) out.addAll(_plain(leftRight('  Service', rupiah(order['service_total'] as int))));
-  if ((order['tax_total'] as int) > 0) out.addAll(_plain(leftRight('  Pajak', rupiah(order['tax_total'] as int))));
+  // Persen tarif saat transaksi, supaya pelanggan tahu besarnya (order lama tanpa tarif: label saja).
+  if ((order['service_total'] as int) > 0) {
+    out.addAll(_plain(leftRight('  ${withRate('Service', order['service_bp'] as int?)}', rupiah(order['service_total'] as int))));
+  }
+  if ((order['tax_total'] as int) > 0) {
+    out.addAll(_plain(leftRight('  ${withRate('Pajak', order['tax_bp'] as int?)}', rupiah(order['tax_total'] as int))));
+  }
   if ((order['rounding'] as int) != 0) out.addAll(_plain(leftRight('  Pembulatan', rupiah(order['rounding'] as int))));
   out.addAll(_bold(leftRight('  Total', rupiah(order['grand_total'] as int))));
 

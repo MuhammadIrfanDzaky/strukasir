@@ -54,6 +54,8 @@ class PricingService
             taxTotal: $tax,
             rounding: $grand - $beforeRounding,
             grandTotal: $grand,
+            serviceBp: $settings->serviceBp,
+            taxBp: $settings->taxBp,
         );
     }
 

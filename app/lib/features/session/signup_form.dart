@@ -51,6 +51,10 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   final _password = TextEditingController();
   final _pin = TextEditingController();
   final _pin2 = TextEditingController();
+  final _emailCode = TextEditingController();
+
+  /// Pesan setelah kode dikirim, mis. "Kode dikirim ke ...".
+  String? _codeInfo;
 
   int _step = 0;
   String? _sector;
@@ -71,7 +75,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
 
   @override
   void dispose() {
-    for (final c in [_businessName, _phone, _address, _sectorOther, _server, _ownerName, _email, _password, _pin, _pin2]) {
+    for (final c in [_businessName, _phone, _address, _sectorOther, _server, _ownerName, _email, _password, _pin, _pin2, _emailCode]) {
       c.dispose();
     }
     super.dispose();
@@ -172,9 +176,50 @@ class _SignupFormState extends ConsumerState<SignupForm> {
     });
   }
 
+  /// Langkah 2 → 3: kirim kode verifikasi ke email (akun belum dibuat).
+  Future<void> _sendCode({bool resend = false}) async {
+    if (!resend) {
+      setState(() => _submitted = true);
+      if (!_ownerForm.currentState!.validate() || !_terms) return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+      _serverErrors = {};
+    });
+    try {
+      final message = await ref
+          .read(sessionProvider.notifier)
+          .sendSignupCode(serverUrl: _serverUrl, email: _email.text, ownerName: _ownerName.text);
+      setState(() {
+        _codeInfo = message;
+        _step = 2;
+        _submitted = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _serverErrors = {for (final f in e.fieldErrors.keys) f: e.field(f)!};
+        if (_serverErrors.containsKey('email')) _step = 1;
+        // Kode baru saja dikirim (jeda 1 menit): tetap lanjut ke isian kode.
+        if (e.status == 429 && _step == 1 && !resend) {
+          _step = 2;
+          _codeInfo = 'Kode sudah dikirim ke ${_email.text.trim()}. Periksa juga folder spam.';
+        } else if (_serverErrors.isEmpty) {
+          _error = e.message;
+        }
+      });
+      _ownerForm.currentState?.validate();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _submit() async {
-    setState(() => _submitted = true);
-    if (!_ownerForm.currentState!.validate() || !_terms) return;
+    if (_emailCode.text.trim().length != 6) {
+      setState(() => _serverErrors = {'email_code': 'Isi 6 angka dari email'});
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -197,6 +242,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
               email: _email.text,
               password: _password.text,
               pin: _pin.text,
+              emailCode: _emailCode.text,
             ),
           );
     } on ApiException catch (e) {
@@ -204,8 +250,12 @@ class _SignupFormState extends ConsumerState<SignupForm> {
       final errors = {for (final f in e.fieldErrors.keys) f: e.field(f)!};
       setState(() {
         _serverErrors = errors;
-        // Kesalahan di data usaha → kembali ke langkah 1 supaya terlihat.
-        if (errors.keys.any(_businessFields.contains)) _step = 0;
+        // Kembali ke langkah tempat kesalahan berada supaya terlihat.
+        if (errors.keys.any(_businessFields.contains)) {
+          _step = 0;
+        } else if (errors.keys.any((f) => f != 'email_code')) {
+          _step = 1;
+        }
         _error = errors.isEmpty ? e.message : 'Periksa kembali isian yang ditandai.';
       });
       _businessForm.currentState?.validate();
@@ -217,7 +267,11 @@ class _SignupFormState extends ConsumerState<SignupForm> {
 
   @override
   Widget build(BuildContext context) {
-    return _step == 0 ? _businessStep() : _ownerStep();
+    return switch (_step) {
+      0 => _businessStep(),
+      1 => _ownerStep(),
+      _ => _verifyStep(),
+    };
   }
 
   Widget _choiceError(String text) => Padding(
@@ -237,7 +291,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           FormHeader(
-            step: 'Langkah 1 dari 2',
+            step: 'Langkah 1 dari 3',
             title: 'Tentang usaha Anda',
             subtitle: 'Dipakai untuk struk dan menyesuaikan aplikasi dengan cara Anda berjualan.',
             onBack: widget.onBack,
@@ -391,7 +445,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             FormHeader(
-              step: 'Langkah 2 dari 2',
+              step: 'Langkah 2 dari 3',
               title: 'Akun owner',
               subtitle: 'Email & password untuk menambah tablet. PIN untuk masuk kasir sehari-hari.',
               onBack: () => setState(() {
@@ -485,15 +539,82 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             ],
             const SizedBox(height: AppSpace.s5),
             FilledButton(
-              onPressed: _busy ? null : _submit,
+              onPressed: _busy ? null : _sendCode,
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(AppSize.touchLg)),
               child: _busy
                   ? const SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
-                  : const Text('Daftar & mulai'),
+                  : const Text('Kirim kode verifikasi'),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Langkah 3: kode dari email → usaha dibuat & langsung masuk ke Kasir.
+  Widget _verifyStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FormHeader(
+          step: 'Langkah 3 dari 3',
+          title: 'Verifikasi email',
+          subtitle: _codeInfo ?? 'Masukkan kode 6 digit yang kami kirim ke ${_email.text.trim()}.',
+          onBack: () => setState(() {
+            _step = 1;
+            _error = null;
+          }),
+        ),
+        const SizedBox(height: AppSpace.s5),
+        TextField(
+          controller: _emailCode,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'Kode 6 digit dari email',
+            prefixIcon: const Icon(Icons.mark_email_read_rounded),
+            counterText: '',
+            errorText: _serverErrors['email_code'],
+          ),
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          maxLength: 6,
+          onChanged: (_) {
+            if (_serverErrors.containsKey('email_code')) setState(() => _serverErrors.remove('email_code'));
+          },
+        ),
+        const SizedBox(height: AppSpace.s2),
+        Wrap(
+          spacing: AppSpace.s2,
+          children: [
+            TextButton.icon(
+              onPressed: _busy ? null : () => _sendCode(resend: true),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Kirim ulang kode'),
+            ),
+            TextButton.icon(
+              onPressed: _busy ? null : () => setState(() => _step = 1),
+              icon: const Icon(Icons.edit_rounded),
+              label: const Text('Ubah email'),
+            ),
+          ],
+        ),
+        Text(
+          'Tidak ada di kotak masuk? Periksa folder spam / promosi. Kode berlaku 15 menit.',
+          style: AppType.caption.copyWith(color: AppColors.inkMuted),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: AppSpace.s3),
+          Text(_error!, style: AppType.body.copyWith(color: AppColors.danger)),
+        ],
+        const SizedBox(height: AppSpace.s5),
+        FilledButton(
+          onPressed: _busy ? null : _submit,
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(AppSize.touchLg)),
+          child: _busy
+              ? const SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
+              : const Text('Daftar & mulai'),
+        ),
+      ],
     );
   }
 

@@ -1,3 +1,4 @@
+import 'package:berrybrew_pos/core/money.dart';
 import 'package:berrybrew_pos/features/cart/payment_dialog.dart';
 import 'package:berrybrew_pos/features/printing/receipt_format.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -107,5 +108,25 @@ void main() {
   test('saran nominal tunai', () {
     expect(suggestedCash(28000), [28000, 30000, 40000, 50000, 100000]);
     expect(suggestedCash(50000), [50000, 60000, 100000]); // 60.000 = 3 lembar 20 ribu
+  });
+
+  test('pajak & service menampilkan persen saat transaksi (order lama: tanpa persen)', () {
+    final withRates = {...order(), 'service_total': 2570, 'tax_total': 5397, 'service_bp': 500, 'tax_bp': 1000};
+    final text = customerReceipt(withRates).map((l) => l.text).join(' | ');
+    expect(text, contains('Service 5%'));
+    expect(text, contains('Pajak 10%'));
+
+    final old = {...order(), 'service_total': 2570, 'tax_total': 5397};
+    final oldText = customerReceipt(old).map((l) => l.text).join(' | ');
+    expect(oldText, contains('  Pajak'));
+    expect(oldText, isNot(contains('%')));
+  });
+
+  test('persen dari basis poin', () {
+    expect(percentBp(1000), '10%');
+    expect(percentBp(550), '5,5%');
+    expect(percentBp(1125), '11,25%');
+    expect(withRate('Pajak', null), 'Pajak');
+    expect(withRate('Pajak', 0), 'Pajak');
   });
 }

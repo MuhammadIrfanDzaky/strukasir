@@ -13,6 +13,16 @@ String rupiah(int amount) {
 /// "Rp 13.000"
 String rp(int amount) => 'Rp ${rupiah(amount)}';
 
+/// Basis poin → persen: 1000 → "10%", 550 → "5,5%", 1125 → "11,25%".
+String percentBp(int bp) {
+  final whole = bp ~/ 100;
+  final frac = (bp % 100).toString().padLeft(2, '0').replaceFirst(RegExp(r'0+$'), '');
+  return frac.isEmpty ? '$whole%' : '$whole,$frac%';
+}
+
+/// "Pajak 10%" — label dengan persen bila tarif diketahui (order lama: tanpa persen).
+String withRate(String label, int? bp) => bp == null || bp <= 0 ? label : '$label ${percentBp(bp)}';
+
 /// Parse input kasir ("13.000", "13000", "Rp 13.000") ke integer. Null jika tidak valid.
 int? parseRupiah(String input) {
   final digits = input.replaceAll(RegExp(r'[^0-9]'), '');

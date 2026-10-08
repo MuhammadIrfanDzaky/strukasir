@@ -72,6 +72,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
       final cart = ref.read(cartProvider);
       final totals = ref.read(cartTotalsProvider);
       final count = cart.lines.fold<int>(0, (n, l) => n + l.qty);
+      final pricing = ref.read(menuProvider).value?.menu.pricing;
       return AlertDialog(
         scrollable: true,
         title: Text(cart.isSaved ? 'Cek pesanan · ${cart.number}' : 'Cek pesanan'),
@@ -134,8 +135,8 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               AppSummaryRow('Subtotal', rupiah(totals.subtotal)),
               if (totals.orderDiscount > 0)
                 AppSummaryRow('Diskon', '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
-              if (totals.serviceTotal > 0) AppSummaryRow('Service', rupiah(totals.serviceTotal)),
-              if (totals.taxTotal > 0) AppSummaryRow('Pajak', rupiah(totals.taxTotal)),
+              if (totals.serviceTotal > 0) AppSummaryRow(withRate('Service', pricing?.serviceBp), rupiah(totals.serviceTotal)),
+              if (totals.taxTotal > 0) AppSummaryRow(withRate('Pajak', pricing?.taxBp), rupiah(totals.taxTotal)),
               if (totals.rounding != 0) AppSummaryRow('Pembulatan', rupiah(totals.rounding)),
               AppSummaryRow('Total', rp(totals.grandTotal), emphasis: true),
             ],
@@ -317,8 +318,8 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           AppSummaryRow('Subtotal', rupiah(totals.subtotal)),
           if (totals.orderDiscount > 0)
             AppSummaryRow('Diskon', '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
-          if (totals.serviceTotal > 0) AppSummaryRow('Service', rupiah(totals.serviceTotal)),
-          if (totals.taxTotal > 0) AppSummaryRow('Pajak', rupiah(totals.taxTotal)),
+          if (totals.serviceTotal > 0) AppSummaryRow(withRate('Service', menu?.pricing.serviceBp), rupiah(totals.serviceTotal)),
+          if (totals.taxTotal > 0) AppSummaryRow(withRate('Pajak', menu?.pricing.taxBp), rupiah(totals.taxTotal)),
           if (totals.rounding != 0) AppSummaryRow('Pembulatan', rupiah(totals.rounding)),
           if (canDiscount && !cart.isEmpty)
             Align(

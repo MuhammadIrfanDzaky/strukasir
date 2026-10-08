@@ -54,6 +54,9 @@ class OrderResource extends JsonResource
             'discount_total' => $this->discount_total,
             'service_total' => $this->service_total,
             'tax_total' => $this->tax_total,
+            // Tarif saat transaksi (basis poin, 1000 = 10%); null untuk order lama.
+            'service_bp' => $this->service_bp,
+            'tax_bp' => $this->tax_bp,
             'rounding' => $this->rounding,
             'grand_total' => $this->grand_total,
             'paid_total' => $this->paid_total,

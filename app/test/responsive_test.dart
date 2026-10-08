@@ -214,6 +214,10 @@ class FakeSession extends SessionController {
   @override
   Future<T> authed<T>(Future<T> Function(ApiClient api, String token) call) =>
       call(ApiClient(baseUrl: 'http://test', dio: fakeDio()), 'token');
+
+  @override
+  Future<String> sendSignupCode({required String serverUrl, required String email, String? ownerName}) async =>
+      'Kode dikirim ke $email. Periksa juga folder spam.';
 }
 
 class FakeMenu extends MenuController {
@@ -291,9 +295,39 @@ final scenarios = <Scenario>[
       await t.tap(find.text('Lanjut'));
       await settle(t);
       expect(find.text('Akun owner'), findsOneWidget);
-      await t.ensureVisible(find.text('Daftar & mulai'));
-      await t.tap(find.text('Daftar & mulai'));
+      await t.ensureVisible(find.text('Kirim kode verifikasi'));
+      await t.tap(find.text('Kirim kode verifikasi')); // tampilkan semua pesan validasi
       await settle(t);
+    },
+  ),
+  (
+    name: 'daftar-verifikasi-email',
+    session: const NeedsSetup(),
+    home: (_) => const SetupScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Daftar usaha baru'));
+      await settle(t);
+      await t.enterText(find.widgetWithText(TextFormField, 'Alamat server (development)'), 'http://test');
+      await t.enterText(find.widgetWithText(TextFormField, 'Nama usaha'), 'Laundry Bersih');
+      await pick(t, 'Jenis usaha', 'Laundry');
+      await pick(t, 'Provinsi', 'Sumatera Utara');
+      await pick(t, 'Kota / kabupaten', 'Kota Medan');
+      await t.ensureVisible(find.text('Lanjut'));
+      await t.tap(find.text('Lanjut'));
+      await settle(t);
+      await t.enterText(find.widgetWithText(TextFormField, 'Nama Anda'), 'Wahyu');
+      await t.enterText(find.widgetWithText(TextFormField, 'Email'), 'wahyu@contoh.id');
+      await t.enterText(find.widgetWithText(TextFormField, 'Password'), 'rahasia123');
+      await t.enterText(find.widgetWithText(TextFormField, 'PIN kasir (6 digit)'), '482915');
+      await t.enterText(find.widgetWithText(TextFormField, 'Ulangi PIN'), '482915');
+      await t.ensureVisible(find.byType(Checkbox));
+      await settle(t);
+      await t.tap(find.byType(Checkbox));
+      await t.ensureVisible(find.text('Kirim kode verifikasi'));
+      await t.tap(find.text('Kirim kode verifikasi'));
+      await settle(t);
+      expect(find.text('Verifikasi email'), findsOneWidget);
     },
   ),
   (

@@ -147,4 +147,25 @@ class FeatureSettingsTest extends TestCase
 
         $this->assertTrue($this->feature('modifiers', $this->pinLogin($other, $other->owner)));
     }
+
+    public function test_order_keeps_rates_used_at_sale_time(): void
+    {
+        $this->save(['tax_percent' => 10, 'service_percent' => 5])->assertOk();
+        $category = $this->api('POST', '/api/v1/categories', $this->owner, ['name' => 'Kopi'])->json('id');
+        $productId = $this->api('POST', '/api/v1/products', $this->owner, ['category_id' => $category, 'name' => 'Americano', 'price' => 10000])->json('id');
+        $cashier = $this->pinLogin($this->shop);
+        $this->api('POST', '/api/v1/shifts/open', $cashier, ['opening_cash' => 0])->assertSuccessful();
+
+        $order = $this->api('PUT', '/api/v1/orders/'.Str::uuid(), $cashier, [
+            'customer_label' => 'Meja 1',
+            'expected_total' => 11550,
+            'items' => [['id' => (string) Str::uuid(), 'product_id' => $productId, 'qty' => 1, 'modifier_ids' => []]],
+        ])->assertSuccessful();
+
+        $this->assertSame([500, 1000], [$order->json('data.service_bp'), $order->json('data.tax_bp')]);
+
+        // Tarif diubah kemudian: order lama tetap menyimpan tarif saat transaksi.
+        $this->save(['tax_percent' => 11])->assertOk();
+        $this->api('GET', '/api/v1/orders/'.$order->json('data.id'), $cashier)->assertJsonPath('data.tax_bp', 1000);
+    }
 }

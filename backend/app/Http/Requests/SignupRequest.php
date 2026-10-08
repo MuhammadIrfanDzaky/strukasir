@@ -26,6 +26,8 @@ class SignupRequest extends FormRequest
             // Akun owner
             'owner_name' => ['required', 'string', 'max:60'],
             'email' => ['required', 'email:rfc', 'max:255', 'unique:users,email'],
+            // Kode dari POST /signup/email-code (dicek di controller, sekali pakai).
+            'email_code' => ['required', 'string', 'max:10'],
             // SEC-10: minimal 8 karakter, ada huruf & angka. Tidak memakai uncompromised() (butuh internet keluar).
             'password' => ['required', 'string', 'max:255', Password::min(8)->letters()->numbers()],
             'pin' => ['required', 'digits:6', function (string $attribute, mixed $value, Closure $fail) {

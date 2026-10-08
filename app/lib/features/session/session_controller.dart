@@ -81,6 +81,7 @@ class SignupData {
     required this.email,
     required this.password,
     required this.pin,
+    required this.emailCode,
     this.phone,
     this.address,
   });
@@ -100,6 +101,9 @@ class SignupData {
   final String email;
   final String password;
   final String pin;
+
+  /// Kode verifikasi dari email (POST /signup/email-code).
+  final String emailCode;
   final String? phone;
   final String? address;
 
@@ -115,6 +119,7 @@ class SignupData {
         'email': email.trim(),
         'password': password,
         'pin': pin,
+        'email_code': emailCode.trim(),
         if (phone != null && phone!.trim().isNotEmpty) 'phone': phone!.trim(),
         if (address != null && address!.trim().isNotEmpty) 'address': address!.trim(),
         'terms': true,
@@ -206,6 +211,15 @@ class SessionController extends AsyncNotifier<Session> {
     });
     await _saveRegistration(serverUrl, res);
     await pinLogin(res['owner_id'] as String, data.pin);
+  }
+
+  /// Kirim kode verifikasi ke email calon owner (sebelum usaha dibuat). Mengembalikan pesan.
+  Future<String> sendSignupCode({required String serverUrl, required String email, String? ownerName}) async {
+    final res = await ApiClient(baseUrl: serverUrl).post('/signup/email-code', data: {
+      'email': email.trim(),
+      if (ownerName != null && ownerName.trim().isNotEmpty) 'owner_name': ownerName.trim(),
+    });
+    return res['message'] as String? ?? 'Kode dikirim.';
   }
 
   Future<void> _saveRegistration(String serverUrl, Map<String, dynamic> res) async {
