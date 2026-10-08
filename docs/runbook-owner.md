@@ -64,8 +64,13 @@ alamat, dan pesan penutup. Pratinjau di layar sama dengan hasil cetak. Ketuk **S
 
 ## Dashboard (owner)
 
-Menu **Dashboard** (di HP: *Laporan*) → *Hari ini / 7 hari / 30 hari / Bulan ini*. Angka utama menunjukkan naik/turun dibanding periode sebelumnya yang sama panjang; grafik: tren harian, jam ramai, hari tersibuk, metode bayar, kategori, produk terlaris, kasir. Sentuh grafik untuk angka persisnya. Sebelumnya: menu Laporan → *Hari ini / 7 hari / Bulan ini*: penjualan, **laba kotor** & HPP, rata-rata per order,
-per metode bayar, per kasir, produk terlaris (dengan laba), dan void.
+Menu **Dashboard** (di HP: *Laporan*) → *Hari ini / 7 hari / 30 hari / Bulan ini*.
+
+- **Angka utama**: penjualan, transaksi, rata-rata per transaksi, **laba kotor** (+ margin), dengan naik/turun
+  dibanding periode sebelumnya yang sama panjang (mis. 7 hari ini vs 7 hari sebelumnya). Di bawahnya: HPP,
+  diskon, service, pajak, void.
+- **Grafik**: tren penjualan harian, jam ramai, hari tersibuk, metode bayar, penjualan per kategori, produk
+  terlaris (dengan laba), dan kasir. Sentuh grafik untuk melihat angka persisnya.
 **Cocokkan total QRIS** dengan mutasi di aplikasi merchant QRIS minimal seminggu sekali.
 
 - **Laba kotor** = penjualan − pajak − modal (HPP). Modal diambil dari harga modal produk **saat transaksi**,
