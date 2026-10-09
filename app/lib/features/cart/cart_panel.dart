@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
+import '../customers/customer_picker.dart';
 import '../menu/menu_controller.dart';
 import '../menu/modifier_selection.dart';
 import '../session/session_controller.dart';
@@ -59,6 +60,17 @@ class _CartPanelState extends ConsumerState<CartPanel> {
     setState(() => _labelError = 'Isi ${hint.toLowerCase()} dulu');
     _labelFocus.requestFocus();
     return false;
+  }
+
+  /// Cari / daftarkan member lalu tautkan ke order ini.
+  Future<void> _pickMember() async {
+    final menu = ref.read(menuProvider).value?.menu;
+    final c = await pickCustomer(context, phoneRequired: menu?.customerPhoneRequired ?? true);
+    if (c == null || !mounted) return;
+    ref.read(cartProvider.notifier).setCustomer(
+          CartCustomer(id: c.id, code: c.code, name: c.name, phone: c.phone, visits: c.visits, note: c.note),
+        );
+    if (_labelError != null) setState(() => _labelError = null);
   }
 
   Future<void> _act(Future<void> Function(CheckoutFlow flow) action) async {
@@ -195,6 +207,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         ((user?.can('discount.within_limit') ?? false) || (user?.can('discount.over_limit') ?? false));
     final openBill = menu?.feature('open_bill') ?? false;
     final askLabel = menu?.customerNameOn ?? true;
+    final memberOn = (menu?.customersOn ?? false) && (user?.can('customers.view') ?? false);
     final canAct = !_busy && !cart.isEmpty;
 
     if (_label.text != cart.customerLabel) _label.text = cart.customerLabel;
@@ -257,6 +270,13 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               isDense: true,
               prefixIcon: const Icon(Icons.person_outline_rounded),
               errorText: _labelError,
+              suffixIcon: memberOn && cart.customer == null
+                  ? IconButton(
+                      tooltip: 'Pilih member',
+                      onPressed: _busy ? null : _pickMember,
+                      icon: const Icon(Icons.person_search_rounded),
+                    )
+                  : null,
             ),
             onChanged: (v) {
               notifier.setCustomerLabel(v);
@@ -264,6 +284,72 @@ class _CartPanelState extends ConsumerState<CartPanel> {
             },
           ),
         );
+
+        // Member tertaut: nama · kode (+ catatan) dengan tombol lepas. Tanpa kolom nama (fitur dimatikan),
+        // tombol "Tambah member" tampil sendiri.
+        final customer = cart.customer;
+        final Widget memberRow = !memberOn
+            ? const SizedBox.shrink()
+            : customer == null
+                ? (askLabel
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: EdgeInsets.fromLTRB(gutter - AppSpace.s2, AppSpace.s2, gutter, 0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: _busy ? null : _pickMember,
+                            icon: const Icon(Icons.person_search_rounded),
+                            label: const Text('Tambah member'),
+                          ),
+                        ),
+                      ))
+                : Padding(
+                    padding: EdgeInsets.fromLTRB(gutter, askLabel ? 0 : AppSpace.s3, gutter, AppSpace.s2),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(AppSpace.s3, AppSpace.s1, AppSpace.s1, AppSpace.s1),
+                      decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: AppRadius.mdAll),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.card_membership_rounded, size: 20, color: AppColors.primaryStrong),
+                          const SizedBox(width: AppSpace.s2),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  customer.name,
+                                  style: AppType.caption.copyWith(color: AppColors.primaryStrong, fontWeight: FontWeight.w700),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  [
+                                    'Member ${customer.code}',
+                                    if (customer.visits != null) '${customer.visits}× belanja',
+                                  ].join(' · '),
+                                  style: AppType.caption.copyWith(color: AppColors.primaryStrong),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (customer.note != null && customer.note!.isNotEmpty)
+                                  Text('Catatan: ${customer.note}',
+                                      style: AppType.caption.copyWith(color: AppColors.warning),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Lepas member',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: _busy ? null : notifier.clearCustomer,
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
 
         Widget line(int i) {
           final l = cart.lines[i];
@@ -402,6 +488,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 children: [
                   header,
                   if (askLabel) labelField,
+                  memberRow,
                   if (cart.isEmpty)
                     const SizedBox(height: 220, child: empty)
                   else
@@ -417,6 +504,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 children: [
                   header,
                   if (askLabel) labelField,
+                  memberRow,
                   Expanded(
                     child: cart.isEmpty
                         ? empty

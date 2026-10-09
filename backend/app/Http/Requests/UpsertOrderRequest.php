@@ -14,6 +14,8 @@ class UpsertOrderRequest extends FormRequest
     {
         return [
             'customer_label' => ['nullable', 'string', 'max:60'],
+            // Pelanggan / member (fitur `customers`); keberadaan & status dicek di OrderService.
+            'customer_id' => ['nullable', 'uuid'],
             'client_created_at' => ['nullable', 'date'],
             'expected_total' => ['required', 'integer', 'min:0'],
             'items' => ['required', 'array', 'min:1', 'max:100'],

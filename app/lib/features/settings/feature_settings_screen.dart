@@ -59,6 +59,9 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
   /// Harga di menu sudah termasuk pajak / service (diatur terpisah).
   bool _taxInclusive = false;
   bool _serviceInclusive = false;
+
+  /// Form pelanggan baru: no HP wajib.
+  bool _phoneRequired = true;
   String? _loadError;
   String? _error;
   Map<String, String> _fieldErrors = {};
@@ -71,6 +74,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
     'discounts': Icons.percent_rounded,
     'tax_service': Icons.account_balance_rounded,
     'split_payment': Icons.call_split_rounded,
+    'customers': Icons.groups_rounded,
   };
 
   @override
@@ -100,6 +104,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
       _service.text = _percent(data['service_percent'] as num);
       _taxInclusive = data['tax_inclusive'] as bool? ?? false;
       _serviceInclusive = data['service_inclusive'] as bool? ?? false;
+      _phoneRequired = data['customer_phone_required'] as bool? ?? true;
     });
   }
 
@@ -166,6 +171,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
           token: token,
           data: {
             'features': _on,
+            if (_on['customers'] ?? false) 'customer_phone_required': _phoneRequired,
             if (_on['tax_service'] ?? false) ...{
               'tax_percent': tax,
               'service_percent': service,
@@ -223,6 +229,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
                                 if (i > 0) const Divider(height: 1),
                                 _tile(o),
                                 if (o.key == 'tax_service' && (_on[o.key] ?? false)) _taxFields(),
+                                if (o.key == 'customers' && (_on[o.key] ?? false)) _customerFields(),
                               ],
                             ],
                           ),
@@ -275,6 +282,23 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
       ),
     );
   }
+
+  Widget _customerFields() => Padding(
+        padding: EdgeInsets.fromLTRB(context.isCompact ? AppSpace.s4 : 72, 0, AppSpace.s4, AppSpace.s2),
+        child: SwitchListTile(
+          value: _phoneRequired,
+          onChanged: _busy ? null : (v) => setState(() => _phoneRequired = v),
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: Text('No HP pelanggan wajib', style: AppType.body),
+          subtitle: Text(
+            _phoneRequired
+                ? 'Pelanggan baru harus punya no HP (tidak dobel, siap untuk WhatsApp)'
+                : 'Boleh daftar dengan nama saja; tiap pelanggan tetap dapat kode member',
+            style: AppType.caption.copyWith(color: AppColors.inkMuted),
+          ),
+        ),
+      );
 
   Widget _taxFields() {
     InputDecoration deco(String label, String key) => InputDecoration(

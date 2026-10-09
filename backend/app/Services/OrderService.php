@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\Feature;
 use App\Enums\Permission;
+use App\Models\Customer;
 use App\Models\Device;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -55,13 +56,14 @@ class OrderService
         $lines = $this->buildLines($data['items'], $products, $existingItemIds);
 
         $this->guardDiscountFeature($data);
+        $customer = $this->resolveCustomer($data['customer_id'] ?? null, $existing);
         $result = $this->price($lines, $data['order_discount'] ?? null);
         $this->guardExpectedTotal($result, (int) $data['expected_total']);
 
         // Persetujuan diverifikasi SEBELUM transaksi: percobaan PIN gagal harus tetap tercatat.
         $approver = $this->authorizeDiscount($result, $lines, $cashier, $data['approval'] ?? null);
 
-        $order = DB::transaction(function () use ($orderId, $data, $cashier, $device, $tenant, $lines, $result) {
+        $order = DB::transaction(function () use ($orderId, $data, $cashier, $device, $tenant, $lines, $result, $customer) {
             $order = Order::query()->lockForUpdate()->find($orderId);
 
             if ($order === null) {
@@ -80,7 +82,9 @@ class OrderService
             }
 
             $order->forceFill([
-                'customer_label' => $data['customer_label'] ?? null,
+                // Member tanpa label → nama member (tampil di struk, open bill & riwayat).
+                'customer_label' => ($data['customer_label'] ?? null) ?: $customer?->name,
+                'customer_id' => $customer?->id,
                 'order_discount_type' => $data['order_discount']['type'] ?? null,
                 'order_discount_value' => $data['order_discount']['value'] ?? 0,
                 'subtotal' => $result->subtotal,
@@ -112,6 +116,30 @@ class OrderService
         }
 
         return $order;
+    }
+
+    /**
+     * Pelanggan untuk order ini. Pelanggan dari kedai lain tidak ditemukan (global scope + RLS).
+     * Tautan yang sudah ada tetap boleh dikirim ulang walau fitur dimatikan / datanya dianonimkan,
+     * supaya open bill lama tetap bisa disimpan; tautan baru wajib fitur aktif & pelanggan aktif.
+     */
+    private function resolveCustomer(?string $customerId, ?Order $existing): ?Customer
+    {
+        if ($customerId === null) {
+            return null;
+        }
+        $customer = Customer::query()->find($customerId);
+        if ($customer !== null && $existing?->customer_id === $customer->id) {
+            return $customer;
+        }
+        if (! $this->features->enabled(Feature::Customers)) {
+            throw ValidationException::withMessages(['customer_id' => 'Fitur pelanggan tidak aktif.']);
+        }
+        if ($customer === null || $customer->isAnonymized()) {
+            throw ValidationException::withMessages(['customer_id' => 'Pelanggan tidak ditemukan.']);
+        }
+
+        return $customer;
     }
 
     /**

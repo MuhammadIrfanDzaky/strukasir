@@ -8,6 +8,7 @@ import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
+import '../menu/menu_controller.dart';
 import '../session/session_controller.dart';
 import 'dashboard_charts.dart';
 
@@ -101,7 +102,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               );
             }
             if (!snap.hasData) return const AppLoading();
-            return LayoutBuilder(builder: (context, box) => _Dashboard(report: snap.data!, width: box.maxWidth - gutter * 2, gutter: gutter, range: _range));
+            return LayoutBuilder(builder: (context, box) => _Dashboard(
+                  report: snap.data!,
+                  width: box.maxWidth - gutter * 2,
+                  gutter: gutter,
+                  range: _range,
+                  customersOn: ref.watch(menuProvider).value?.menu.customersOn ?? false,
+                ));
           },
         ),
       ),
@@ -116,12 +123,21 @@ String _dayLabel(DateTime d) => '${_days[d.weekday - 1]}, ${d.day} ${_months[d.m
 
 /// Isi dashboard owner: KPI dengan perbandingan periode sebelumnya, lalu grafik.
 class _Dashboard extends StatelessWidget {
-  const _Dashboard({required this.report, required this.width, required this.gutter, required this.range});
+  const _Dashboard({
+    required this.report,
+    required this.width,
+    required this.gutter,
+    required this.range,
+    this.customersOn = false,
+  });
 
   final Map<String, dynamic> report;
   final double width;
   final double gutter;
   final _Range range;
+
+  /// Fitur pelanggan aktif → tampilkan bagian member.
+  final bool customersOn;
 
   List<Map<String, dynamic>> _list(String key) => ((report[key] as List?) ?? const []).cast<Map<String, dynamic>>();
 
@@ -309,11 +325,49 @@ class _Dashboard extends StatelessWidget {
             ]),
         ]),
       ),
+      if (customersOn) ...[
+        const SizedBox(height: AppSpace.s3),
+        _customerCards(r, pair),
+      ],
       const SizedBox(height: AppSpace.s3),
       Text('Penjualan = order lunas (void tidak dihitung). Laba kotor = penjualan − pajak − HPP; margin = laba kotor ÷ (penjualan − pajak).',
           style: AppType.caption.copyWith(color: AppColors.inkMuted)),
     ]);
   }
+}
+
+/// Member vs non-member (porsi penjualan) + pelanggan teratas. Member = warna utama,
+/// non-member = abu-abu (penekanan pada member); label & nilai selalu tertulis.
+Widget _customerCards(Map<String, dynamic> r, Widget Function(Widget, Widget?) pair) {
+  final c = (r['customers'] as Map<String, dynamic>?) ?? const {};
+  final orders = r['orders'] as int;
+  final sales = r['sales'] as int;
+  final memberOrders = (c['orders'] as int?) ?? 0;
+  final memberSales = (c['sales'] as int?) ?? 0;
+  final top = ((c['top'] as List?) ?? const []).cast<Map<String, dynamic>>();
+  final share = orders > 0 ? memberOrders * 100 ~/ orders : 0;
+
+  return pair(
+    AppSectionCard(title: 'Pelanggan member', children: [
+      if (orders == 0)
+        const _NoData()
+      else ...[
+        _Caption('$memberOrders dari $orders transaksi ($share%) oleh member · '
+            '${c['active'] ?? 0} member belanja: ${c['new'] ?? 0} baru, ${c['returning'] ?? 0} kembali'),
+        const SizedBox(height: AppSpace.s3),
+        ShareBar(parts: [
+          ('Member', memberSales, ChartColors.series),
+          ('Non-member', sales - memberSales, ChartColors.muted),
+        ]),
+      ],
+    ]),
+    AppSectionCard(title: 'Pelanggan teratas', empty: 'Belum ada transaksi member di periode ini.', children: [
+      if (top.isNotEmpty)
+        RankedBars(rows: [
+          for (final t in top) ('${t['name']} · ${t['code']}', t['sales'] as int, rp(t['sales'] as int), '${t['orders']} transaksi'),
+        ]),
+    ]),
+  );
 }
 
 class _Caption extends StatelessWidget {

@@ -17,7 +17,7 @@ class TenantDataService
 {
     /** Tabel milik tenant (semua punya kolom tenant_id), urut dari induk ke anak. */
     public const TABLES = [
-        'tenant_settings', 'tenant_features', 'users', 'devices',
+        'tenant_settings', 'tenant_features', 'users', 'devices', 'customers',
         'categories', 'modifier_groups', 'modifiers', 'products', 'product_modifier_groups',
         'shifts', 'order_counters', 'orders', 'order_items', 'order_item_modifiers', 'payments',
         'audit_logs',

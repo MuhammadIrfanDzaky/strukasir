@@ -11,12 +11,16 @@ import 'package:berrybrew_pos/core/api_client.dart';
 import 'package:berrybrew_pos/core/theme/theme.dart';
 import 'package:berrybrew_pos/features/cart/cart_controller.dart';
 import 'package:berrybrew_pos/features/cart/payment_dialog.dart';
+import 'package:berrybrew_pos/features/customers/customer_api.dart';
+import 'package:berrybrew_pos/features/customers/customer_form.dart';
+import 'package:berrybrew_pos/features/customers/customers_screen.dart';
 import 'package:berrybrew_pos/features/history/history_screen.dart';
 import 'package:berrybrew_pos/features/menu/menu_controller.dart';
 import 'package:berrybrew_pos/features/menu/menu_models.dart';
 import 'package:berrybrew_pos/features/menu/modifier_selection.dart';
 import 'package:berrybrew_pos/features/menu_admin/menu_admin_screen.dart';
 import 'package:berrybrew_pos/features/printing/printer_service.dart';
+import 'package:berrybrew_pos/features/printing/printer_settings_screen.dart';
 import 'package:berrybrew_pos/features/printing/receipt_logo.dart';
 import 'package:berrybrew_pos/features/printing/receipt_settings_screen.dart';
 import 'package:berrybrew_pos/features/session/account_dialogs.dart';
@@ -59,11 +63,13 @@ const sizes = <String, Size>{
 final device = DeviceInfo.fromJson({'id': 'd1', 'code': 'T1', 'name': 'Tablet Kasir', 'tenant_name': 'BerryBrew'});
 const owner = SessionUser(id: 'u1', name: 'Rina Amelia', role: 'owner', permissions: {
   'reports.view', 'menu.manage', 'settings.manage', 'discount.within_limit', 'discount.over_limit', 'order.void',
+  'customers.view', 'customers.manage',
 });
 
 /// Menu contoh + beberapa produk tambahan (nama panjang, habis) supaya grid terisi.
 final bigMenu = Menu.fromJson({
   ...menuJson,
+  'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true},
   'categories': [
     ...menuJson['categories'] as List,
     {'id': 'c3', 'name': 'Non-kopi', 'sort': 2, 'active': true},
@@ -113,6 +119,13 @@ final reportJson = {
     {'name': 'Snacks', 'qty': 95, 'revenue': 1650000},
     {'name': 'Manual Brew', 'qty': 25, 'revenue': 695000},
   ],
+  'customers': {
+    'orders': 151, 'sales': 5320000, 'active': 64, 'new': 12, 'returning': 52,
+    'top': [
+      {'id': 'cu1', 'code': 'M0007', 'name': 'Andi Saputra', 'orders': 9, 'sales': 412000},
+      {'id': 'cu2', 'code': 'M0012', 'name': 'Siti Nurhaliza Putri Ramadhani', 'orders': 7, 'sales': 296000},
+    ],
+  },
   'previous': {'from': '2026-09-23', 'to': '2026-09-29', 'orders': 380, 'sales': 11900000, 'average': 31315, 'gross_profit': 6900000},
 };
 
@@ -127,7 +140,9 @@ final featureSettingsJson = {
     _f('discounts', 'Diskon', 'Diskon manual per item / per order', on: false),
     _f('tax_service', 'Pajak & service', 'Pajak dan service charge'),
     _f('split_payment', 'Bayar dengan beberapa metode', 'Satu order dibayar dengan beberapa metode', on: false, available: false),
+    _f('customers', 'Pelanggan / member', 'Data pelanggan / member: cari & tautkan ke order, riwayat belanja, kelompok pelanggan'),
   ],
+  'customer_phone_required': true,
   'tax_percent': 10,
   'tax_inclusive': true,
   'service_inclusive': false,
@@ -199,12 +214,50 @@ Future<void> pick(WidgetTester t, String field, String option, {String? search})
   await settle(t);
 }
 
+Map<String, dynamic> customerJson(int i, {bool full = true}) => {
+      'id': 'cu$i',
+      'code': 'M${(i + 1).toString().padLeft(4, '0')}',
+      'name': const ['Andi Saputra', 'Siti Nurhaliza Putri Ramadhani', 'Budi', 'Wahyu Pratama'][i % 4],
+      'phone': full ? '+6281234567${80 + i}' : '0812****67${80 + i}',
+      'note': i == 1 ? 'Alergi susu sapi, ganti oat milk. Suka less sugar dan es dipisah.' : null,
+      'visits': i == 3 ? 0 : 12 - i,
+      'last_visit_at': i == 3 ? null : '2026-10-0${i + 1}T10:00:00Z',
+      if (full) ...{
+        'birth_date': i == 0 ? '1990-05-01' : null,
+        'total_spent': i == 3 ? 0 : 412000 - i * 50000,
+        'first_visit_at': '2026-06-01T10:00:00Z',
+        'created_at': '2026-06-01T10:00:00Z',
+      },
+    };
+
+final customerDetailJson = {
+  ...customerJson(1),
+  'favorites': [
+    {'name': 'Kopi Susu Gula Aren', 'qty': 14},
+    {'name': 'Es Kopi Susu Berry Spesial Ukuran Jumbo', 'qty': 6},
+  ],
+  'recent_orders': [
+    {'id': 'o1', 'number': 'T1-0042', 'status': 'paid', 'grand_total': 51400, 'business_date': '2026-10-06'},
+    {'id': 'o2', 'number': 'T2-0108', 'status': 'void', 'grand_total': 18000, 'business_date': '2026-10-02'},
+  ],
+};
+
 /// Dio palsu: jawab per path tanpa jaringan.
 Dio fakeDio() => Dio()
   ..interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
     final path = o.path;
     final data = path.startsWith('/settings/features')
         ? {'data': featureSettingsJson}
+        : path.startsWith('/customers/')
+        ? {'data': customerDetailJson}
+        : path.startsWith('/customers')
+        ? {
+            'data': [for (var i = 0; i < 4; i++) customerJson(i)],
+            'meta': {
+              'current_page': 1, 'last_page': 2, 'total': 64, 'phone_required': true,
+              'segments': {'all': 64, 'new': 12, 'loyal': 9, 'lost': 21},
+            },
+          }
         : path.startsWith('/orders')
         ? {'data': [order(), order(status: 'open'), order(status: 'void')]}
         : path.startsWith('/reports')
@@ -481,7 +534,7 @@ final scenarios = <Scenario>[
     act: (t) async {
       await t.tap(find.text('7 hari'));
       await settle(t);
-      await t.scrollUntilVisible(find.text('Produk terlaris'), 300, scrollable: find.byType(Scrollable).last);
+      await t.scrollUntilVisible(find.text('Pelanggan teratas'), 300, scrollable: find.byType(Scrollable).last);
       await settle(t);
     },
   ),
@@ -500,7 +553,65 @@ final scenarios = <Scenario>[
     fillCart: false,
     act: null,
   ),
-  (name: 'printer', session: loggedIn, home: (s) => home(s, 4), fillCart: false, act: null),
+  // Tab terakhir: di HP (6 tab untuk owner) Pengaturan dibuka dari menu akun sebagai halaman sendiri.
+  (name: 'printer', session: loggedIn, home: (s) => home(s, 99), fillCart: false, act: null),
+  (
+    name: 'printer-halaman',
+    session: loggedIn,
+    home: (_) => Scaffold(appBar: AppBar(title: const Text('Pengaturan')), body: const PrinterSettingsScreen()),
+    fillCart: false,
+    act: null,
+  ),
+  (name: 'pelanggan', session: loggedIn, home: (s) => home(s, 4), fillCart: false, act: null),
+  (
+    name: 'pelanggan-detail',
+    session: loggedIn,
+    home: (_) => const CustomerDetailScreen(customerId: 'cu1', phoneRequired: true),
+    fillCart: false,
+    act: null,
+  ),
+  (
+    name: 'form-pelanggan',
+    session: loggedIn,
+    home: (_) => dialogHost(CustomerFormDialog(customer: Customer.fromJson(customerJson(0)), phoneRequired: true, full: true)),
+    fillCart: false,
+    act: null,
+  ),
+  (
+    name: 'kasir-pilih-member',
+    session: loggedIn,
+    home: home,
+    fillCart: true,
+    act: (t) async {
+      final open = find.text('Lihat pesanan');
+      if (open.evaluate().isNotEmpty) {
+        await t.tap(open);
+        await settle(t);
+      }
+      await t.ensureVisible(find.byTooltip('Pilih member').last);
+      await t.tap(find.byTooltip('Pilih member').last);
+      await settle(t);
+      expect(find.text('Pelanggan baru'), findsOneWidget);
+    },
+  ),
+  (
+    name: 'kasir-member-tertaut',
+    session: loggedIn,
+    home: home,
+    fillCart: true,
+    act: (t) async {
+      final container = ProviderScope.containerOf(t.element(find.byType(HomeShell)));
+      container.read(cartProvider.notifier).setCustomer(const CartCustomer(
+          id: 'cu1', code: 'M0002', name: 'Siti Nurhaliza Putri Ramadhani', visits: 11,
+          note: 'Alergi susu sapi, ganti oat milk. Suka less sugar dan es dipisah.'));
+      await settle(t);
+      final open = find.text('Lihat pesanan');
+      if (open.evaluate().isNotEmpty) {
+        await t.tap(open);
+        await settle(t);
+      }
+    },
+  ),
   (
     name: 'kasir-cek-pesanan',
     session: loggedIn,

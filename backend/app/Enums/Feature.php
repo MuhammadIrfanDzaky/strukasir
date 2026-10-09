@@ -15,6 +15,7 @@ enum Feature: string
     case TaxService = 'tax_service';
     case SplitPayment = 'split_payment';
     case Reports = 'reports';
+    case Customers = 'customers';
 
     public function description(): string
     {
@@ -26,6 +27,7 @@ enum Feature: string
             self::TaxService => 'Pajak dan service charge',
             self::SplitPayment => 'Satu order dibayar dengan beberapa metode',
             self::Reports => 'Laporan penjualan untuk owner',
+            self::Customers => 'Data pelanggan / member: cari & tautkan ke order, riwayat belanja, kelompok pelanggan',
         };
     }
 
@@ -40,6 +42,7 @@ enum Feature: string
             self::TaxService => 'Pajak & service',
             self::SplitPayment => 'Bayar dengan beberapa metode',
             self::Reports => 'Laporan',
+            self::Customers => 'Pelanggan / member',
         };
     }
 

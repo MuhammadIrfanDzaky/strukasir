@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/tokens.dart';
 import 'core/ui/components.dart';
 import 'core/ui/responsive.dart';
+import 'features/customers/customers_screen.dart';
 import 'features/history/history_screen.dart';
 import 'features/menu/menu_controller.dart';
 import 'features/menu_admin/menu_admin_screen.dart';
@@ -48,18 +49,28 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final user = widget.session.user;
-    final destinations = [
+    final customersOn = ref.watch(menuProvider).value?.menu.customersOn ?? false;
+    final compact = context.isCompact;
+    final all = [
       _Destination('Kasir', Icons.point_of_sale_rounded, (_) => const PosScreen()),
       _Destination('Riwayat', Icons.receipt_long_rounded, (_) => const HistoryScreen()),
       if (user.can('reports.view')) _Destination('Dashboard', Icons.insights_rounded, (_) => const ReportsScreen()),
       if (user.can('menu.manage'))
         _Destination('Kelola Menu', Icons.restaurant_menu_rounded, (_) => const MenuAdminScreen()),
+      if (customersOn && user.can('customers.manage'))
+        _Destination('Pelanggan', Icons.groups_rounded, (_) => const CustomersScreen()),
       // Printer untuk semua; Fitur & Struk hanya owner (lihat PrinterSettingsScreen).
       _Destination('Pengaturan', Icons.settings_rounded, (_) => const PrinterSettingsScreen()),
     ];
+    // Bar bawah HP maksimal 5 tab (lebih dari itu labelnya terpotong): Pengaturan pindah ke menu akun.
+    final settingsInMenu = compact && all.length > 5;
+    final destinations = settingsInMenu ? all.where((d) => d.label != 'Pengaturan').toList() : all;
     final index = _index.clamp(0, destinations.length - 1);
-    final compact = context.isCompact;
     final short = context.isShort;
+    // Rail tanpa logo/label/tombol keluar bila tinggi tersisa tidak cukup untuk semua item
+    // (HP landscape, atau tablet saat keyboard muncul). Keluar tetap lewat menu akun.
+    final railHeight = MediaQuery.sizeOf(context).height - MediaQuery.viewInsetsOf(context).bottom;
+    final tightRail = short || railHeight < 120 + destinations.length * 76;
 
     final needsVerify = user.email != null && !user.emailVerified;
     void verifyEmail() => showDialog<bool>(context: context, builder: (_) => VerifyEmailDialog(email: user.email!));
@@ -72,6 +83,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       deviceCode: widget.session.device.code,
       onRefresh: () => ref.read(menuProvider.notifier).refresh(),
       onLogout: _logout,
+      onSettings: settingsInMenu
+          ? () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => Scaffold(
+                  backgroundColor: AppColors.surfaceApp,
+                  appBar: AppBar(title: const Text('Pengaturan')),
+                  body: const PrinterSettingsScreen(),
+                ),
+              ))
+          : null,
     );
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -98,7 +118,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           onDestinationSelected: (i) => setState(() => _index = i),
           destinations: [
             for (final d in destinations)
-              NavigationDestination(icon: Icon(d.icon), label: switch (d.label) { 'Kelola Menu' => 'Menu', 'Pengaturan' => 'Setelan', 'Dashboard' => 'Laporan', _ => d.label }),
+              NavigationDestination(icon: Icon(d.icon), label: switch (d.label) {
+                'Kelola Menu' => 'Menu',
+                'Pengaturan' => 'Setelan',
+                'Dashboard' => 'Laporan',
+                'Pelanggan' => 'Member',
+                _ => d.label,
+              }),
           ],
         ),
         ),
@@ -112,16 +138,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             selectedIndex: index,
             onDestinationSelected: (i) => setState(() => _index = i),
             // Layar pendek (HP landscape): tanpa logo & label agar semua item muat; keluar lewat menu profil.
+            // Lebar tetap saat keyboard muncul (lebar berubah = panel keranjang disusun ulang).
             minWidth: context.widthClass == WidthClass.expanded && !short ? AppSize.rail : 80,
-            labelType: short ? NavigationRailLabelType.none : NavigationRailLabelType.all,
-            groupAlignment: short ? 0 : -1,
-            leading: short
+            labelType: tightRail ? NavigationRailLabelType.none : NavigationRailLabelType.all,
+            groupAlignment: tightRail ? 0 : -1,
+            leading: tightRail
                 ? null
                 : const Padding(
                     padding: EdgeInsets.only(top: AppSpace.s4, bottom: AppSpace.s6),
                     child: BrandMark(size: 48, reversed: true),
                   ),
-            trailing: short
+            trailing: tightRail
                 ? null
                 : Expanded(
                     child: Align(
@@ -200,7 +227,11 @@ class _TopBar extends StatelessWidget {
     required this.onRefresh,
     required this.onLogout,
     this.onVerifyEmail,
+    this.onSettings,
   });
+
+  /// HP dengan banyak tab: Pengaturan dibuka dari menu akun.
+  final VoidCallback? onSettings;
 
   /// Null = email sudah terverifikasi / bukan owner.
   final VoidCallback? onVerifyEmail;
@@ -245,6 +276,7 @@ class _TopBar extends StatelessWidget {
             onSelected: (v) => switch (v) {
               'refresh' => onRefresh(),
               'verify' => onVerifyEmail?.call(),
+              'settings' => onSettings?.call(),
               _ => onLogout(),
             },
             itemBuilder: (_) => [
@@ -263,6 +295,11 @@ class _TopBar extends StatelessWidget {
                 const PopupMenuItem(
                   value: 'verify',
                   child: ListTile(leading: Icon(Icons.mark_email_unread_rounded), title: Text('Verifikasi email')),
+                ),
+              if (onSettings != null)
+                const PopupMenuItem(
+                  value: 'settings',
+                  child: ListTile(leading: Icon(Icons.settings_rounded), title: Text('Pengaturan')),
                 ),
               const PopupMenuItem(
                 value: 'refresh',

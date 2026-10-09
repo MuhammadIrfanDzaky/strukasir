@@ -19,7 +19,7 @@ class OrderResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $this->resource->loadMissing(['items.modifiers', 'payments', 'cashier:id,name']);
+        $this->resource->loadMissing(['items.modifiers', 'payments', 'cashier:id,name', 'customer:id,code,name,anonymized_at']);
         $settings = TenantSetting::query()->first();
 
         return [
@@ -28,6 +28,10 @@ class OrderResource extends JsonResource
             'status' => $this->status,
             'business_date' => $this->business_date->toDateString(),
             'customer_label' => $this->customer_label,
+            'customer' => $this->customer
+                ? ['id' => $this->customer->id, 'code' => $this->customer->code, 'name' => $this->customer->name,
+                    'anonymized' => $this->customer->isAnonymized()]
+                : null,
             'cashier' => $this->cashier?->name,
             'currency' => $this->currency,
             'items' => $this->items->map(fn (OrderItem $i) => [

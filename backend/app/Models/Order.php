@@ -29,6 +29,11 @@ class Order extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cashier_id');

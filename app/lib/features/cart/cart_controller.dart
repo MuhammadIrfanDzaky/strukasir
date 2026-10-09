@@ -47,11 +47,28 @@ class CartLine {
       };
 }
 
+/// Member yang ditautkan ke order (cukup untuk tampilan kasir & struk).
+class CartCustomer {
+  const CartCustomer({required this.id, required this.code, required this.name, this.phone, this.visits, this.note});
+
+  final String id;
+  final String code;
+  final String name;
+
+  /// Tersamar untuk kasir (0812****7890).
+  final String? phone;
+  final int? visits;
+
+  /// Catatan pelanggan (alergi, selera) — ditampilkan ke kasir.
+  final String? note;
+}
+
 class CartState {
   const CartState({
     required this.orderId,
     this.lines = const [],
     this.customerLabel = '',
+    this.customer,
     this.orderDiscount,
     this.number,
   });
@@ -60,6 +77,9 @@ class CartState {
   final String orderId;
   final List<CartLine> lines;
   final String customerLabel;
+
+  /// Pelanggan / member (opsional, fitur `customers`).
+  final CartCustomer? customer;
   final Discount? orderDiscount;
 
   /// Nomor dari server bila order sudah pernah disimpan (open bill).
@@ -72,6 +92,8 @@ class CartState {
   CartState copyWith({
     List<CartLine>? lines,
     String? customerLabel,
+    CartCustomer? customer,
+    bool clearCustomer = false,
     Discount? orderDiscount,
     bool clearOrderDiscount = false,
     String? number,
@@ -80,12 +102,14 @@ class CartState {
         orderId: orderId,
         lines: lines ?? this.lines,
         customerLabel: customerLabel ?? this.customerLabel,
+        customer: clearCustomer ? null : (customer ?? this.customer),
         orderDiscount: clearOrderDiscount ? null : (orderDiscount ?? this.orderDiscount),
         number: number ?? this.number,
       );
 
   Map<String, dynamic> toJson(int expectedTotal) => {
         'customer_label': customerLabel.trim().isEmpty ? null : customerLabel.trim(),
+        'customer_id': customer?.id,
         'client_created_at': DateTime.now().toUtc().toIso8601String(),
         'expected_total': expectedTotal,
         'items': lines.map((l) => l.toJson()).toList(),
@@ -154,6 +178,21 @@ class CartController extends Notifier<CartState> {
 
   void setCustomerLabel(String label) => state = state.copyWith(customerLabel: label);
 
+  /// Tautkan member. Kolom nama yang masih kosong diisi nama member (tetap bisa diganti, mis. "Meja 5").
+  void setCustomer(CartCustomer customer) => state = state.copyWith(
+        customer: customer,
+        customerLabel: state.customerLabel.trim().isEmpty ? customer.name : null,
+      );
+
+  /// Lepas member; label yang masih sama dengan nama member ikut dikosongkan.
+  void clearCustomer() {
+    final label = state.customerLabel.trim();
+    state = state.copyWith(
+      clearCustomer: true,
+      customerLabel: label == state.customer?.name ? '' : null,
+    );
+  }
+
   void markSaved(String number) => state = state.copyWith(number: number);
 
   /// Mulai order baru (setelah dibayar / disimpan sebagai open bill).
@@ -196,10 +235,14 @@ class CartController extends Notifier<CartState> {
       ));
     }
 
+    final customer = order['customer'] as Map<String, dynamic>?;
     state = CartState(
       orderId: order['id'] as String,
       lines: lines,
       customerLabel: order['customer_label'] as String? ?? '',
+      customer: customer == null
+          ? null
+          : CartCustomer(id: customer['id'] as String, code: customer['code'] as String, name: customer['name'] as String),
       orderDiscount: order['order_discount'] == null
           ? null
           : Discount.fromJson(order['order_discount'] as Map<String, dynamic>),

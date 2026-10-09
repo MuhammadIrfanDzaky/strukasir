@@ -38,6 +38,8 @@ class OrderController extends Controller
                 ->where('number', 'ilike', '%'.addcslashes($term, '%_\\').'%')
                 ->orWhere('customer_label', 'ilike', '%'.addcslashes($term, '%_\\').'%')))
             ->latest()
+            // Satu query per relasi untuk seluruh halaman (bukan per order).
+            ->with(['items.modifiers', 'payments', 'cashier:id,name', 'customer:id,code,name,anonymized_at'])
             ->paginate($validated['per_page'] ?? 20);
 
         return OrderResource::collection($orders);

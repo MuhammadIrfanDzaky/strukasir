@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Category;
+use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Product;
 use Tests\TestCase;
@@ -33,5 +34,18 @@ class DemoSalesTest extends TestCase
         // Jalankan ulang: hari yang sudah terisi dilewati (tidak dobel).
         $this->artisan('pos:demo-sales', ['code' => $shop->tenant->code, '--weeks' => 1])->assertSuccessful();
         $this->assertSame($count, $this->tenancy()->run($shop->tenant->id, fn () => Order::count()));
+
+        // Pelanggan contoh ditautkan ke sebagian order lunas; dijalankan ulang tidak menambah.
+        $this->artisan('pos:demo-customers', ['code' => $shop->tenant->code, '--count' => 10])->assertSuccessful();
+        [$customers, $linked, $codes] = $this->tenancy()->run($shop->tenant->id, fn () => [
+            Customer::count(),
+            Order::query()->whereNotNull('customer_id')->count(),
+            Customer::query()->orderBy('code')->pluck('code')->first(),
+        ]);
+        $this->assertSame(10, $customers);
+        $this->assertGreaterThan(10, $linked);
+        $this->assertSame('M0001', $codes);
+        $this->artisan('pos:demo-customers', ['code' => $shop->tenant->code])->assertSuccessful();
+        $this->assertSame(10, $this->tenancy()->run($shop->tenant->id, fn () => Customer::count()));
     }
 }

@@ -18,7 +18,7 @@ class TenantSetting extends Model
     protected $fillable = [
         'receipt_name', 'receipt_header', 'receipt_footer',
         'tax_enabled', 'tax_rate_bp', 'service_enabled', 'service_rate_bp',
-        'rounding_unit', 'cashier_discount_limit_bp', 'tax_inclusive', 'service_inclusive',
+        'rounding_unit', 'cashier_discount_limit_bp', 'tax_inclusive', 'service_inclusive', 'customer_phone_required',
     ];
 
     protected function casts(): array
@@ -28,6 +28,7 @@ class TenantSetting extends Model
             'service_enabled' => 'boolean',
             'tax_inclusive' => 'boolean',
             'service_inclusive' => 'boolean',
+            'customer_phone_required' => 'boolean',
             'tax_rate_bp' => 'integer',
             'service_rate_bp' => 'integer',
             'rounding_unit' => 'integer',

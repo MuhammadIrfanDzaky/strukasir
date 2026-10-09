@@ -4,6 +4,8 @@ use App\Enums\Permission;
 use App\Http\Controllers\Api\V1\AppVersionController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CategoryController;
+use App\Http\Controllers\Api\V1\CustomerController;
+use App\Http\Controllers\Api\V1\CustomerImportController;
 use App\Http\Controllers\Api\V1\DeviceRegistrationController;
 use App\Http\Controllers\Api\V1\DeviceUnregisterController;
 use App\Http\Controllers\Api\V1\EmailVerificationController;
@@ -57,6 +59,18 @@ Route::prefix('v1')->group(function () {
             Route::post('orders/{order}/pay', [OrderController::class, 'pay']);
             // Kasir boleh memanggil; tanpa izin order.void wajib menyertakan persetujuan PIN owner.
             Route::post('orders/{order}/void', [OrderController::class, 'void']);
+        });
+
+        // Pelanggan / member (fitur `customers`): kasir mencari & mendaftarkan, owner mengelola.
+        Route::middleware('can:'.Permission::CustomersView->value)->group(function () {
+            Route::get('customers', [CustomerController::class, 'index']);
+            Route::post('customers', [CustomerController::class, 'store']);
+        });
+        Route::middleware('can:'.Permission::CustomersManage->value)->group(function () {
+            Route::post('customers/import', CustomerImportController::class);
+            Route::get('customers/{customer}', [CustomerController::class, 'show']);
+            Route::put('customers/{customer}', [CustomerController::class, 'update']);
+            Route::post('customers/{customer}/anonymize', [CustomerController::class, 'anonymize']);
         });
 
         Route::middleware('can:'.Permission::ShiftOperate->value)->group(function () {

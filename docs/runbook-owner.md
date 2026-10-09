@@ -21,6 +21,11 @@ Untuk owner & kasir. Simpan di dekat meja kasir.
    - **Debit**: konfirmasi setelah mesin EDC menyatakan berhasil.
 5. Struk pelanggan tercetak otomatis.
 
+**Member / pelanggan**: ketuk ikon cari (🔍) di kolom nama → cari nama, kode member (M0001), atau beberapa
+angka no HP → pilih. Belum terdaftar? Ketuk **Pelanggan baru** (nama + no HP, minta izin pelanggan dulu).
+Kolom nama otomatis terisi nama member (boleh diganti, mis. "Meja 5"); catatan pelanggan (alergi, selera)
+tampil di keranjang. Kode member tercetak di struk (no HP tidak pernah dicetak).
+
 **Bayar nanti (Open Bill)**: ketuk **Open Bill** di bawah keranjang. Order disimpan tanpa mencetak apa pun.
 Untuk menambah pesanan atau membayar, ketuk **Open Bill** di atas keranjang dan pilih order-nya:
 - pelanggan pesan lagi → tambah produk, lalu ketuk **Simpan Bill**;
@@ -77,6 +82,22 @@ Menu **Dashboard** (di HP: *Laporan*) → *Hari ini / 7 hari / 30 hari / Bulan i
   jadi mengubah modal tidak mengubah laporan lama. Bila muncul peringatan "belum punya harga modal",
   isi modal produk tersebut di Kelola Menu.
 
+## Pelanggan / member (owner)
+
+Menu **Pelanggan** (di HP: *Member*; Pengaturan pindah ke menu akun di kanan atas).
+
+- **Cari & kelompok**: cari nama, kode, atau no HP. Kelompok: **Baru** (terdaftar 30 hari terakhir),
+  **Setia** (belanja 5× atau lebih dan masih datang 30 hari terakhir), **Menghilang** (pernah belanja, tapi
+  tidak datang lebih dari 30 hari — saatnya disapa). Urutkan menurut nama, terakhir datang, belanja terbanyak.
+- **Detail**: total belanja, jumlah kunjungan, rata-rata, terakhir datang, produk favorit, order terakhir.
+  Hanya order lunas yang dihitung (void tidak).
+- **Ubah**: nama, no HP, tanggal lahir, catatan. Kode member tetap.
+- **Hapus data pelanggan** (bila pelanggan memintanya, sesuai UU PDP): nama, no HP, tanggal lahir, catatan,
+  dan nama di riwayat order dihapus permanen. Angka penjualan tetap ada di laporan. Tidak bisa dibatalkan.
+- **Import CSV**: kolom *Nama* (wajib), *No HP*, *Tanggal Lahir*, *Catatan*. No HP sama = diperbarui.
+- **Dashboard**: porsi penjualan member vs non-member, member baru vs kembali, pelanggan teratas.
+- Kasir hanya bisa mencari & mendaftarkan; no HP tampil tersamar (0812****7890), tanpa total belanja.
+
 ## Fitur (owner)
 
 Menu **Pengaturan → Atur fitur**: nyalakan hanya yang dipakai supaya layar kasir ringkas. Semua tablet
@@ -87,6 +108,8 @@ ikut berubah. Mematikan fitur tidak menghapus data.
 - **Open Bill**: tidak bisa dimatikan selama masih ada bill yang belum dibayar.
 - **Varian produk**: mati → produk langsung masuk keranjang tanpa pilihan suhu/gula/tambahan.
 - **Diskon**, **Bayar dengan beberapa metode**: tombolnya hilang dari kasir saat dimatikan.
+- **Pelanggan / member**: data pelanggan, kode member, riwayat belanja. Saklar **No HP pelanggan wajib**:
+  nyala = pelanggan baru harus punya no HP (tidak bisa dobel); mati = boleh nama saja.
 - **Pajak & service**: isi persen (mis. PB1 10%, service 5%); 0 = tidak dipungut. Untuk tiap tarif yang
   diisi, pilih **Harga menu sudah termasuk pajak / service**: nyala = total sama dengan harga menu dan
   struk menulis "Termasuk pajak 10%"; mati = ditambahkan di atas harga. Persen ikut tercetak di struk.

@@ -20,6 +20,7 @@ enum Role: string
                 Permission::OrderCreate,
                 Permission::ShiftOperate,
                 Permission::DiscountWithinLimit,
+                Permission::CustomersView,
             ],
         };
     }

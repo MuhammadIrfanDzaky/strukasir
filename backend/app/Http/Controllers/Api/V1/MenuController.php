@@ -50,6 +50,8 @@ class MenuController extends Controller
             'features' => $features,
             // Label kolom nama di kasir ("meja" hanya untuk usaha makan di tempat).
             'customer_label_hint' => BusinessTemplate::customerLabelHint($tenant?->sector, $tenant?->sales_mode),
+            // Form "Pelanggan baru" di kasir: no HP wajib atau boleh kosong (Pengaturan → Fitur).
+            'customer_phone_required' => $settings->customer_phone_required,
             // Nama, alamat, penutup & logo struk; disimpan tablet bersama cache menu (struk tetap lengkap saat offline).
             'receipt' => ReceiptSettingsController::present($settings),
             'categories' => Category::query()->orderBy('sort')->orderBy('name')->get()

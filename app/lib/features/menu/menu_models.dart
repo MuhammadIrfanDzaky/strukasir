@@ -175,6 +175,7 @@ class Menu {
     required this.cashierDiscountLimitBp,
     required this.features,
     this.customerLabelHint = 'Nama pelanggan / meja',
+    this.customerPhoneRequired = true,
     required this.categories,
     required this.products,
     required this.modifierGroups,
@@ -187,6 +188,7 @@ class Menu {
         cashierDiscountLimitBp: (j['pricing'] as Map<String, dynamic>)['cashier_discount_limit_bp'] as int,
         features: (j['features'] as Map<String, dynamic>).map((k, v) => MapEntry(k, v as bool)),
         customerLabelHint: j['customer_label_hint'] as String? ?? 'Nama pelanggan / meja',
+        customerPhoneRequired: j['customer_phone_required'] as bool? ?? true,
         categories: (j['categories'] as List)
             .cast<Map<String, dynamic>>()
             .map(MenuCategory.fromJson)
@@ -209,6 +211,9 @@ class Menu {
 
   /// Label kolom nama di kasir sesuai cara jualan ("Nama pelanggan" untuk bawa pulang saja).
   final String customerLabelHint;
+
+  /// Form "Pelanggan baru" di kasir: no HP wajib (Pengaturan → Fitur).
+  final bool customerPhoneRequired;
   final List<MenuCategory> categories;
 
   bool feature(String key) => features[key] ?? false;
@@ -218,6 +223,9 @@ class Menu {
 
   /// Varian produk aktif; mati → produk langsung masuk keranjang tanpa dialog pilihan.
   bool get modifiersOn => features['modifiers'] ?? true;
+
+  /// Pelanggan / member (fitur paket). Server lama tanpa kunci ini = tidak ada.
+  bool get customersOn => features['customers'] ?? false;
 
   MenuProduct? product(String id) => products.where((p) => p.id == id).firstOrNull;
   final List<MenuProduct> products;

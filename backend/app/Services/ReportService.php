@@ -75,6 +75,18 @@ class ReportService
             ->selectRaw("coalesce(categories.name, 'Lainnya') as name, sum(order_items.qty) as qty, sum(order_items.line_total) as revenue")
             ->orderByDesc('revenue')->get();
 
+        // Pelanggan / member: porsi transaksi member, pelanggan baru vs kembali, pelanggan teratas.
+        $members = $paid()->whereNotNull('customer_id')
+            ->selectRaw('count(*) as orders, coalesce(sum(grand_total),0) as sales, count(distinct customer_id) as customers')->first();
+        // "Baru" = transaksi lunas pertamanya jatuh di periode ini.
+        $newCustomers = DB::table('orders')->where('status', 'paid')->whereNotNull('customer_id')
+            ->groupBy('customer_id')->havingRaw('min(business_date) between ? and ?', [$from, $to])
+            ->select('customer_id')->get()->count();
+        $topCustomers = $paid()->join('customers', 'customers.id', '=', 'orders.customer_id')
+            ->groupBy('customers.id', 'customers.code', 'customers.name')
+            ->selectRaw('customers.id, customers.code, customers.name, count(*) as orders, sum(orders.grand_total) as sales')
+            ->orderByDesc('sales')->limit(5)->get();
+
         $orders = (int) $totals->orders;
         $sales = (int) $totals->sales;
 
@@ -117,6 +129,16 @@ class ReportService
             'by_category' => $byCategory->map(fn ($r) => [
                 'name' => $r->name, 'qty' => (int) $r->qty, 'revenue' => (int) $r->revenue,
             ]),
+            'customers' => [
+                'orders' => (int) $members->orders,
+                'sales' => (int) $members->sales,
+                'active' => (int) $members->customers,
+                'new' => $newCustomers,
+                'returning' => max(0, (int) $members->customers - $newCustomers),
+                'top' => $topCustomers->map(fn ($r) => [
+                    'id' => $r->id, 'code' => $r->code, 'name' => $r->name, 'orders' => (int) $r->orders, 'sales' => (int) $r->sales,
+                ]),
+            ],
             // Periode sebelumnya dengan panjang sama (mis. 7 hari sebelumnya) untuk naik/turun di dashboard.
             'previous' => $this->totals(...self::previousRange($from, $to)),
         ];

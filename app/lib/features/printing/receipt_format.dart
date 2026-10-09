@@ -96,6 +96,8 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
     PrintLine('Date: ${_time((order['paid_at'] ?? order['created_at']) as String)}'),
     if (order['cashier'] != null) ..._plain(wrap('Cashier: ${order['cashier']}')),
     if ((order['customer_label'] as String?)?.isNotEmpty ?? false) ..._plain(wrap('Customer: ${order['customer_label']}')),
+    // Kode member saja (bukan no HP): struk bisa terbawa / dibuang pelanggan.
+    if (order['customer'] case {'code': final String code, 'anonymized': false}) PrintLine('Member: $code'),
     ..._plain(wrap('Transaction No: ${order['number']}')),
     PrintLine(divider()),
   ];
