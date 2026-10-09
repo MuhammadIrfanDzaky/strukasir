@@ -17,6 +17,7 @@ use App\Models\Shift;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\User;
+use App\Models\Voucher;
 use App\Support\Approval;
 use App\Support\Audit;
 use App\Support\Pricing\PricingResult;
@@ -42,6 +43,7 @@ class OrderService
         private readonly LoyaltyService $loyalty,
         private readonly TierService $tiers,
         private readonly CreditService $credit,
+        private readonly PromotionService $promotions,
     ) {}
 
     /**
@@ -63,18 +65,21 @@ class OrderService
         $this->guardDiscountFeature($data);
         $customer = $this->resolveCustomer($data['customer_id'] ?? null, $existing);
         [$lines, $orderDiscount, $reward] = $this->applyReward($data, $customer, $lines, $existing);
-        [$lines, $tier] = $this->applyTier($data, $customer, $lines);
+        [$lines, $tier] = $this->applyLineBenefits($data, $customer, $lines);
+        [$orderDiscount, $voucher] = $this->applyVoucher($data, $lines, $orderDiscount, $reward, $existing);
         $result = $this->price($lines, $orderDiscount);
         $this->guardExpectedTotal($result, (int) $data['expected_total']);
         $rewardDiscount = $reward === null ? 0
             : ($reward['line_index'] !== null ? $result->lineDiscounts[$reward['line_index']] : $result->orderDiscount);
         $tierDiscount = array_sum(array_map(fn ($i) => ($lines[$i]['tier'] ?? false) ? $result->lineDiscounts[$i] : 0, array_keys($lines)));
+        $promoDiscount = array_sum(array_map(fn ($i) => isset($lines[$i]['promo']) ? $result->lineDiscounts[$i] : 0, array_keys($lines)));
+        $voucherDiscount = $voucher === null ? 0 : $result->orderDiscount;
 
         // Persetujuan diverifikasi SEBELUM transaksi: percobaan PIN gagal harus tetap tercatat.
         // Potongan hadiah sudah "dibayar" dengan stempel/poin, jadi tidak ikut batas diskon kasir.
-        $approver = $this->authorizeDiscount($result, $lines, $cashier, $data['approval'] ?? null, $rewardDiscount + $tierDiscount);
+        $approver = $this->authorizeDiscount($result, $lines, $cashier, $data['approval'] ?? null, $rewardDiscount + $tierDiscount + $promoDiscount + $voucherDiscount);
 
-        $order = DB::transaction(function () use ($orderId, $data, $cashier, $device, $tenant, $lines, $result, $customer, $reward, $rewardDiscount, $tier, $tierDiscount) {
+        $order = DB::transaction(function () use ($orderId, $data, $cashier, $device, $tenant, $lines, $result, $customer, $reward, $rewardDiscount, $tier, $tierDiscount, $promoDiscount, $voucher, $voucherDiscount) {
             $order = Order::query()->lockForUpdate()->find($orderId);
 
             if ($order === null) {
@@ -108,6 +113,10 @@ class OrderService
                 'tier_discount_bp' => $tier->discount_bp ?? 0,
                 'tier_multiplier' => $tier->earn_multiplier ?? 1,
                 'tier_discount' => $tierDiscount,
+                'promo_discount' => $promoDiscount,
+                'voucher_id' => $voucher?->id,
+                'voucher_code' => $voucher?->code,
+                'voucher_discount' => $voucherDiscount,
                 'order_discount_type' => $data['order_discount']['type'] ?? null,
                 'order_discount_value' => $data['order_discount']['value'] ?? 0,
                 'subtotal' => $result->subtotal,
@@ -239,6 +248,11 @@ class OrderService
                 'change_total' => $change,
                 'paid_at' => $now,
             ])->save();
+
+            // Kuota voucher dicek ulang dengan kunci (dua order bersamaan tidak melewati kuota).
+            if ($order->voucher_id !== null) {
+                $this->promotions->voucher((string) $order->voucher_code, $order->id, lock: true);
+            }
 
             // Tukar hadiah & catat stempel/poin member di transaksi yang sama: gagal = bayar dibatalkan.
             $this->loyalty->onPaid($order, $cashier);
@@ -465,27 +479,66 @@ class OrderService
      *
      * @return array{0: list<array<string, mixed>>, 1: ?MemberTier}
      */
-    private function applyTier(array $data, ?Customer $customer, array $lines): array
+    private static function automatic(array $line): bool
+    {
+        return ($line['reward'] ?? false) || ($line['tier'] ?? false) || isset($line['promo']);
+    }
+
+    /**
+     * Diskon otomatis per baris tanpa diskon lain (manual / hadiah): yang terbesar antara promo yang
+     * sedang berlaku dan diskon tingkat member (seri → promo). Tablet mengirim tingkat yang dipakainya;
+     * bila berbeda dari tingkat sekarang, minta pilih ulang member.
+     *
+     * @return array{0: list<array<string, mixed>>, 1: ?MemberTier}
+     */
+    private function applyLineBenefits(array $data, ?Customer $customer, array $lines): array
     {
         $tier = $customer !== null && ! $customer->isAnonymized() && $this->tiers->enabled()
             ? $this->tiers->evaluate($customer)['tier'] : null;
+        $promos = $this->promotions->activeAt($this->promotions->now());
 
         if (array_key_exists('tier_id', $data) && ($data['tier_id'] ?? null) !== $tier?->id) {
             throw ValidationException::withMessages([
                 'customer_id' => 'Tingkat member pelanggan ini berubah'.($tier ? " (sekarang {$tier->name})" : '').'. Pilih ulang membernya.',
             ]);
         }
-        if ($tier === null || $tier->discount_bp === 0) {
-            return [$lines, $tier];
-        }
         foreach ($lines as $i => $line) {
-            if (empty($line['discount']) && ! ($line['reward'] ?? false)) {
+            if (! empty($line['discount']) || ($line['reward'] ?? false)) {
+                continue;
+            }
+            $unit = $line['product']->price + $line['modifiers_total'];
+            [$promo, $promoAmount] = PromotionService::best($promos, $line['product'], $unit, $line['qty']);
+            $tierAmount = $tier && $tier->discount_bp > 0 ? intdiv($unit * $line['qty'] * $tier->discount_bp, 10000) : 0;
+            if ($promo !== null && $promoAmount >= $tierAmount) {
+                $lines[$i]['discount'] = ['type' => 'amount', 'value' => $promoAmount];
+                $lines[$i]['promo'] = $promo->name;
+            } elseif ($tierAmount > 0) {
                 $lines[$i]['discount'] = ['type' => 'percent', 'value' => $tier->discount_bp];
                 $lines[$i]['tier'] = true;
             }
         }
 
         return [$lines, $tier];
+    }
+
+    /**
+     * Voucher kode → diskon order (Rp). Tidak bisa digabung dengan diskon order manual / hadiah potongan.
+     *
+     * @return array{0: ?array{type: string, value: int}, 1: ?Voucher}
+     */
+    private function applyVoucher(array $data, array $lines, ?array $orderDiscount, ?array $reward, ?Order $existing): array
+    {
+        $code = trim((string) ($data['voucher_code'] ?? ''));
+        if ($code === '') {
+            return [$orderDiscount, null];
+        }
+        if (! empty($orderDiscount['value'])) {
+            throw ValidationException::withMessages(['voucher_code' => 'Voucher tidak bisa digabung dengan diskon order / hadiah potongan.']);
+        }
+        $voucher = $this->promotions->voucher($code, $existing?->id);
+        $subtotal = $this->price($lines, null)->subtotal;
+
+        return [['type' => 'amount', 'value' => PromotionService::voucherDiscount($voucher, $subtotal)], $voucher];
     }
 
     private function guardDiscountFeature(array $data): void
@@ -545,8 +598,10 @@ class OrderService
             'qty' => $line['qty'],
             'modifiers_total' => $line['modifiers_total'],
             // Baris hadiah: potongan tercatat di discount_total, bukan sebagai diskon manual.
-            'discount_type' => ($line['reward'] ?? false) || ($line['tier'] ?? false) ? null : ($line['discount']['type'] ?? null),
-            'discount_value' => ($line['reward'] ?? false) || ($line['tier'] ?? false) ? 0 : ($line['discount']['value'] ?? 0),
+            // Diskon otomatis (hadiah, tingkat, promo): tercatat di discount_total, bukan diskon manual.
+            'discount_type' => self::automatic($line) ? null : ($line['discount']['type'] ?? null),
+            'discount_value' => self::automatic($line) ? 0 : ($line['discount']['value'] ?? 0),
+            'promo_name' => $line['promo'] ?? null,
             'discount_total' => $result->lineDiscounts[$i],
             'line_total' => $result->lines[$i],
             'note' => $line['note'],

@@ -30,6 +30,9 @@ import 'package:berrybrew_pos/features/printing/printer_settings_screen.dart';
 import 'package:berrybrew_pos/features/printing/receipt_logo.dart';
 import 'package:berrybrew_pos/features/printing/receipt_settings_screen.dart';
 import 'package:berrybrew_pos/features/printing/stations.dart';
+import 'package:berrybrew_pos/features/promotions/promotion_models.dart';
+import 'package:berrybrew_pos/features/promotions/promotions_screen.dart';
+import 'package:berrybrew_pos/features/promotions/voucher_dialog.dart';
 import 'package:berrybrew_pos/features/printing/stations_screen.dart';
 import 'package:berrybrew_pos/features/session/account_dialogs.dart';
 import 'package:berrybrew_pos/features/session/login_screen.dart';
@@ -79,7 +82,8 @@ const owner = SessionUser(id: 'u1', name: 'Rina Amelia', role: 'owner', permissi
 /// Menu contoh + beberapa produk tambahan (nama panjang, habis) supaya grid terisi.
 final bigMenu = Menu.fromJson({
   ...menuJson,
-  'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true, 'member_tiers': true, 'customer_credit': true, 'customer_messaging': true},
+  'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true, 'member_tiers': true, 'customer_credit': true, 'customer_messaging': true, 'promotions': true},
+  'promotions': promotionsJson,
   'member_tiers': tiersJson,
   'loyalty': loyaltyJson,
   'categories': [
@@ -100,6 +104,14 @@ final bigMenu = Menu.fromJson({
       },
   ],
 });
+
+/// Promo tanpa jadwal (selalu berjalan) + happy hour berjadwal.
+final promotionsJson = [
+  {'id': 'pr1', 'name': 'Promo Gajian Akhir Bulan Spesial', 'type': 'percent', 'value': 1000, 'scope': 'categories', 'target_ids': ['c1'],
+    'days': null, 'start_time': null, 'end_time': null, 'starts_on': null, 'ends_on': null, 'active': true},
+  {'id': 'pr2', 'name': 'Happy Hour', 'type': 'bogo', 'value': 0, 'buy_qty': 2, 'free_qty': 1, 'scope': 'products', 'target_ids': ['x0'],
+    'days': [1, 2, 3, 4, 5], 'start_time': '14:00', 'end_time': '17:00', 'starts_on': null, 'ends_on': '2026-12-31', 'active': true},
+];
 
 final tiersJson = [
   {'id': 't1', 'name': 'Silver', 'threshold': 500000, 'discount_bp': 500, 'earn_multiplier': 1, 'color': 'silver'},
@@ -367,6 +379,16 @@ Dio fakeDio() => Dio()
                 {'key': k, 'title': t, 'body': b, 'default': b},
             ],
             'placeholders': ['{nama}', '{kedai}', '{kode}', '{tingkat}', '{stempel}', '{sisa_kasbon}', '{struk}', '{total}', '{nomor}'],
+          }}
+        : path.startsWith('/settings/promotions')
+        ? {'data': {
+            'promotions': promotionsJson,
+            'vouchers': [
+              {'id': 'v1', 'code': 'HEMAT10', 'type': 'percent', 'value': 1000, 'max_discount': 5000, 'min_spend': 30000,
+                'starts_on': null, 'ends_on': '2026-12-31', 'usage_limit': 100, 'used': 37, 'active': true},
+              {'id': 'v2', 'code': 'LEBARAN2026', 'type': 'amount', 'value': 10000, 'max_discount': null, 'min_spend': 0,
+                'starts_on': null, 'ends_on': null, 'usage_limit': null, 'used': 4, 'active': false},
+            ],
           }}
         : path.startsWith('/settings/tiers')
         ? {'data': {'basis': 'spend', 'window_months': 12, 'tiers': tiersJson}}
@@ -746,6 +768,57 @@ final scenarios = <Scenario>[
     act: null,
   ),
   (name: 'tiket-stasiun', session: loggedIn, home: (_) => const StationsScreen(), fillCart: false, act: null),
+  (name: 'promo-pengaturan', session: loggedIn, home: (_) => const PromotionsScreen(), fillCart: false, act: null),
+  (
+    name: 'promo-form',
+    session: loggedIn,
+    home: (_) => const PromotionsScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Happy Hour'));
+      await settle(t);
+      expect(find.text('Ubah promo'), findsOneWidget);
+    },
+  ),
+  (
+    name: 'voucher-form',
+    session: loggedIn,
+    home: (_) => const PromotionsScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Voucher'));
+      await settle(t);
+      await t.tap(find.text('HEMAT10'));
+      await settle(t);
+      expect(find.text('Ubah voucher'), findsOneWidget);
+    },
+  ),
+  (
+    name: 'voucher-dialog',
+    session: loggedIn,
+    home: (_) => Builder(builder: (context) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => showVoucherDialog(context));
+          return const Scaffold(body: SizedBox.expand());
+        }),
+    fillCart: false,
+    act: null,
+  ),
+  (
+    name: 'kasir-promo-voucher',
+    session: loggedIn,
+    home: home,
+    fillCart: true,
+    act: (t) async {
+      final container = ProviderScope.containerOf(t.element(find.byType(HomeShell)));
+      container.read(cartProvider.notifier).setVoucher(const VoucherTerms(code: 'HEMAT10', type: 'percent', value: 1000, maxDiscount: 5000, minSpend: 30000));
+      await settle(t);
+      final open = find.text('Lihat pesanan');
+      if (open.evaluate().isNotEmpty) {
+        await t.tap(open);
+        await settle(t);
+      }
+    },
+  ),
   (
     name: 'tiket-form',
     session: loggedIn,

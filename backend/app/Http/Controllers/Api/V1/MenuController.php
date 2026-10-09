@@ -9,9 +9,11 @@ use App\Models\Category;
 use App\Models\Modifier;
 use App\Models\ModifierGroup;
 use App\Models\Product;
+use App\Models\Promotion;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Services\LoyaltyService;
+use App\Services\PromotionService;
 use App\Services\TierService;
 use App\Support\BusinessTemplate;
 use App\Support\Pricing\PricingSettings;
@@ -57,6 +59,9 @@ class MenuController extends Controller
             // Program loyalitas + hadiah aktif (null bila tidak berjalan): kasir menukar hadiah & melihat
             // perkiraan stempel/poin; server tetap menghitung ulang saat simpan & bayar.
             'loyalty' => app(LoyaltyService::class)->presentForMenu(),
+            // Promo otomatis aktif + jadwalnya (kosong = fitur mati); tablet menghitung, server memeriksa ulang.
+            'promotions' => app(PromotionService::class)->enabled()
+                ? Promotion::query()->where('active', true)->orderBy('name')->get()->map(fn ($p) => PromotionService::presentPromotion($p))->values() : [],
             // Tingkat member aktif (kosong = fitur mati): untuk lencana & pengali di tablet.
             'member_tiers' => app(TierService::class)->enabled()
                 ? app(TierService::class)->tiers()->map(fn ($t) => TierService::present($t))->values() : [],
@@ -97,7 +102,7 @@ class MenuController extends Controller
 
     private function version(): string
     {
-        $stamps = collect(['categories', 'products', 'modifier_groups', 'modifiers', 'tenant_settings', 'tenant_features', 'loyalty_programs', 'loyalty_rewards', 'member_tiers'])
+        $stamps = collect(['categories', 'products', 'modifier_groups', 'modifiers', 'tenant_settings', 'tenant_features', 'loyalty_programs', 'loyalty_rewards', 'member_tiers', 'promotions'])
             ->map(fn (string $table) => DB::table($table)->selectRaw('count(*) as n, max(updated_at) as t')->first())
             ->map(fn ($row) => $row->n.'@'.$row->t)
             ->implode('|');

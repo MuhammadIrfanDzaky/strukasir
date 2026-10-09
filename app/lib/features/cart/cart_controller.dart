@@ -5,6 +5,7 @@ import '../menu/menu_controller.dart';
 import '../menu/menu_models.dart';
 import '../customers/member_tier.dart';
 import '../loyalty/loyalty_models.dart';
+import '../promotions/promotion_models.dart';
 import '../menu/modifier_selection.dart';
 import 'pricing.dart';
 
@@ -86,6 +87,7 @@ class CartState {
     this.orderDiscount,
     this.number,
     this.ticketed = const {},
+    this.voucher,
   });
 
   /// UUID order dibuat di tablet = idempotency key. Kirim ulang aman.
@@ -107,6 +109,9 @@ class CartState {
   /// Qty per baris yang sudah dikirim ke bar/dapur (tiket); sisanya dicetak sebagai tambahan.
   final Map<String, int> ticketed;
 
+  /// Voucher kode (diskon order); tidak digabung dengan diskon order manual / hadiah potongan.
+  final VoucherTerms? voucher;
+
   bool get isEmpty => lines.isEmpty;
   bool get isSaved => number != null;
   int get itemCount => lines.fold(0, (s, l) => s + l.qty);
@@ -123,6 +128,8 @@ class CartState {
     bool clearOrderDiscount = false,
     String? number,
     Map<String, int>? ticketed,
+    VoucherTerms? voucher,
+    bool clearVoucher = false,
   }) =>
       CartState(
         orderId: orderId,
@@ -134,6 +141,7 @@ class CartState {
         orderDiscount: clearOrderDiscount ? null : (orderDiscount ?? this.orderDiscount),
         number: number ?? this.number,
         ticketed: ticketed ?? this.ticketed,
+        voucher: clearVoucher ? null : (voucher ?? this.voucher),
       );
 
   Map<String, dynamic> toJson(int expectedTotal) => {
@@ -141,6 +149,7 @@ class CartState {
         'customer_id': customer?.id,
         if (customer != null) 'tier_id': customer!.tier?.id,
         if (reward != null) 'reward': {'id': reward!.id, 'item_id': rewardItemId},
+        if (voucher != null) 'voucher_code': voucher!.code,
         'client_created_at': DateTime.now().toUtc().toIso8601String(),
         'expected_total': expectedTotal,
         'items': lines.map((l) => l.toJson()).toList(),
@@ -165,9 +174,9 @@ final cartTotalsProvider = Provider<PricingResult>((ref) {
 /// Harga keranjang termasuk hadiah loyalitas & tingkat member, sama dengan OrderService di server:
 /// gratis produk = potongan harga dasar 1 porsi di barisnya; potongan Rp (maks. subtotal) / % = diskon order;
 /// tingkat member = diskon % di setiap baris yang belum punya diskon (manual / hadiah).
-PricingResult priceCart(CartState cart, Menu menu) {
+PricingResult priceCart(CartState cart, Menu menu, {DateTime? at}) {
   final reward = cart.reward;
-  final tierBp = cart.customer?.tier?.discountBp ?? 0;
+  final now = at ?? DateTime.now();
   final lines = [
     for (final l in cart.lines)
       PricingLine(
@@ -175,7 +184,7 @@ PricingResult priceCart(CartState cart, Menu menu) {
         qty: l.qty,
         discount: reward != null && reward.isFreeProduct && l.id == cart.rewardItemId
             ? Discount.amount(l.product.price)
-            : l.discount ?? (tierBp > 0 ? Discount.percent(tierBp) : null),
+            : l.discount ?? lineBenefit(cart, menu, l, now)?.discount,
       ),
   ];
   var orderDiscount = cart.orderDiscount;
@@ -186,8 +195,33 @@ PricingResult priceCart(CartState cart, Menu menu) {
       final subtotal = calculatePrice(lines, null, menu.pricing).subtotal;
       orderDiscount = Discount.amount(reward.value < subtotal ? reward.value : subtotal);
     }
+  } else if (cart.voucher != null && orderDiscount == null) {
+    final d = cart.voucher!.discountFor(calculatePrice(lines, null, menu.pricing).subtotal);
+    if (d > 0) orderDiscount = Discount.amount(d);
   }
   return calculatePrice(lines, orderDiscount, menu.pricing);
+}
+
+/// Diskon otomatis satu baris (tanpa diskon manual & bukan baris hadiah), sama dengan
+/// OrderService::applyLineBenefits: yang terbesar antara promo berjalan dan tingkat member (seri → promo).
+({String label, Discount discount})? lineBenefit(CartState cart, Menu menu, CartLine l, DateTime at) {
+  if (l.discount != null || (cart.reward?.isFreeProduct == true && l.id == cart.rewardItemId)) return null;
+  Promotion? best;
+  var promoAmount = 0;
+  for (final p in menu.promotions) {
+    if (!p.runsAt(at)) continue;
+    final d = p.discountFor(
+        productId: l.product.id, categoryId: l.product.categoryId, unitPrice: l.unitPrice, qty: l.qty, basePrice: l.product.price);
+    if (d > promoAmount) {
+      best = p;
+      promoAmount = d;
+    }
+  }
+  final tier = cart.customer?.tier;
+  final tierAmount = tier != null && tier.discountBp > 0 ? l.unitPrice * l.qty * tier.discountBp ~/ 10000 : 0;
+  if (best != null && promoAmount >= tierAmount) return (label: best.name, discount: Discount.amount(promoAmount));
+  if (tierAmount > 0) return (label: 'Diskon member', discount: Discount.percent(tier!.discountBp));
+  return null;
 }
 
 /// Potongan dari hadiah (untuk rincian keranjang).
@@ -199,9 +233,6 @@ int rewardDiscount(CartState cart, PricingResult totals) {
   return i >= 0 && i < totals.lineDiscounts.length ? totals.lineDiscounts[i] : 0;
 }
 
-/// Baris yang mendapat diskon tingkat member (tanpa diskon manual & bukan baris hadiah).
-bool isTierLine(CartState cart, CartLine l) =>
-    (cart.customer?.tier?.discountBp ?? 0) > 0 && l.discount == null && !(cart.reward?.isFreeProduct == true && l.id == cart.rewardItemId);
 
 /// Perkiraan stempel/poin yang didapat member dari order ini (server menghitung ulang saat bayar).
 int loyaltyEarnPreview(CartState cart, Menu menu, PricingResult totals) =>
@@ -286,6 +317,7 @@ class CartController extends Notifier<CartState> {
       reward: reward,
       rewardItemId: reward.isFreeProduct ? itemId : null,
       clearOrderDiscount: !reward.isFreeProduct,
+      clearVoucher: !reward.isFreeProduct, // hadiah potongan memakai jatah diskon order
       lines: reward.isFreeProduct
           ? [for (final l in state.lines) l.id == itemId ? l.copyWith(clearDiscount: true) : l]
           : null,
@@ -293,6 +325,11 @@ class CartController extends Notifier<CartState> {
   }
 
   void clearReward() => state = state.copyWith(clearReward: true);
+
+  /// Pakai voucher: menggantikan diskon order manual (tidak bisa digabung).
+  void setVoucher(VoucherTerms voucher) => state = state.copyWith(voucher: voucher, clearOrderDiscount: true);
+
+  void clearVoucher() => state = state.copyWith(clearVoucher: true);
 
   /// Lepas member; label yang masih sama dengan nama member ikut dikosongkan.
   void clearCustomer() {
@@ -383,6 +420,14 @@ class CartController extends Notifier<CartState> {
             ),
       reward: reward,
       rewardItemId: savedReward?['item_id'] as String?,
+      // Voucher tersimpan: potongan dari salinan di order (server menghitung ulang saat disimpan lagi).
+      voucher: order['voucher'] is Map
+          ? VoucherTerms(
+              code: (order['voucher'] as Map)['code'] as String,
+              type: 'amount',
+              value: (order['voucher'] as Map)['discount'] as int,
+            )
+          : null,
       // Open bill yang dimuat ulang: item lamanya sudah dicetak ke bar/dapur saat disimpan.
       ticketed: {for (final l in lines) l.id: l.qty},
       orderDiscount: order['order_discount'] == null

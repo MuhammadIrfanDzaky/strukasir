@@ -49,6 +49,10 @@ bila lewat batas, owner memasukkan PIN. Struk mencetak "Sisa kasbon". Kasbon tid
 **Struk via WA** di layar Lunas (atau Riwayat → order → *Struk via WA*). WhatsApp terbuka dengan struk siap
 kirim; tekan kirim. Butuh WhatsApp terpasang di tablet/HP (gratis, tanpa langganan WA Business API).
 
+**Promo & voucher**: promo yang sedang berjalan langsung memotong harga item di keranjang (nama promonya
+tertulis). Voucher: ketuk **Pakai voucher** di bawah subtotal → ketik kodenya. Voucher tidak bisa digabung
+dengan diskon order atau hadiah potongan; bila belanja belum mencapai minimal, keranjang memberi tahu.
+
 **Bayar nanti (Open Bill)**: ketuk **Open Bill** di bawah keranjang. Order disimpan tanpa mencetak apa pun.
 Untuk menambah pesanan atau membayar, ketuk **Open Bill** di atas keranjang dan pilih order-nya:
 - pelanggan pesan lagi → tambah produk, lalu ketuk **Simpan Bill**;
@@ -165,6 +169,19 @@ Menu **Pengaturan → Program loyalitas** (fitur *Program loyalitas* harus aktif
   {sisa_kasbon} {struk} {total} {nomor}. *Teks bawaan* mengembalikan teks awal.
 - Kasir hanya bisa mengirim struk digital; pesan lain hanya owner. Semua pesan yang disiapkan tercatat.
 
+## Promo & voucher (owner)
+
+Menu **Pengaturan → Atur promo & voucher** (fitur *Promo & voucher*).
+
+- **Promo otomatis**: *Diskon %*, *Rp per item*, atau *Beli X gratis Y* (item gratis = harga dasar produk yang
+  sama). Untuk semua produk, kategori, atau produk tertentu. Jadwal: hari (Sen–Min), jam (mis. happy hour
+  14:00–17:00; boleh melewati tengah malam), dan tanggal berakhir. Tanda **Berjalan** = sedang aktif sekarang.
+- Per item dipakai **potongan terbesar** antara promo dan diskon tingkat member; item yang sudah didiskon
+  manual / hadiah tidak ikut. Potongan promo & voucher tidak butuh PIN owner.
+- **Voucher**: kode (mis. HEMAT10), diskon % (boleh dengan batas maksimal) atau Rp, minimal belanja, kuota
+  pemakaian, tanggal berakhir. Kuota dihitung dari transaksi lunas; transaksi yang di-void mengembalikan kuota.
+- Dashboard: promo & voucher yang terpakai beserta total potongannya; struk menulis nama promo / kode voucher.
+
 ## Kasbon (owner)
 
 - **Batas default** per member: Pengaturan → Fitur → *Kasbon* (kosong = tanpa batas). Batas khusus per
@@ -203,6 +220,7 @@ ikut berubah. Mematikan fitur tidak menghapus data.
 - **Pelanggan / member**: data pelanggan, kode member, riwayat belanja. Saklar **No HP pelanggan wajib**:
   nyala = pelanggan baru harus punya no HP (tidak bisa dobel); mati = boleh nama saja.
 - **Program loyalitas**: stempel/poin & hadiah untuk member (butuh *Pelanggan / member*).
+- **Promo & voucher**: promo otomatis terjadwal & voucher kode.
 - **Pesan WhatsApp**: struk digital & pesan ke member lewat WhatsApp (butuh *Pelanggan*).
 - **Kasbon (bayar nanti)**: member boleh berutang dengan batas; pelunasan di kasir (butuh *Pelanggan*).
 - **Tingkat member**: Silver/Gold dst. dengan diskon & pengali stempel (butuh *Pelanggan / member*).

@@ -119,6 +119,13 @@ class ReportService
         $expenseCats = array_keys(array_filter(CashMovementService::CATEGORIES['out'], fn ($c) => $c[1]));
         $expenses = collect($moves)->only($expenseCats)->map(fn ($v) => (int) $v)->filter();
 
+        // Promo & voucher terpakai di periode.
+        $promoUse = $paidItems()->whereNotNull('order_items.promo_name')->groupBy('order_items.promo_name')
+            ->selectRaw('order_items.promo_name as name, sum(order_items.qty) as qty, sum(order_items.discount_total) as discount')
+            ->orderByDesc('discount')->get();
+        $voucherUse = $paid()->whereNotNull('voucher_code')->groupBy('voucher_code')
+            ->selectRaw('voucher_code as code, count(*) as orders, sum(voucher_discount) as discount')->orderByDesc('orders')->get();
+
         $orders = (int) $totals->orders;
         $sales = (int) $totals->sales;
 
@@ -188,6 +195,10 @@ class ReportService
                 'top' => $debtors->take(5)->map(fn ($d) => [
                     'id' => $d->id, 'code' => $d->code, 'name' => $d->name, 'balance' => (int) $d->credit_balance,
                 ])->values(),
+            ],
+            'promotions' => [
+                'promos' => $promoUse->map(fn ($r) => ['name' => $r->name, 'qty' => (int) $r->qty, 'discount' => (int) $r->discount]),
+                'vouchers' => $voucherUse->map(fn ($r) => ['code' => $r->code, 'orders' => (int) $r->orders, 'discount' => (int) $r->discount]),
             ],
             'by_tier' => $byTier->map(fn ($r) => [
                 'name' => $r->name, 'orders' => (int) $r->orders, 'sales' => (int) $r->sales,

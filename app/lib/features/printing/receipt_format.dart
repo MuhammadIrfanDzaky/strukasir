@@ -120,6 +120,8 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
     // Diskon tingkat member: baris tanpa diskon manual (discount null) di order bertingkat.
     final label = reward?['item_id'] == item['id']
         ? '  Hadiah'
+        : item['promo'] != null
+        ? '  ${item['promo']}'
         : (order['tier'] != null && item['discount'] == null ? '  Diskon ${(order['tier'] as Map)['name']}' : '  Diskon');
     if (disc > 0) out.addAll(_plain(leftRight(label, '-${rupiah(disc)}')));
   }
@@ -133,7 +135,9 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
     ..add(PrintLine('Total Qty: ${items.fold<int>(0, (s, i) => s + (i['qty'] as int))}'))
     ..addAll(_plain(leftRight('  Sub Total', rupiah(order['subtotal'] as int))));
   if (orderDiscount > 0) {
-    final label = reward != null && reward['item_id'] == null ? '  Hadiah ${reward['name']}' : '  Diskon';
+    final label = reward != null && reward['item_id'] == null
+        ? '  Hadiah ${reward['name']}'
+        : order['voucher'] is Map ? '  Voucher ${(order['voucher'] as Map)['code']}' : '  Diskon';
     out.addAll(_plain(leftRight(label, '-${rupiah(orderDiscount)}')));
   }
   // Persen tarif saat transaksi, supaya pelanggan tahu besarnya (order lama tanpa tarif: label saja).

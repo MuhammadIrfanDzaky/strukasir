@@ -8,6 +8,7 @@ import '../customers/credit_dialogs.dart';
 import '../customers/customer_picker.dart';
 import '../customers/member_tier.dart';
 import '../loyalty/reward_dialog.dart';
+import '../promotions/voucher_dialog.dart';
 import '../menu/menu_controller.dart';
 import '../menu/modifier_selection.dart';
 import '../session/session_controller.dart';
@@ -113,6 +114,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
       final totals = ref.read(cartTotalsProvider);
       final count = cart.lines.fold<int>(0, (n, l) => n + l.qty);
       final pricing = ref.read(menuProvider).value?.menu.pricing;
+      final pricingMenu = ref.read(menuProvider).value?.menu;
       return AlertDialog(
         scrollable: true,
         title: Text(cart.isSaved ? 'Cek pesanan · ${cart.number}' : 'Cek pesanan'),
@@ -156,7 +158,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                               Text('Catatan: ${l.note}', style: AppType.caption.copyWith(color: AppColors.warning)),
                             if (totals.lineDiscounts.length > i && totals.lineDiscounts[i] > 0)
                               Text(
-                                '${l.id == cart.rewardItemId ? 'Hadiah' : isTierLine(cart, l) ? 'Diskon member' : 'Diskon'} -${rupiah(totals.lineDiscounts[i])}',
+                                '${l.id == cart.rewardItemId ? 'Hadiah' : (pricingMenu == null ? null : lineBenefit(cart, pricingMenu, l, DateTime.now()))?.label ?? 'Diskon'} -${rupiah(totals.lineDiscounts[i])}',
                                 style: AppType.caption.copyWith(color: AppColors.success),
                               ),
                           ],
@@ -174,7 +176,9 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               const SizedBox(height: AppSpace.s3),
               AppSummaryRow('Subtotal', rupiah(totals.subtotal)),
               if (totals.orderDiscount > 0)
-                AppSummaryRow(cart.reward != null && !cart.reward!.isFreeProduct ? 'Hadiah: ${cart.reward!.name}' : 'Diskon',
+                AppSummaryRow(cart.reward != null && !cart.reward!.isFreeProduct
+                    ? 'Hadiah: ${cart.reward!.name}'
+                    : cart.voucher != null ? 'Voucher ${cart.voucher!.code}' : 'Diskon',
                     '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
               if (totals.serviceTotal > 0)
                 AppSummaryRow(withRate('Service', pricing?.serviceBp, included: pricing?.serviceInclusive ?? false),
@@ -434,7 +438,8 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           final l = cart.lines[i];
           final discount = totals.lineDiscounts.length > i ? totals.lineDiscounts[i] : 0;
           final isReward = l.id == cart.rewardItemId;
-          final tierLine = isTierLine(cart, l);
+          // Diskon otomatis (promo / tingkat member) diberi nama sumbernya.
+          final auto = isReward || menu == null ? null : lineBenefit(cart, menu, l, DateTime.now());
           final meta = [
             if (l.modifiers.isNotEmpty) modifierSummary(l.modifiers),
             if (l.note != null && l.note!.isNotEmpty) '“${l.note}”',
@@ -453,7 +458,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                         if (meta.isNotEmpty) Text(meta, style: AppType.caption.copyWith(color: AppColors.inkMuted)),
                         if (discount > 0)
                           Text(
-                            '${isReward ? 'Hadiah' : tierLine ? 'Diskon member' : 'Diskon'} -${rupiah(discount)}',
+                            '${isReward ? 'Hadiah' : auto?.label ?? 'Diskon'} -${rupiah(discount)}',
                             style: AppType.caption.copyWith(color: AppColors.success, fontWeight: FontWeight.w600),
                           ),
                       ],
@@ -489,7 +494,9 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         final breakdown = <Widget>[
           AppSummaryRow('Subtotal', rupiah(totals.subtotal)),
           if (totals.orderDiscount > 0)
-            AppSummaryRow(reward != null && !reward.isFreeProduct ? 'Hadiah: ${reward.name}' : 'Diskon',
+            AppSummaryRow(reward != null && !reward.isFreeProduct
+                ? 'Hadiah: ${reward.name}'
+                : cart.voucher != null ? 'Voucher ${cart.voucher!.code}' : 'Diskon',
                 '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
           if (totals.serviceTotal > 0)
             AppSummaryRow(withRate('Service', menu?.pricing.serviceBp, included: menu?.pricing.serviceInclusive ?? false),
@@ -511,7 +518,38 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               ]),
             ),
           // Hadiah potongan memakai diskon order: diskon order manual tidak bisa digabung.
-          if (canDiscount && !cart.isEmpty && (reward == null || reward.isFreeProduct))
+          if (cart.voucher != null) ...[
+            Row(children: [
+              Expanded(
+                child: Text(
+                  totals.orderDiscount > 0
+                      ? 'Voucher ${cart.voucher!.code} terpasang'
+                      : 'Voucher ${cart.voucher!.code}: minimal belanja ${rp(cart.voucher!.minSpend)}',
+                  style: AppType.caption.copyWith(color: totals.orderDiscount > 0 ? AppColors.success : AppColors.warning),
+                ),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(minimumSize: const Size(0, 32), visualDensity: VisualDensity.compact),
+                onPressed: _busy ? null : notifier.clearVoucher,
+                child: const Text('Lepas voucher'),
+              ),
+            ]),
+          ] else if ((menu?.feature('promotions') ?? false) && !cart.isEmpty && cart.orderDiscount == null && (reward == null || reward.isFreeProduct))
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40)),
+                onPressed: _busy
+                    ? null
+                    : () async {
+                        final v = await showVoucherDialog(context);
+                        if (v != null) notifier.setVoucher(v);
+                      },
+                icon: const Icon(Icons.confirmation_number_rounded, size: 18),
+                label: const Text('Pakai voucher'),
+              ),
+            ),
+          if (canDiscount && !cart.isEmpty && cart.voucher == null && (reward == null || reward.isFreeProduct))
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(

@@ -414,6 +414,18 @@ class _Dashboard extends StatelessWidget {
           ]),
         ]),
       ],
+      if (((r['promotions'] as Map?)?['promos'] as List?)?.isNotEmpty == true ||
+          ((r['promotions'] as Map?)?['vouchers'] as List?)?.isNotEmpty == true) ...[
+        const SizedBox(height: AppSpace.s3),
+        AppSectionCard(title: 'Promo & voucher terpakai', children: [
+          RankedBars(rows: [
+            for (final p in (((r['promotions'] as Map)['promos'] as List?) ?? const []).cast<Map<String, dynamic>>())
+              (p['name'] as String, p['discount'] as int, '-${rp(p['discount'] as int)}', '${p['qty']} item'),
+            for (final v in (((r['promotions'] as Map)['vouchers'] as List?) ?? const []).cast<Map<String, dynamic>>())
+              ('Voucher ${v['code']}', v['discount'] as int, '-${rp(v['discount'] as int)}', '${v['orders']} transaksi'),
+          ]),
+        ]),
+      ],
       if (customersOn && _list('by_tier').isNotEmpty) ...[
         const SizedBox(height: AppSpace.s3),
         AppSectionCard(title: 'Penjualan per tingkat member', children: [

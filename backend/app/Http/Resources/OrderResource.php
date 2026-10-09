@@ -45,6 +45,8 @@ class OrderResource extends JsonResource
             ],
             'loyalty' => $this->loyalty(),
             'credit' => $this->credit(),
+            'voucher' => $this->voucher_code === null ? null : ['code' => $this->voucher_code, 'discount' => $this->voucher_discount],
+            'promo_discount' => $this->promo_discount,
             'tier' => $this->tier_name === null ? null : [
                 'id' => $this->tier_id,
                 'name' => $this->tier_name,
@@ -65,6 +67,8 @@ class OrderResource extends JsonResource
                 'discount' => $i->discount_type ? ['type' => $i->discount_type, 'value' => $i->discount_value] : null,
                 'discount_total' => $i->discount_total,
                 'line_total' => $i->line_total,
+                // Nama promo bila diskon baris ini dari promo otomatis.
+                'promo' => $i->promo_name,
                 'modifiers' => $i->modifiers->map(fn (OrderItemModifier $m) => [
                     'modifier_id' => $m->modifier_id,
                     'group_name' => $m->group_name,

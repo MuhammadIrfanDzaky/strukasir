@@ -50,8 +50,9 @@ void main() {
     notifier.setLineDiscount(c.read(cartProvider).lines.last.id, const Discount.amount(1000));
     totals = priceCart(c.read(cartProvider), menu);
     expect(totals.lineDiscounts, [3000, 1000]);
-    expect(isTierLine(c.read(cartProvider), c.read(cartProvider).lines.first), isTrue);
-    expect(isTierLine(c.read(cartProvider), c.read(cartProvider).lines.last), isFalse);
+    final now = DateTime(2026, 10, 14, 10);
+    expect(lineBenefit(c.read(cartProvider), menu, c.read(cartProvider).lines.first, now)?.label, 'Diskon member');
+    expect(lineBenefit(c.read(cartProvider), menu, c.read(cartProvider).lines.last, now), isNull);
   });
 
   test('baris hadiah gratis tidak ikut diskon tingkat; stempel dikali pengali tingkat', () {

@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductImportController;
+use App\Http\Controllers\Api\V1\PromotionController;
 use App\Http\Controllers\Api\V1\ReceiptSettingsController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\ReportExportController;
@@ -67,6 +68,7 @@ Route::prefix('v1')->group(function () {
             Route::post('orders/{order}/pay', [OrderController::class, 'pay']);
             // Kasir boleh memanggil; tanpa izin order.void wajib menyertakan persetujuan PIN owner.
             Route::post('orders/{order}/void', [OrderController::class, 'void']);
+            Route::get('vouchers/check', [PromotionController::class, 'check'])->middleware('throttle:30,1');
         });
 
         // Pelanggan / member (fitur `customers`): kasir mencari & mendaftarkan, owner mengelola.
@@ -117,6 +119,11 @@ Route::prefix('v1')->group(function () {
             Route::put('settings/loyalty', [LoyaltyController::class, 'update']);
             Route::get('settings/tiers', [TierController::class, 'show']);
             Route::put('settings/tiers', [TierController::class, 'update']);
+            Route::get('settings/promotions', [PromotionController::class, 'index']);
+            Route::post('promotions', [PromotionController::class, 'savePromotion']);
+            Route::put('promotions/{promotion}', [PromotionController::class, 'savePromotion']);
+            Route::post('vouchers', [PromotionController::class, 'saveVoucher']);
+            Route::put('vouchers/{voucher}', [PromotionController::class, 'saveVoucher']);
             Route::get('settings/messages', [MessageController::class, 'templates']);
             Route::put('settings/messages', [MessageController::class, 'saveTemplates']);
             Route::post('devices/current/unregister', DeviceUnregisterController::class);

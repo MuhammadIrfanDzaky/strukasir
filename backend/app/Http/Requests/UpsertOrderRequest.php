@@ -22,6 +22,8 @@ class UpsertOrderRequest extends FormRequest
             'reward.item_id' => ['nullable', 'uuid'],
             // Tingkat member yang dipakai tablet untuk menghitung harga (deteksi tingkat yang berubah).
             'tier_id' => ['nullable', 'uuid'],
+            // Voucher kode (diskon order); syarat & potongan dihitung server.
+            'voucher_code' => ['nullable', 'string', 'max:20'],
             'client_created_at' => ['nullable', 'date'],
             'expected_total' => ['required', 'integer', 'min:0'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
