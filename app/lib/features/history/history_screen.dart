@@ -14,6 +14,7 @@ import '../printing/receipt_format.dart';
 import '../printing/receipt_preview.dart';
 import '../session/session_controller.dart';
 import '../shift/shift_controller.dart';
+import '../customers/messaging.dart';
 
 String _isoDate(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -332,6 +333,17 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
             child: const Text('Void'),
           ),
         if (o['status'] == 'paid') TextButton(onPressed: _busy ? null : _reprint, child: const Text('Cetak ulang')),
+        // Struk digital ke member (fitur pesan WhatsApp); server menolak bila member tanpa no HP.
+        if (o['status'] == 'paid' &&
+            o['customer'] is Map &&
+            (o['customer'] as Map)['anonymized'] != true &&
+            (ref.watch(menuProvider).value?.menu.feature('customer_messaging') ?? false))
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () => openWhatsApp(context, ref, (o['customer'] as Map)['id'] as String, 'receipt', orderId: o['id'] as String),
+            child: const Text('Struk via WA'),
+          ),
         FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Tutup')),
       ],
     );

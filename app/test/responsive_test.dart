@@ -16,6 +16,7 @@ import 'package:berrybrew_pos/features/customers/customer_api.dart';
 import 'package:berrybrew_pos/features/customers/customer_form.dart';
 import 'package:berrybrew_pos/features/customers/customers_screen.dart';
 import 'package:berrybrew_pos/features/customers/member_tier.dart';
+import 'package:berrybrew_pos/features/customers/messaging.dart';
 import 'package:berrybrew_pos/features/customers/tier_settings_screen.dart';
 import 'package:berrybrew_pos/features/history/history_screen.dart';
 import 'package:berrybrew_pos/features/loyalty/loyalty_models.dart';
@@ -74,7 +75,7 @@ const owner = SessionUser(id: 'u1', name: 'Rina Amelia', role: 'owner', permissi
 /// Menu contoh + beberapa produk tambahan (nama panjang, habis) supaya grid terisi.
 final bigMenu = Menu.fromJson({
   ...menuJson,
-  'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true, 'member_tiers': true, 'customer_credit': true},
+  'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true, 'member_tiers': true, 'customer_credit': true, 'customer_messaging': true},
   'member_tiers': tiersJson,
   'loyalty': loyaltyJson,
   'categories': [
@@ -183,6 +184,7 @@ final featureSettingsJson = {
     _f('split_payment', 'Bayar dengan beberapa metode', 'Satu order dibayar dengan beberapa metode', on: false, available: false),
     _f('customers', 'Pelanggan / member', 'Data pelanggan / member: cari & tautkan ke order, riwayat belanja, kelompok pelanggan'),
     _f('loyalty', 'Program loyalitas', 'Program loyalitas: stempel / poin dari belanja member, tukar hadiah', requires: 'customers'),
+    _f('customer_messaging', 'Pesan WhatsApp', 'Pesan WhatsApp ke member: struk digital, ucapan ulang tahun, sapa pelanggan lama, pengingat kasbon', requires: 'customers'),
     _f('customer_credit', 'Kasbon (bayar nanti)', 'Kasbon / piutang member: bayar nanti dengan batas, pelunasan di kasir, laporan piutang', requires: 'customers'),
     _f('member_tiers', 'Tingkat member', 'Tingkat member (mis. Silver/Gold): naik otomatis dari belanja, diskon & pengali stempel', requires: 'customers'),
   ],
@@ -312,6 +314,27 @@ Dio fakeDio() => Dio()
     final path = o.path;
     final data = path.startsWith('/settings/features')
         ? {'data': featureSettingsJson}
+        : path.startsWith('/messages/audience')
+        ? {'data': [
+            {'id': 'cu1', 'code': 'M0001', 'name': 'Andi Saputra', 'birth_date': '1990-10-11', 'last_visit_at': '2026-08-20T10:00:00Z',
+              'credit_balance': 185000, 'last_sent_at': null},
+            {'id': 'cu2', 'code': 'M0012', 'name': 'Siti Nurhaliza Putri Ramadhani', 'birth_date': '1995-10-14',
+              'last_visit_at': '2026-07-02T10:00:00Z', 'credit_balance': 45000, 'last_sent_at': '2026-10-08T10:00:00Z'},
+          ]}
+        : path.startsWith('/settings/messages')
+        ? {'data': {
+            'templates': [
+              for (final (k, t, b) in const [
+                ('receipt', 'Struk digital', 'Halo {nama}, terima kasih sudah belanja di {kedai}!\n\n{struk}\n\nSampai jumpa lagi'),
+                ('birthday', 'Ucapan ulang tahun', 'Selamat ulang tahun, {nama}! Mampir ke {kedai} ya.'),
+                ('winback', 'Sapa pelanggan lama', 'Halo {nama}, sudah lama tidak mampir ke {kedai}.'),
+                ('credit_reminder', 'Pengingat kasbon', 'Halo {nama}, kasbon di {kedai} saat ini {sisa_kasbon}.'),
+                ('greeting', 'Sapaan umum', 'Halo {nama}, salam dari {kedai}!'),
+              ])
+                {'key': k, 'title': t, 'body': b, 'default': b},
+            ],
+            'placeholders': ['{nama}', '{kedai}', '{kode}', '{tingkat}', '{stempel}', '{sisa_kasbon}', '{struk}', '{total}', '{nomor}'],
+          }}
         : path.startsWith('/settings/tiers')
         ? {'data': {'basis': 'spend', 'window_months': 12, 'tiers': tiersJson}}
         : path.startsWith('/settings/loyalty')
@@ -611,6 +634,18 @@ final scenarios = <Scenario>[
         }),
     fillCart: false,
     act: null,
+  ),
+  (name: 'pesan-wa-daftar', session: loggedIn, home: (_) => const MessagingScreen(creditOn: true), fillCart: false, act: null),
+  (name: 'pesan-wa-template', session: loggedIn, home: (_) => const MessageTemplatesScreen(), fillCart: false, act: null),
+  (
+    name: 'riwayat-detail-member',
+    session: loggedIn,
+    home: (_) => dialogHost(OrderDetailDialog(order: {
+          ...order(),
+          'customer': {'id': 'cu1', 'code': 'M0001', 'name': 'Andi', 'anonymized': false},
+        })),
+    fillCart: false,
+    act: (t) async => expect(find.text('Struk via WA'), findsOneWidget),
   ),
   (name: 'riwayat', session: loggedIn, home: (s) => home(s, 1), fillCart: false, act: null),
   (

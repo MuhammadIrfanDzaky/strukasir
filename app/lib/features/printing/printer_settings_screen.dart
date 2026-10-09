@@ -6,6 +6,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import 'printer_service.dart';
+import '../customers/messaging.dart';
 import '../customers/tier_settings_screen.dart';
 import '../loyalty/loyalty_settings_screen.dart';
 import '../menu/menu_controller.dart';
@@ -77,6 +78,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     final receipt = ref.watch(menuProvider).value?.menu.receipt;
     final loyaltyOn = ref.watch(menuProvider).value?.menu.feature('loyalty') ?? false;
     final tiersOn = ref.watch(menuProvider).value?.menu.feature('member_tiers') ?? false;
+    final messagingOn = ref.watch(menuProvider).value?.menu.feature('customer_messaging') ?? false;
     final device = (ref.watch(sessionProvider).value as LoggedIn?)?.device;
     final testButton = OutlinedButton(
       onPressed: saved == null || _busy
@@ -225,6 +227,29 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                           )),
                           icon: const Icon(Icons.workspace_premium_rounded),
                           label: const Text('Atur tingkat member'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (messagingOn) ...[
+                  const SizedBox(height: AppSpace.s4),
+                  AppSectionCard(
+                    title: 'Pesan WhatsApp',
+                    children: [
+                      Text(
+                        'Teks struk digital, ucapan ulang tahun, sapaan pelanggan lama, dan pengingat kasbon.',
+                        style: AppType.body.copyWith(color: AppColors.inkMuted),
+                      ),
+                      const SizedBox(height: AppSpace.s3),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                            builder: (_) => const MessageTemplatesScreen(),
+                          )),
+                          icon: const Icon(Icons.chat_rounded),
+                          label: const Text('Atur pesan WhatsApp'),
                         ),
                       ),
                     ],

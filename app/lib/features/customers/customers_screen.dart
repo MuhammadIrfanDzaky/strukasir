@@ -15,6 +15,7 @@ import 'customer_form.dart';
 import 'credit_dialogs.dart';
 import 'customer_picker.dart';
 import 'member_tier.dart';
+import 'messaging.dart';
 
 /// Kelompok pelanggan (sama dengan server: CustomerService::SEGMENTS).
 const _segments = [
@@ -202,6 +203,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       itemBuilder: (_) => [for (final e in _sorts.entries) PopupMenuItem(value: e.key, child: Text(e.value))],
       icon: const Icon(Icons.sort_rounded),
     );
+    final messagingOn = ref.watch(menuProvider).value?.menu.feature('customer_messaging') ?? false;
+    void openMessaging() => Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => MessagingScreen(creditOn: ref.read(menuProvider).value?.menu.feature('customer_credit') ?? false),
+        ));
     // HP: urutkan & import digabung di satu menu supaya kolom cari tetap lega.
     final actions = compact
         ? [
@@ -211,6 +216,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
               onSelected: (v) {
                 if (v == 'import') {
                   _import();
+                } else if (v == 'messages') {
+                  openMessaging();
                 } else {
                   setState(() => _sort = v);
                   _load();
@@ -224,12 +231,18 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   value: 'import',
                   child: ListTile(leading: Icon(Icons.upload_file_rounded), title: Text('Import CSV')),
                 ),
+                if (messagingOn)
+                  const PopupMenuItem(
+                    value: 'messages',
+                    child: ListTile(leading: Icon(Icons.chat_rounded), title: Text('Kirim pesan WA')),
+                  ),
               ],
             ),
           ]
         : [
             sortMenu,
             IconButton(tooltip: 'Import CSV', onPressed: _import, icon: const Icon(Icons.upload_file_rounded)),
+            if (messagingOn) IconButton(tooltip: 'Kirim pesan WA', onPressed: openMessaging, icon: const Icon(Icons.chat_rounded)),
             FilledButton.icon(onPressed: _add, icon: const Icon(Icons.person_add_alt_1_rounded), label: const Text('Tambah')),
           ];
 
@@ -546,6 +559,17 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
           actions: [
             if (c != null) ...[
               IconButton(tooltip: 'Ubah', onPressed: () => _edit(c), icon: const Icon(Icons.edit_rounded)),
+              if (c.phone != null && (ref.watch(menuProvider).value?.menu.feature('customer_messaging') ?? false))
+                PopupMenuButton<String>(
+                  tooltip: 'Kirim WA',
+                  icon: const Icon(Icons.chat_rounded),
+                  onSelected: (t) => openWhatsApp(context, ref, c.id, t),
+                  itemBuilder: (_) => [
+                    for (final (key, label, icon) in ownerTemplates)
+                      if (key != 'credit_reminder' || (c.creditBalance ?? 0) > 0)
+                        PopupMenuItem(value: key, child: ListTile(leading: Icon(icon), title: Text(label))),
+                  ],
+                ),
               PopupMenuButton<String>(
                 tooltip: 'Lainnya',
                 onSelected: (_) => _anonymize(c),

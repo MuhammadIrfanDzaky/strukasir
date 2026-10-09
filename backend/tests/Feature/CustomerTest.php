@@ -298,7 +298,7 @@ class CustomerTest extends TestCase
         $item = ['id' => (string) Str::uuid(), 'product_id' => $this->latte->id, 'qty' => 1, 'modifier_ids' => []];
         $this->api('PUT', "/api/v1/orders/{$openId}", $this->cashier, ['items' => [$item], 'expected_total' => 20000, 'customer_id' => $id])->assertOk();
 
-        $this->api('PUT', '/api/v1/settings/features', $this->owner, ['features' => ['customers' => false, 'loyalty' => false, 'member_tiers' => false, 'customer_credit' => false]])->assertOk();
+        $this->api('PUT', '/api/v1/settings/features', $this->owner, ['features' => ['customers' => false, 'loyalty' => false, 'member_tiers' => false, 'customer_credit' => false, 'customer_messaging' => false]])->assertOk();
         $this->assertNotContains('customers.view', $this->api('GET', '/api/v1/auth/me', $this->cashier)->json('user.permissions'));
 
         $this->api('GET', '/api/v1/customers', $this->cashier)->assertForbidden();

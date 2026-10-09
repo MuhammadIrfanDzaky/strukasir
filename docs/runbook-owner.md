@@ -45,6 +45,10 @@ bila lewat batas, owner memasukkan PIN. Struk mencetak "Sisa kasbon". Kasbon tid
   *Catat pelunasan*). Boleh dicicil. Tunai masuk laci dan ikut "kas seharusnya" saat tutup shift; bukti
   pelunasan tercetak.
 
+**Struk via WhatsApp** (bila fitur *Pesan WhatsApp* aktif & member punya no HP): setelah bayar, ketuk
+**Struk via WA** di layar Lunas (atau Riwayat → order → *Struk via WA*). WhatsApp terbuka dengan struk siap
+kirim; tekan kirim. Butuh WhatsApp terpasang di tablet/HP (gratis, tanpa langganan WA Business API).
+
 **Bayar nanti (Open Bill)**: ketuk **Open Bill** di bawah keranjang. Order disimpan tanpa mencetak apa pun.
 Untuk menambah pesanan atau membayar, ketuk **Open Bill** di atas keranjang dan pilih order-nya:
 - pelanggan pesan lagi → tambah produk, lalu ketuk **Simpan Bill**;
@@ -131,6 +135,17 @@ Menu **Pengaturan → Program loyalitas** (fitur *Program loyalitas* harus aktif
   stempel kertas. Semua perubahan tercatat di riwayat stempel pelanggan.
 - **Dashboard**: stempel/poin keluar vs ditukar, nilai hadiah, hadiah terpopuler.
 
+## Pesan WhatsApp (owner)
+
+- **Kirim pesan**: Pelanggan → ikon chat (*Kirim pesan WA*) → tab **Ulang tahun** (hari ini s/d 7 hari ke
+  depan), **Menghilang** (>30 hari tidak datang), **Berkasbon**. Ketuk **WA** → WhatsApp terbuka dengan pesan
+  siap kirim. Yang sudah dikirimi bertanda "Terkirim …" supaya tidak dobel.
+- **Per pelanggan**: detail pelanggan → ikon chat → pilih sapaan / ulang tahun / sapa pelanggan lama /
+  pengingat kasbon.
+- **Ubah teks**: Pengaturan → *Pesan WhatsApp*. Isian otomatis: {nama} {kedai} {kode} {tingkat} {stempel}
+  {sisa_kasbon} {struk} {total} {nomor}. *Teks bawaan* mengembalikan teks awal.
+- Kasir hanya bisa mengirim struk digital; pesan lain hanya owner. Semua pesan yang disiapkan tercatat.
+
 ## Kasbon (owner)
 
 - **Batas default** per member: Pengaturan → Fitur → *Kasbon* (kosong = tanpa batas). Batas khusus per
@@ -169,6 +184,7 @@ ikut berubah. Mematikan fitur tidak menghapus data.
 - **Pelanggan / member**: data pelanggan, kode member, riwayat belanja. Saklar **No HP pelanggan wajib**:
   nyala = pelanggan baru harus punya no HP (tidak bisa dobel); mati = boleh nama saja.
 - **Program loyalitas**: stempel/poin & hadiah untuk member (butuh *Pelanggan / member*).
+- **Pesan WhatsApp**: struk digital & pesan ke member lewat WhatsApp (butuh *Pelanggan*).
 - **Kasbon (bayar nanti)**: member boleh berutang dengan batas; pelunasan di kasir (butuh *Pelanggan*).
 - **Tingkat member**: Silver/Gold dst. dengan diskon & pengali stempel (butuh *Pelanggan / member*).
 - **Pajak & service**: isi persen (mis. PB1 10%, service 5%); 0 = tidak dipungut. Untuk tiap tarif yang

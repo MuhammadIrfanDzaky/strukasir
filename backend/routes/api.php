@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\EmailVerificationController;
 use App\Http\Controllers\Api\V1\FeatureSettingsController;
 use App\Http\Controllers\Api\V1\LoyaltyController;
 use App\Http\Controllers\Api\V1\MenuController;
+use App\Http\Controllers\Api\V1\MessageController;
 use App\Http\Controllers\Api\V1\ModifierGroupController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
@@ -69,6 +70,9 @@ Route::prefix('v1')->group(function () {
             Route::post('customers', [CustomerController::class, 'store']);
         });
         // Pelunasan kasbon: kasir yang mengoperasikan shift (uang masuk laci).
+        // Pesan WhatsApp: kasir boleh struk digital (dicek di controller), sisanya owner.
+        Route::post('customers/{customer}/messages', [MessageController::class, 'prepare'])
+            ->middleware('can:'.Permission::CustomersView->value);
         Route::post('customers/{customer}/credit-repayments', [CustomerController::class, 'repayCredit'])
             ->middleware(['can:'.Permission::CustomersView->value, 'can:'.Permission::ShiftOperate->value]);
         Route::middleware('can:'.Permission::CustomersManage->value)->group(function () {
@@ -78,6 +82,7 @@ Route::prefix('v1')->group(function () {
             Route::post('customers/{customer}/anonymize', [CustomerController::class, 'anonymize']);
             Route::post('customers/{customer}/loyalty-adjust', [CustomerController::class, 'adjustLoyalty']);
             Route::put('customers/{customer}/tier', [CustomerController::class, 'setTier']);
+            Route::get('messages/audience', [MessageController::class, 'audience']);
             Route::put('customers/{customer}/credit-limit', [CustomerController::class, 'setCreditLimit']);
             Route::post('customers/{customer}/credit-repayments/{repayment}/reverse', [CustomerController::class, 'reverseRepayment'])->whereUuid('repayment');
         });
@@ -100,6 +105,8 @@ Route::prefix('v1')->group(function () {
             Route::put('settings/loyalty', [LoyaltyController::class, 'update']);
             Route::get('settings/tiers', [TierController::class, 'show']);
             Route::put('settings/tiers', [TierController::class, 'update']);
+            Route::get('settings/messages', [MessageController::class, 'templates']);
+            Route::put('settings/messages', [MessageController::class, 'saveTemplates']);
             Route::post('devices/current/unregister', DeviceUnregisterController::class);
         });
 

@@ -5,6 +5,7 @@ import '../../core/api_client.dart';
 import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
+import '../customers/messaging.dart';
 import '../menu/menu_controller.dart';
 import '../printing/printer_service.dart';
 import '../printing/receipt_format.dart';
@@ -90,9 +91,12 @@ class CheckoutFlow {
       paid = current!;
     }
 
+    // Struk digital via WA: hanya bila fitur aktif & member punya no HP (dicatat sebelum keranjang dikosongkan).
+    final member = ref.read(cartProvider).customer;
+    final canWhatsApp = (ref.read(menuProvider).value?.menu.feature('customer_messaging') ?? false) && member?.phone != null;
     ref.read(cartProvider.notifier).clear();
     await _print(paid);
-    if (context.mounted) await _showDone(paid);
+    if (context.mounted) await _showDone(paid, whatsAppTo: canWhatsApp ? member!.id : null);
   }
 
   Future<void> reprint(OrderJson order) => _print(order);
@@ -152,7 +156,7 @@ class CheckoutFlow {
     }
   }
 
-  Future<void> _showDone(OrderJson order) => showDialog<void>(
+  Future<void> _showDone(OrderJson order, {String? whatsAppTo}) => showDialog<void>(
         context: context,
         builder: (_) => AlertDialog(
           scrollable: true,
@@ -179,6 +183,12 @@ class CheckoutFlow {
             ]),
           ),
           actions: [
+            if (whatsAppTo != null)
+              TextButton.icon(
+                onPressed: () => openWhatsApp(context, ref, whatsAppTo, 'receipt', orderId: order['id'] as String),
+                icon: const Icon(Icons.chat_rounded, size: 18),
+                label: const Text('Struk via WA'),
+              ),
             TextButton(onPressed: () => reprint(order), child: const Text('Cetak ulang struk')),
             FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Order baru')),
           ],

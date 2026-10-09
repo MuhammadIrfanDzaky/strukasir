@@ -19,6 +19,7 @@ enum Feature: string
     case Loyalty = 'loyalty';
     case MemberTiers = 'member_tiers';
     case CustomerCredit = 'customer_credit';
+    case CustomerMessaging = 'customer_messaging';
 
     public function description(): string
     {
@@ -34,6 +35,7 @@ enum Feature: string
             self::Loyalty => 'Program loyalitas: stempel / poin dari belanja member, tukar hadiah',
             self::MemberTiers => 'Tingkat member (mis. Silver/Gold): naik otomatis dari belanja, diskon & pengali stempel',
             self::CustomerCredit => 'Kasbon / piutang member: bayar nanti dengan batas, pelunasan di kasir, laporan piutang',
+            self::CustomerMessaging => 'Pesan WhatsApp ke member: struk digital, ucapan ulang tahun, sapa pelanggan lama, pengingat kasbon',
         };
     }
 
@@ -52,6 +54,7 @@ enum Feature: string
             self::Loyalty => 'Program loyalitas',
             self::MemberTiers => 'Tingkat member',
             self::CustomerCredit => 'Kasbon (bayar nanti)',
+            self::CustomerMessaging => 'Pesan WhatsApp',
         };
     }
 
@@ -71,6 +74,7 @@ enum Feature: string
             self::Loyalty => self::Customers,
             self::MemberTiers => self::Customers,
             self::CustomerCredit => self::Customers,
+            self::CustomerMessaging => self::Customers,
             default => null,
         };
     }
