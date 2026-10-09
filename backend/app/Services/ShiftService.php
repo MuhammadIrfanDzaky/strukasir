@@ -30,6 +30,7 @@ class ShiftService
         $shift = new Shift;
         $shift->forceFill([
             'device_id' => $device->id,
+            'outlet_id' => $device->outlet_id,
             'opened_by' => $user->id,
             'opened_at' => now(),
             'opening_cash' => $openingCash,

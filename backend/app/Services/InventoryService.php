@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\Audit;
 use App\Support\Tenancy\FeatureGate;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Stok bahan & resep (fitur `inventory`). Semua perubahan stok lewat move(): baris bahan dikunci
+ * Stok bahan & resep (fitur `inventory`); stok & modal rata-rata per outlet. Semua perubahan stok lewat move(): baris stok dikunci
  * (urut ID, supaya dua transaksi bersamaan tidak saling menunggu), stok & modal rata-rata dihitung
  * ulang, lalu satu baris `stock_movements` dicatat. Stok boleh minus: penjualan tidak pernah
  * ditolak karena stok (pembelian sering terlambat dicatat); minus tampil sebagai peringatan.
@@ -62,10 +63,16 @@ class InventoryService
         return $i->active && ((float) $i->stock < 0 || ($i->min_stock !== null && (float) $i->stock <= (float) $i->min_stock));
     }
 
-    /** @return Collection<int, Ingredient> bahan aktif yang menipis / minus */
-    public function lowStock(): Collection
+    /** @return Collection<int, Ingredient> bahan aktif yang menipis / minus di satu outlet */
+    public function lowStock(string $outletId): Collection
     {
-        return Ingredient::query()->where('active', true)->orderBy('name')->get()->filter(fn ($i) => self::isLow($i))->values();
+        return Ingredient::query()->withStock($outletId)->where('active', true)->orderBy('name')->get()->filter(fn ($i) => self::isLow($i))->values();
+    }
+
+    /** @return Collection<int, Ingredient> semua bahan dengan stok satu outlet (aktif dulu) */
+    public function ingredients(string $outletId): Collection
+    {
+        return Ingredient::query()->withStock($outletId)->orderByDesc('ingredients.active')->orderBy('ingredients.name')->get();
     }
 
     // ───────────────────────────── resep & HPP ─────────────────────────────
@@ -133,20 +140,20 @@ class InventoryService
      *
      * @return array<string, int>
      */
-    public function productCosts(): array
+    public function productCosts(string $outletId): array
     {
-        return DB::table('recipe_items')->join('ingredients', 'ingredients.id', '=', 'recipe_items.ingredient_id')
+        return $this->recipeCostQuery($outletId)
             ->whereNotNull('recipe_items.product_id')->groupBy('recipe_items.product_id')
-            ->selectRaw('recipe_items.product_id, sum(recipe_items.qty * ingredients.avg_cost) as cost')
+            ->selectRaw('recipe_items.product_id, sum(recipe_items.qty * coalesce(s.avg_cost, 0)) as cost')
             ->pluck('cost', 'product_id')->map(fn ($c) => max(0, (int) round((float) $c)))->all();
     }
 
     /** @return array<string, float> tambahan HPP per pilihan varian (boleh negatif) */
-    public function modifierCosts(): array
+    public function modifierCosts(string $outletId): array
     {
-        return DB::table('recipe_items')->join('ingredients', 'ingredients.id', '=', 'recipe_items.ingredient_id')
+        return $this->recipeCostQuery($outletId)
             ->whereNotNull('recipe_items.modifier_id')->groupBy('recipe_items.modifier_id')
-            ->selectRaw('recipe_items.modifier_id, sum(recipe_items.qty * ingredients.avg_cost) as cost')
+            ->selectRaw('recipe_items.modifier_id, sum(recipe_items.qty * coalesce(s.avg_cost, 0)) as cost')
             ->pluck('cost', 'modifier_id')->map(fn ($c) => (float) $c)->all();
     }
 
@@ -157,13 +164,13 @@ class InventoryService
      * @param  list<array<string, mixed>>  $lines  baris dari OrderService::buildLines
      * @return list<array<string, mixed>>
      */
-    public function withUnitCosts(array $lines): array
+    public function withUnitCosts(array $lines, string $outletId): array
     {
         if (! $this->enabled()) {
             return $lines;
         }
-        $products = $this->productCosts();
-        $modifiers = $this->modifierCosts();
+        $products = $this->productCosts($outletId);
+        $modifiers = $this->modifierCosts($outletId);
 
         return array_map(function (array $line) use ($products, $modifiers) {
             $base = $products[$line['product']->id] ?? $line['product']->cost;
@@ -207,7 +214,7 @@ class InventoryService
             }
         }
 
-        $locked = $this->lock(array_keys($need));
+        $locked = $this->lock(array_keys($need), $order->outlet_id);
         foreach ($need as $id => $qty) {
             if (abs($qty) >= 0.0005) {
                 $this->move($locked[$id], 'sale', -$qty, null, ['order_id' => $order->id, 'created_by' => $user->id]);
@@ -222,7 +229,7 @@ class InventoryService
         if ($sold->isEmpty() || DB::table('stock_movements')->where('order_id', $order->id)->where('kind', 'void')->exists()) {
             return;
         }
-        $locked = $this->lock($sold->pluck('ingredient_id')->all());
+        $locked = $this->lock($sold->pluck('ingredient_id')->all(), $sold->first()->outlet_id);
         foreach ($sold as $m) {
             $this->move($locked[$m->ingredient_id], 'void', -(float) $m->qty, (float) $m->unit_cost, [
                 'order_id' => $order->id, 'created_by' => $user->id,
@@ -294,12 +301,12 @@ class InventoryService
     }
 
     /** @return list<array<string, mixed>> riwayat stok satu bahan (terbaru dulu) */
-    public function movements(Ingredient $ingredient, int $limit = 100): array
+    public function movements(Ingredient $ingredient, string $outletId, int $limit = 100): array
     {
         return DB::table('stock_movements as m')
             ->leftJoin('users', 'users.id', '=', 'm.created_by')
             ->leftJoin('orders', 'orders.id', '=', 'm.order_id')
-            ->where('m.ingredient_id', $ingredient->id)
+            ->where('m.ingredient_id', $ingredient->id)->where('m.outlet_id', $outletId)
             ->orderByDesc('m.created_at')->orderByDesc('m.id')->limit($limit)
             ->get(['m.*', 'users.name as user_name', 'orders.number as order_number'])
             ->map(fn ($m) => [
@@ -334,7 +341,7 @@ class InventoryService
 
                 return ['id' => $data['id'], 'replayed' => true];
             }
-            $locked = $this->lock($ids);
+            $locked = $this->lock($ids, $data['outlet_id']);
             foreach ($ids as $i => $id) {
                 if (! isset($locked[$id])) {
                     throw ValidationException::withMessages(["lines.{$i}.ingredient_id" => 'Bahan tidak ditemukan.']);
@@ -346,10 +353,29 @@ class InventoryService
         });
     }
 
-    /** @return array<string, Ingredient> */
-    private function lock(array $ids): array
+    /**
+     * Kunci baris stok bahan di satu outlet (dibuat dulu bila belum ada), urut ID bahan.
+     *
+     * @return array<string, Ingredient> bahan + `stock` / `avg_cost` / `outlet_id` outlet itu
+     */
+    private function lock(array $ids, string $outletId): array
     {
-        return Ingredient::query()->whereIn('id', array_unique($ids))->orderBy('id')->lockForUpdate()->get()->keyBy('id')->all();
+        $found = Ingredient::query()->whereIn('id', array_values(array_unique($ids)))->pluck('tenant_id', 'id');
+        foreach ($found as $id => $tenant) {
+            DB::table('ingredient_stocks')->insertOrIgnore([
+                'tenant_id' => $tenant, 'outlet_id' => $outletId, 'ingredient_id' => $id, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        DB::table('ingredient_stocks')->where('outlet_id', $outletId)->whereIn('ingredient_id', $found->keys())
+            ->orderBy('ingredient_id')->lockForUpdate()->get();
+
+        return Ingredient::query()->withStock($outletId)->whereIn('ingredients.id', $found->keys())->get()->keyBy('id')->all();
+    }
+
+    private function recipeCostQuery(string $outletId): Builder
+    {
+        return DB::table('recipe_items')->leftJoin('ingredient_stocks as s', fn ($j) => $j
+            ->on('s.ingredient_id', '=', 'recipe_items.ingredient_id')->where('s.outlet_id', '=', $outletId));
     }
 
     /**
@@ -370,13 +396,14 @@ class InventoryService
         if (round($newAvg, 4) !== round($avg, 4)) {
             $update += ['avg_cost' => round($newAvg, 4), 'updated_at' => now()]; // HPP berubah → versi menu
         }
-        DB::table('ingredients')->where('id', $ingredient->id)->update($update);
+        DB::table('ingredient_stocks')->where('outlet_id', $ingredient->outlet_id)->where('ingredient_id', $ingredient->id)->update($update);
         $ingredient->forceFill(['stock' => $newStock, 'avg_cost' => round($newAvg, 4)])->syncOriginal();
 
         DB::table('stock_movements')->insert([
             'id' => (string) Str::uuid(),
             'tenant_id' => $ingredient->tenant_id,
             'ingredient_id' => $ingredient->id,
+            'outlet_id' => $ingredient->outlet_id,
             'kind' => $kind,
             'qty' => $qty,
             'unit_cost' => round($cost ?? $avg, 4),

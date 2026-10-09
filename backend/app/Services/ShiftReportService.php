@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Mail\ShiftReportMail;
 use App\Models\Device;
+use App\Models\Outlet;
 use App\Models\Shift;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
@@ -32,6 +33,8 @@ class ShiftReportService
         $shop = TenantSetting::query()->value('receipt_name') ?: $tenant->name;
         $names = User::query()->whereIn('id', array_filter([$shift->opened_by, $shift->closed_by]))->pluck('name', 'id');
         $device = Device::query()->whereKey($shift->device_id)->value('code');
+        $outlets = Outlet::query()->where('active', true)->count();
+        $outlet = Outlet::query()->whereKey($shift->outlet_id)->value('name');
         $opened = $shift->opened_at->copy()->setTimezone($tz);
         $closed = $shift->closed_at?->copy()->setTimezone($tz);
         $m = $summary['by_method'];
@@ -43,15 +46,17 @@ class ShiftReportService
             ->selectRaw('order_items.name, sum(order_items.qty) as qty')->get()
             ->map(fn ($r) => "{$r->name} {$r->qty}×")->implode(', ');
         $voids = DB::table('orders')->where('shift_id', $shift->id)->where('status', 'void')->count();
-        $day = DB::table('orders')->where('status', 'paid')->where('business_date', $opened->toDateString())
-            ->selectRaw('count(*) as n, coalesce(sum(grand_total), 0) as total')->first();
+        $dayQuery = fn () => DB::table('orders')->where('status', 'paid')->where('business_date', $opened->toDateString())
+            ->selectRaw('count(*) as n, coalesce(sum(grand_total), 0) as total');
+        $day = $dayQuery()->first();
+        $dayOutlet = $outlets > 1 ? $dayQuery()->where('outlet_id', $shift->outlet_id)->first() : null;
 
         $methods = collect(['cash' => 'Tunai', 'qris' => 'QRIS', 'debit' => 'Debit', 'credit' => 'Kasbon'])
             ->filter(fn ($label, $key) => ($m[$key] ?? 0) !== 0)
             ->map(fn ($label, $key) => "{$label} ".self::rp($m[$key]))->implode(' · ');
 
         $lines = [
-            "*Laporan shift {$shop}*",
+            "*Laporan shift {$shop}*".($outlets > 1 ? " · {$outlet}" : ''),
             self::DAYS[$opened->dayOfWeekIso - 1].', '.$opened->format('d/m/Y')." · Tablet {$device}",
             'Jam '.$opened->format('H:i').'–'.($closed?->format('H:i') ?? 'sekarang')
                 .' · '.($names[$shift->opened_by] ?? '-').($shift->closed_by && $shift->closed_by !== $shift->opened_by ? ' → '.($names[$shift->closed_by] ?? '-') : ''),
@@ -81,13 +86,16 @@ class ShiftReportService
         if ($shift->note) {
             $lines[] = "Catatan: {$shift->note}";
         }
-        $low = app(InventoryService::class)->enabled() ? app(InventoryService::class)->lowStock() : collect();
+        $low = app(InventoryService::class)->enabled() ? app(InventoryService::class)->lowStock($shift->outlet_id) : collect();
         if ($low->isNotEmpty()) {
             $lines[] = 'Stok menipis: '.$low->take(8)->map(fn ($i) => $i->name.' '.self::qty((float) $i->stock).' '.$i->unit)->implode(', ')
                 .($low->count() > 8 ? ' (+'.($low->count() - 8).')' : '');
         }
         $lines[] = '';
-        $lines[] = 'Total hari ini (semua tablet): '.self::rp((int) $day->total).' · '.$day->n.' transaksi';
+        if ($dayOutlet !== null) {
+            $lines[] = "Total hari ini {$outlet}: ".self::rp((int) $dayOutlet->total).' · '.$dayOutlet->n.' transaksi';
+        }
+        $lines[] = 'Total hari ini ('.($outlets > 1 ? 'semua outlet' : 'semua tablet').'): '.self::rp((int) $day->total).' · '.$day->n.' transaksi';
 
         return implode("\n", $lines);
     }

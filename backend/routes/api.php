@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\MessageController;
 use App\Http\Controllers\Api\V1\ModifierGroupController;
 use App\Http\Controllers\Api\V1\OrderController;
+use App\Http\Controllers\Api\V1\OutletController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductImportController;
@@ -128,6 +129,11 @@ Route::prefix('v1')->group(function () {
             Route::get('settings/messages', [MessageController::class, 'templates']);
             Route::put('settings/messages', [MessageController::class, 'saveTemplates']);
             Route::post('devices/current/unregister', DeviceUnregisterController::class);
+            // Outlet (fitur `multi_outlet` untuk outlet kedua dst.).
+            Route::get('outlets', [OutletController::class, 'index']);
+            Route::post('outlets', [OutletController::class, 'save']);
+            Route::put('outlets/{outlet}', [OutletController::class, 'save'])->whereUuid('outlet');
+            Route::put('devices/{device}/outlet', [OutletController::class, 'moveDevice'])->whereUuid('device');
         });
 
         // Stok bahan & resep (fitur `inventory`).

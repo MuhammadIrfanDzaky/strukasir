@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Outlet;
 use App\Models\Tenant;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -14,28 +15,30 @@ use Illuminate\Support\Facades\DB;
 class ReportService
 {
     /** @return array<string, mixed> */
-    public function summary(string $from, string $to): array
+    /** @param  string|null  $outletId  null = semua outlet */
+    public function summary(string $from, string $to, ?string $outletId = null): array
     {
-        $paid = fn () => DB::table('orders')->where('status', 'paid')->whereBetween('business_date', [$from, $to]);
+        $o = fn ($q, string $column = 'orders.outlet_id') => $outletId === null ? $q : $q->where($column, $outletId);
+        $paid = fn () => $o(DB::table('orders')->where('status', 'paid')->whereBetween('business_date', [$from, $to]));
 
         $totals = $paid()->selectRaw('count(*) as orders, coalesce(sum(grand_total),0) as sales,
             coalesce(sum(discount_total),0) as discounts, coalesce(sum(service_total),0) as service,
             coalesce(sum(tax_total),0) as tax, coalesce(sum(rounding),0) as rounding')->first();
 
-        $voids = DB::table('orders')->where('status', 'void')->whereBetween('business_date', [$from, $to])
+        $voids = $o(DB::table('orders'))->where('status', 'void')->whereBetween('business_date', [$from, $to])
             ->selectRaw('count(*) as orders, coalesce(sum(case when paid_at is not null then grand_total else 0 end),0) as refunded')
             ->first();
 
-        $byMethod = DB::table('payments')
-            ->join('orders', 'orders.id', '=', 'payments.order_id')
+        $byMethod = $o(DB::table('payments')
+            ->join('orders', 'orders.id', '=', 'payments.order_id'))
             ->where('orders.status', 'paid')->where('payments.kind', 'payment')
             ->whereBetween('orders.business_date', [$from, $to])
             ->groupBy('payments.method')
             ->selectRaw('payments.method, sum(payments.amount) as total, count(*) as count')
             ->get();
 
-        $paidItems = fn () => DB::table('order_items')
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+        $paidItems = fn () => $o(DB::table('order_items')
+            ->join('orders', 'orders.id', '=', 'order_items.order_id'))
             ->where('orders.status', 'paid')->whereBetween('orders.business_date', [$from, $to]);
 
         $topProducts = $paidItems()
@@ -79,7 +82,7 @@ class ReportService
         $members = $paid()->whereNotNull('customer_id')
             ->selectRaw('count(*) as orders, coalesce(sum(grand_total),0) as sales, count(distinct customer_id) as customers')->first();
         // "Baru" = transaksi lunas pertamanya jatuh di periode ini.
-        $newCustomers = DB::table('orders')->where('status', 'paid')->whereNotNull('customer_id')
+        $newCustomers = $o(DB::table('orders'))->where('status', 'paid')->whereNotNull('customer_id')
             ->groupBy('customer_id')->havingRaw('min(business_date) between ? and ?', [$from, $to])
             ->select('customer_id')->get()->count();
         $topCustomers = $paid()->join('customers', 'customers.id', '=', 'orders.customer_id')
@@ -88,7 +91,7 @@ class ReportService
             ->orderByDesc('sales')->limit(5)->get();
 
         // Loyalitas: stempel/poin keluar & ditukar (dari order lunas di periode ini), hadiah terpopuler.
-        $loyaltyUnits = DB::table('loyalty_entries')->join('orders', 'orders.id', '=', 'loyalty_entries.order_id')
+        $loyaltyUnits = $o(DB::table('loyalty_entries')->join('orders', 'orders.id', '=', 'loyalty_entries.order_id'))
             ->where('orders.status', 'paid')->whereBetween('orders.business_date', [$from, $to])
             ->selectRaw("coalesce(sum(units) filter (where kind = 'earn'), 0) as earned, coalesce(-sum(units) filter (where kind = 'redeem'), 0) as redeemed")
             ->first();
@@ -102,9 +105,9 @@ class ReportService
             ->orderByDesc('sales')->get();
 
         // Kasbon: pelunasan di periode (hari lokal kedai) & piutang yang masih terbuka sekarang.
-        $repaid = (int) DB::table('credit_repayments')
-            ->whereRaw("((created_at at time zone 'UTC') at time zone ?)::date between ? and ?", [$tz, $from, $to])
-            ->sum(DB::raw("case when kind = 'repayment' then amount else -amount end"));
+        $repaid = (int) $o(DB::table('credit_repayments')->join('shifts', 'shifts.id', '=', 'credit_repayments.shift_id'), 'shifts.outlet_id')
+            ->whereRaw("((credit_repayments.created_at at time zone 'UTC') at time zone ?)::date between ? and ?", [$tz, $from, $to])
+            ->sum(DB::raw("case when credit_repayments.kind = 'repayment' then credit_repayments.amount else -credit_repayments.amount end"));
         $debtors = DB::query()->fromSub(CreditService::balanceQuery(), 'b')
             ->join('customers', 'customers.id', '=', 'b.customer_id')
             ->where('b.credit_balance', '>', 0)
@@ -112,9 +115,10 @@ class ReportService
             ->get(['customers.id', 'customers.code', 'customers.name', 'b.credit_balance']);
 
         // Kas keluar per kategori (hari lokal kedai); hanya kategori biaya yang mengurangi laba.
-        $moves = DB::table('cash_movements')->where('kind', 'out')
-            ->whereRaw("((created_at at time zone 'UTC') at time zone ?)::date between ? and ?", [$tz, $from, $to])
-            ->groupBy('category')->selectRaw('category, '.CashMovementService::netSql().' as total')
+        $moves = $o(DB::table('cash_movements')->join('shifts', 'shifts.id', '=', 'cash_movements.shift_id'), 'shifts.outlet_id')
+            ->where('cash_movements.kind', 'out')
+            ->whereRaw("((cash_movements.created_at at time zone 'UTC') at time zone ?)::date between ? and ?", [$tz, $from, $to])
+            ->groupBy('cash_movements.category')->selectRaw('cash_movements.category, '.CashMovementService::netSql().' as total')
             ->pluck('total', 'category');
         $expenseCats = array_keys(array_filter(CashMovementService::CATEGORIES['out'], fn ($c) => $c[1]));
         $expenses = collect($moves)->only($expenseCats)->map(fn ($v) => (int) $v)->filter();
@@ -127,11 +131,17 @@ class ReportService
             ->selectRaw('voucher_code as code, count(*) as orders, sum(voucher_discount) as discount')->orderByDesc('orders')->get();
 
         // Stok (fitur `inventory`): pembelian, kerugian (terbuang + susut opname) di periode, nilai stok sekarang.
-        $stockRows = DB::table('stock_movements')->whereIn('kind', ['purchase', 'waste', 'count'])
+        $stockRows = $o(DB::table('stock_movements'), 'outlet_id')->whereIn('kind', ['purchase', 'waste', 'count'])
             ->whereRaw("((created_at at time zone 'UTC') at time zone ?)::date between ? and ?", [$tz, $from, $to])
             ->groupBy('kind')->selectRaw('kind, sum(qty * unit_cost) as total')->pluck('total', 'kind');
         $stockLoss = (int) round(-(float) ($stockRows['waste'] ?? 0) - (float) ($stockRows['count'] ?? 0));
         $inventoryOn = app(InventoryService::class)->enabled();
+
+        // Per outlet (hanya bila laporan semua outlet & ada lebih dari satu outlet).
+        $outlets = Outlet::query()->orderByRaw('length(code), code')->get(['id', 'code', 'name']);
+        $byOutlet = $outletId === null && $outlets->count() > 1
+            ? $paid()->groupBy('outlet_id')->selectRaw('outlet_id, count(*) as orders, sum(grand_total) as sales')->get()->keyBy('outlet_id')
+            : null;
 
         $orders = (int) $totals->orders;
         $sales = (int) $totals->sales;
@@ -166,12 +176,21 @@ class ReportService
                 'waste' => (int) round(-(float) ($stockRows['waste'] ?? 0)),
                 'count_diff' => (int) round((float) ($stockRows['count'] ?? 0)),
                 'loss' => $stockLoss,
-                'value' => (int) round((float) DB::table('ingredients')->where('active', true)->where('stock', '>', 0)->sum(DB::raw('stock * avg_cost'))),
-                'low' => app(InventoryService::class)->lowStock()->map(fn ($i) => [
-                    'id' => $i->id, 'name' => $i->name, 'unit' => $i->unit, 'stock' => round((float) $i->stock, 3),
-                    'min_stock' => $i->min_stock === null ? null : round((float) $i->min_stock, 3),
-                ])->values(),
+                'value' => (int) round((float) $o(DB::table('ingredient_stocks')->join('ingredients', 'ingredients.id', '=', 'ingredient_stocks.ingredient_id'), 'ingredient_stocks.outlet_id')
+                    ->where('ingredients.active', true)->where('ingredient_stocks.stock', '>', 0)->sum(DB::raw('ingredient_stocks.stock * ingredient_stocks.avg_cost'))),
+                // Bahan menipis per outlet (semua outlet: nama outlet ikut ditulis bila lebih dari satu).
+                'low' => $outlets->when($outletId !== null, fn ($c) => $c->where('id', $outletId))
+                    ->flatMap(fn ($outlet) => app(InventoryService::class)->lowStock($outlet->id)->map(fn ($i) => [
+                        'id' => $i->id, 'name' => $i->name, 'unit' => $i->unit, 'stock' => round((float) $i->stock, 3),
+                        'min_stock' => $i->min_stock === null ? null : round((float) $i->min_stock, 3),
+                        'outlet' => $outletId === null && $outlets->count() > 1 ? $outlet->name : null,
+                    ]))->values(),
             ] : null,
+            'outlet_id' => $outletId,
+            'by_outlet' => $byOutlet === null ? null : $outlets->map(fn ($x) => [
+                'id' => $x->id, 'name' => $x->name,
+                'orders' => (int) ($byOutlet[$x->id]->orders ?? 0), 'sales' => (int) ($byOutlet[$x->id]->sales ?? 0),
+            ])->values(),
             'by_method' => collect(['cash', 'debit', 'qris', 'credit'])->mapWithKeys(fn ($m) => [
                 $m => (int) ($byMethod->firstWhere('method', $m)->total ?? 0),
             ]),
@@ -229,7 +248,7 @@ class ReportService
                 'rewards' => $rewards->map(fn ($r) => ['name' => $r->name, 'count' => (int) $r->count, 'discount' => (int) $r->discount]),
             ],
             // Periode sebelumnya dengan panjang sama (mis. 7 hari sebelumnya) untuk naik/turun di dashboard.
-            'previous' => $this->totals(...self::previousRange($from, $to)),
+            'previous' => $this->totals(...[...self::previousRange($from, $to), $outletId]),
         ];
     }
 
@@ -243,11 +262,12 @@ class ReportService
     }
 
     /** Angka ringkas untuk perbandingan: transaksi, penjualan, rata-rata, laba kotor. */
-    private function totals(string $from, string $to): array
+    private function totals(string $from, string $to, ?string $outletId = null): array
     {
-        $t = DB::table('orders')->where('status', 'paid')->whereBetween('business_date', [$from, $to])
+        $o = fn ($q) => $outletId === null ? $q : $q->where('orders.outlet_id', $outletId);
+        $t = $o(DB::table('orders'))->where('status', 'paid')->whereBetween('business_date', [$from, $to])
             ->selectRaw('count(*) as orders, coalesce(sum(grand_total),0) as sales, coalesce(sum(tax_total),0) as tax')->first();
-        $cost = (int) DB::table('order_items')->join('orders', 'orders.id', '=', 'order_items.order_id')
+        $cost = (int) $o(DB::table('order_items')->join('orders', 'orders.id', '=', 'order_items.order_id'))
             ->where('orders.status', 'paid')->whereBetween('orders.business_date', [$from, $to])
             ->sum(DB::raw('coalesce(order_items.unit_cost * order_items.qty, 0)'));
         $orders = (int) $t->orders;

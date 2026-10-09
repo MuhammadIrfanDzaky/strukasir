@@ -31,6 +31,7 @@ class DatabaseGuardsTest extends TestCase
             'id' => $id,
             'tenant_id' => $this->shop->tenant->id,
             'device_id' => $this->shop->device->id,
+            'outlet_id' => $this->shop->device->outlet_id,
             'cashier_id' => $this->shop->cashier->id,
             'business_date' => '2026-10-03',
             'number' => 'T1-'.random_int(1, 9999),

@@ -17,6 +17,8 @@ class RegisterDeviceRequest extends FormRequest
             'device_name' => ['nullable', 'string', 'max:60'],
             // UUID yang dibuat tablet sekali per instalasi → daftar ulang setelah timeout tidak membuat tablet ganda.
             'device_id' => ['nullable', 'uuid'],
+            // Usaha dengan beberapa outlet: outlet tablet ini (server meminta bila belum diisi).
+            'outlet_id' => ['nullable', 'uuid'],
         ];
     }
 }

@@ -61,7 +61,7 @@ class InventoryTest extends TestCase
 
     private function stock(string $id): array
     {
-        return $this->inShop(fn () => Ingredient::query()->findOrFail($id)->only(['stock', 'avg_cost']));
+        return $this->inShop(fn () => Ingredient::query()->withStock($this->shop->device->outlet_id)->findOrFail($id)->only(['stock', 'avg_cost']));
     }
 
     private function purchase(array $lines, array $extra = [])

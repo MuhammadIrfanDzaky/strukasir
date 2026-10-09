@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Device;
+use App\Models\Outlet;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\NewAccessToken;
@@ -14,9 +15,9 @@ use Laravel\Sanctum\NewAccessToken;
 class DeviceRegistrar
 {
     /** @return array{0: Device, 1: NewAccessToken} */
-    public function register(Tenant $tenant, ?string $clientId, ?string $name): array
+    public function register(Tenant $tenant, ?string $clientId, ?string $name, ?string $outletId = null): array
     {
-        return DB::transaction(function () use ($tenant, $clientId, $name) {
+        return DB::transaction(function () use ($tenant, $clientId, $name, $outletId) {
             // Kunci baris tenant agar kode perangkat (T1, T2, ...) tidak bentrok.
             Tenant::query()->whereKey($tenant->id)->lockForUpdate()->first();
 
@@ -28,6 +29,9 @@ class DeviceRegistrar
 
             if ($device) {
                 $device->tokens()->delete(); // kiriman ulang: tablet sama, token lama diganti
+                if ($outletId !== null && $outletId !== $device->outlet_id) {
+                    app(OutletService::class)->moveDevice($device, $outletId);
+                }
             } else {
                 $number = Device::query()->count() + 1;
                 // Nama opsional: tanpa isian → "Tablet 2" dst. (bisa diganti owner nanti).
@@ -36,6 +40,7 @@ class DeviceRegistrar
                     $device->id = $clientId;
                 }
                 $device->code = 'T'.$number;
+                $device->outlet_id = $outletId; // null → outlet utama
                 $device->save();
             }
 
@@ -48,7 +53,8 @@ class DeviceRegistrar
     {
         return [
             'token' => $token->plainTextToken,
-            'device' => ['id' => $device->id, 'code' => $device->code, 'name' => $device->name],
+            'device' => ['id' => $device->id, 'code' => $device->code, 'name' => $device->name,
+                'outlet' => Outlet::query()->find($device->outlet_id)?->only(['id', 'name'])],
             'tenant' => ['id' => $tenant->id, 'name' => $tenant->name],
         ];
     }

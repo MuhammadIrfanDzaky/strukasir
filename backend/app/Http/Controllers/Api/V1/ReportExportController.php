@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\ReportExportService;
 use App\Support\Audit;
+use App\Support\OutletFilter;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,6 +39,8 @@ class ReportExportController extends Controller
             'tenant' => $context->id(),
             'user' => $request->user()->id,
             ...$data,
+            // `?outlet=` seperti di laporan; kosong = semua outlet.
+            'outlet' => OutletFilter::resolve($request, default: null) ?? '',
         ], absolute: false);
 
         return response()->json(['data' => [
@@ -54,6 +57,7 @@ class ReportExportController extends Controller
             'type' => ['required', Rule::in(array_keys(ReportExportService::TYPES))],
             'from' => ['required', 'date_format:Y-m-d'],
             'to' => ['required', 'date_format:Y-m-d'],
+            'outlet' => ['nullable', 'uuid'],
         ]);
 
         // Izin dicek ulang saat diunduh: user yang dinonaktifkan / dicabut aksesnya tidak bisa memakai tautan lama.
@@ -67,7 +71,7 @@ class ReportExportController extends Controller
 
         return response()->streamDownload(function () use ($context, $export, $data) {
             $out = fopen('php://output', 'w');
-            $context->run($data['tenant'], fn () => $export->write($data['type'], $data['from'], $data['to'], $out));
+            $context->run($data['tenant'], fn () => $export->write($data['type'], $data['from'], $data['to'], $out, $data['outlet'] ?? null));
             fclose($out);
         }, $name, ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'no-store']);
     }

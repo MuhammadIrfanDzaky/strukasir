@@ -22,6 +22,7 @@ enum Feature: string
     case CustomerMessaging = 'customer_messaging';
     case Promotions = 'promotions';
     case Inventory = 'inventory';
+    case MultiOutlet = 'multi_outlet';
 
     public function description(): string
     {
@@ -40,6 +41,7 @@ enum Feature: string
             self::CustomerMessaging => 'Pesan WhatsApp ke member: struk digital, ucapan ulang tahun, sapa pelanggan lama, pengingat kasbon',
             self::Promotions => 'Promo otomatis terjadwal (happy hour, beli X gratis Y) & voucher kode',
             self::Inventory => 'Stok bahan baku & resep: potong stok otomatis, pembelian, stok opname, peringatan stok menipis, HPP otomatis',
+            self::MultiOutlet => 'Lebih dari satu outlet: menu & pelanggan bersama, stok & laporan per outlet',
         };
     }
 
@@ -61,6 +63,7 @@ enum Feature: string
             self::CustomerMessaging => 'Pesan WhatsApp',
             self::Promotions => 'Promo & voucher',
             self::Inventory => 'Stok & resep',
+            self::MultiOutlet => 'Multi-outlet',
         };
     }
 

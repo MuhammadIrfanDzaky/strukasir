@@ -79,13 +79,13 @@ class ReportExportTest extends TestCase
         ])->assertCreated();
 
         $orders = $this->csv('orders');
-        $this->assertStringStartsWith("\xEF\xBB\xBF".'Tanggal;Jam;"No. order"', $orders);
+        $this->assertStringStartsWith("\xEF\xBB\xBF".'Tanggal;Jam;Outlet;"No. order"', $orders);
         $this->assertStringContainsString("{$this->today};", $orders);
-        $this->assertStringContainsString(";{$number};Lunas;Kasir;\"Meja 3\";;40000;0;0;0;0;40000;0;0;40000;0", $orders);
+        $this->assertStringContainsString(";BerryBrew;{$number};Lunas;Kasir;\"Meja 3\";;40000;0;0;0;0;40000;0;0;40000;0", $orders);
 
         $this->assertStringContainsString(';Latte;Kopi;;2;20000;0;40000;16000', $this->csv('items'));
-        $this->assertStringContainsString("{$this->today};1;40000;0;0;40000", $this->csv('tax'));
-        $this->assertStringContainsString(';Keluar;"Belanja bahan";15000;"Es batu";Kasir;', $this->csv('cash'));
+        $this->assertStringContainsString("{$this->today};BerryBrew;1;40000;0;0;40000", $this->csv('tax'));
+        $this->assertStringContainsString(';BerryBrew;Keluar;"Belanja bahan";15000;"Es batu";Kasir;', $this->csv('cash'));
     }
 
     public function test_formula_injection_is_neutralised(): void

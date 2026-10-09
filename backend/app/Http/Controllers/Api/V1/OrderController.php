@@ -9,6 +9,7 @@ use App\Http\Requests\UpsertOrderRequest;
 use App\Http\Resources\OrderResource;
 use App\Models\Order;
 use App\Services\OrderService;
+use App\Support\OutletFilter;
 use App\Support\Tenancy\FeatureGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,7 +32,9 @@ class OrderController extends Controller
             abort(403, 'Fitur open bill tidak aktif untuk kedai ini.');
         }
 
+        $outlet = OutletFilter::resolve($request); // default: outlet tablet ini (open bill & riwayat)
         $orders = Order::query()
+            ->when($outlet, fn ($q, $id) => $q->where('outlet_id', $id))
             ->when($validated['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($validated['date'] ?? null, fn ($q, $date) => $q->where('business_date', $date))
             ->when($validated['q'] ?? null, fn ($q, $term) => $q->where(fn ($w) => $w
@@ -39,7 +42,7 @@ class OrderController extends Controller
                 ->orWhere('customer_label', 'ilike', '%'.addcslashes($term, '%_\\').'%')))
             ->latest()
             // Satu query per relasi untuk seluruh halaman (bukan per order).
-            ->with(['items.modifiers', 'payments', 'cashier:id,name', 'customer:id,code,name,anonymized_at'])
+            ->with(['items.modifiers', 'payments', 'outlet', 'cashier:id,name', 'customer:id,code,name,anonymized_at'])
             ->paginate($validated['per_page'] ?? 20);
 
         return OrderResource::collection($orders);

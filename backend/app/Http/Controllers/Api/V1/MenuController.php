@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Modifier;
 use App\Models\ModifierGroup;
+use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\Promotion;
 use App\Models\Tenant;
@@ -40,7 +41,9 @@ class MenuController extends Controller
         $features = $gate->forTenant($settings->tenant_id);
         $tenant = Tenant::query()->find($settings->tenant_id);
         // HPP dari resep (owner, fitur stok): ditampilkan di form produk menggantikan modal manual.
-        $recipeCosts = $withCost && app(InventoryService::class)->enabled() ? app(InventoryService::class)->productCosts() : [];
+        $device = $request->attributes->get('device');
+        $recipeCosts = $withCost && $device && app(InventoryService::class)->enabled() ? app(InventoryService::class)->productCosts($device->outlet_id) : [];
+        $outlet = $device ? Outlet::query()->find($device->outlet_id) : null;
         $pricing = PricingSettings::fromTenant($settings, $features[Feature::TaxService->value] ?? false);
 
         return response()->json([
@@ -70,6 +73,9 @@ class MenuController extends Controller
                 ? app(TierService::class)->tiers()->map(fn ($t) => TierService::present($t))->values() : [],
             // Nama, alamat, penutup & logo struk; disimpan tablet bersama cache menu (struk tetap lengkap saat offline).
             'receipt' => ReceiptSettingsController::present($settings),
+            // Outlet tablet ini (nama & alamat di struk); `outlets` = jumlah outlet aktif (nama outlet tampil bila > 1).
+            'outlet' => $outlet?->present(),
+            'outlet_count' => Outlet::query()->where('active', true)->count(),
             'categories' => Category::query()->orderBy('sort')->orderBy('name')->get()
                 ->map(fn (Category $c) => [
                     'id' => $c->id, 'name' => $c->name, 'sort' => $c->sort, 'active' => $c->active,
@@ -105,7 +111,7 @@ class MenuController extends Controller
 
     private function version(): string
     {
-        $stamps = collect(['categories', 'products', 'modifier_groups', 'modifiers', 'tenant_settings', 'tenant_features', 'loyalty_programs', 'loyalty_rewards', 'member_tiers', 'promotions', 'ingredients', 'recipe_items'])
+        $stamps = collect(['outlets', 'categories', 'products', 'modifier_groups', 'modifiers', 'tenant_settings', 'tenant_features', 'loyalty_programs', 'loyalty_rewards', 'member_tiers', 'promotions', 'ingredients', 'recipe_items'])
             ->map(fn (string $table) => DB::table($table)->selectRaw('count(*) as n, max(updated_at) as t')->first())
             ->map(fn ($row) => $row->n.'@'.$row->t)
             ->implode('|');

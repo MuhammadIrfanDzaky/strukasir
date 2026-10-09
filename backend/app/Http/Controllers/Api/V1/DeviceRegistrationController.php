@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RegisterDeviceRequest;
+use App\Models\Device;
+use App\Models\Outlet;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\DeviceRegistrar;
@@ -50,6 +52,22 @@ class DeviceRegistrationController extends Controller
                 return $invalid;
             }
 
+            // Beberapa outlet: tanyakan outlet tablet baru dulu (sebelum kode 2FA dipakai, supaya kode yang
+            // sama masih berlaku saat dikirim ulang bersama pilihan outlet).
+            $outlets = Outlet::query()->where('active', true)->orderByRaw('length(code), code')->get();
+            $outletId = $request->input('outlet_id');
+            $known = $request->input('device_id') ? Device::query()->find($request->input('device_id')) : null;
+            if ($outletId === null && $known === null && $outlets->count() > 1) {
+                return response()->json([
+                    'message' => 'Pilih outlet untuk tablet ini.',
+                    'errors' => ['outlet_id' => ['Pilih outlet untuk tablet ini.']],
+                    'outlets' => $outlets->map(fn (Outlet $o) => ['id' => $o->id, 'name' => $o->name, 'address' => $o->address])->values(),
+                ], 422);
+            }
+            if ($outletId !== null && ! $outlets->contains('id', $outletId)) {
+                return response()->json(['message' => 'Outlet tidak ditemukan.', 'errors' => ['outlet_id' => ['Outlet tidak ditemukan.']]], 422);
+            }
+
             // 2FA (SEC-19): password benar tapi kode belum dikirim → minta kode, bukan percobaan gagal.
             if ($owner->hasTwoFactor()) {
                 $otp = trim((string) $request->input('otp'));
@@ -77,7 +95,7 @@ class DeviceRegistrationController extends Controller
 
             $owner->clearFailedAttempts();
 
-            [$device, $token] = $registrar->register($tenant, $request->input('device_id'), $request->input('device_name'));
+            [$device, $token] = $registrar->register($tenant, $request->input('device_id'), $request->input('device_name'), $outletId);
 
             Audit::record('device.registered', $device, after: ['code' => $device->code, 'name' => $device->name],
                 user: $owner, device: $device);

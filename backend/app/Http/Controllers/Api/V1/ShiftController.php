@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\Outlet;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\CashMovementService;
 use App\Services\ShiftReportService;
 use App\Services\ShiftService;
+use App\Support\OutletFilter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -103,7 +105,9 @@ class ShiftController extends Controller
         abort_unless(Gate::allows(Permission::ReportsView->value), 403);
         $data = $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:50']]);
 
-        $page = Shift::query()->latest('opened_at')->paginate($data['per_page'] ?? 20);
+        $outlet = OutletFilter::resolve($request, default: null); // default: semua outlet
+        $page = Shift::query()->when($outlet, fn ($q, $id) => $q->where('outlet_id', $id))
+            ->latest('opened_at')->paginate($data['per_page'] ?? 20);
 
         return response()->json([
             'data' => collect($page->items())->map(fn (Shift $s) => $this->present($s, $shifts->summary($s))),
@@ -118,6 +122,7 @@ class ShiftController extends Controller
 
         return [
             'id' => $shift->id,
+            'outlet' => Outlet::query()->whereKey($shift->outlet_id)->value('name'),
             'opened_by' => $names[$shift->opened_by] ?? null,
             'opened_at' => $shift->opened_at->toIso8601String(),
             'opening_cash' => $shift->opening_cash,

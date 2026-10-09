@@ -28,6 +28,8 @@ class OrderResource extends JsonResource
         return [
             'id' => $this->id,
             'number' => $this->number,
+            // Nama & alamat outlet (struk cetak ulang; riwayat semua outlet).
+            'outlet' => $this->outlet?->only(['id', 'name', 'address', 'phone']),
             'status' => $this->status,
             'business_date' => $this->business_date->toDateString(),
             'customer_label' => $this->customer_label,

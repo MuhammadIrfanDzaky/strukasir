@@ -34,6 +34,11 @@ class Order extends Model
         return $this->belongsTo(Customer::class);
     }
 
+    public function outlet(): BelongsTo
+    {
+        return $this->belongsTo(Outlet::class);
+    }
+
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cashier_id');

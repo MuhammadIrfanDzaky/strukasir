@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
@@ -17,6 +18,19 @@ class Device extends Model
     use BelongsToTenant, HasApiTokens, HasFactory, HasUuids;
 
     protected $fillable = ['name'];
+
+    protected static function booted(): void
+    {
+        // Tablet tanpa pilihan outlet → outlet utama (kedai satu outlet tidak perlu memilih).
+        static::creating(function (Device $device) {
+            $device->outlet_id ??= Outlet::main()->id;
+        });
+    }
+
+    public function outlet(): BelongsTo
+    {
+        return $this->belongsTo(Outlet::class);
+    }
 
     protected function casts(): array
     {

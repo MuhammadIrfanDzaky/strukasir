@@ -58,10 +58,13 @@ class OrderService
         if ($existing && $existing->status !== 'open') {
             throw new ConflictHttpException('Order ini sudah '.($existing->status === 'paid' ? 'dibayar' : 'dibatalkan').'.');
         }
+        if ($existing) {
+            self::guardOutlet($existing, $device);
+        }
 
         $products = $this->loadProducts($data['items']);
         $existingItemIds = $existing?->items->pluck('id')->all() ?? [];
-        $lines = $this->inventory->withUnitCosts($this->buildLines($data['items'], $products, $existingItemIds));
+        $lines = $this->inventory->withUnitCosts($this->buildLines($data['items'], $products, $existingItemIds), $device->outlet_id);
 
         $this->guardDiscountFeature($data);
         $customer = $this->resolveCustomer($data['customer_id'] ?? null, $existing);
@@ -89,6 +92,7 @@ class OrderService
                 $order->id = $orderId;
                 $order->forceFill([
                     'device_id' => $device->id,
+                    'outlet_id' => $device->outlet_id,
                     'cashier_id' => $cashier->id,
                     'business_date' => $businessDate,
                     'client_created_at' => $data['client_created_at'] ?? null,
@@ -210,6 +214,7 @@ class OrderService
             if ($order->status !== 'open') {
                 throw new ConflictHttpException('Order ini sudah dibatalkan.');
             }
+            self::guardOutlet($order, $device);
 
             if ($expectedTotal !== $order->grand_total) {
                 throw ValidationException::withMessages([
@@ -291,6 +296,8 @@ class OrderService
 
             $refunded = 0;
             if ($order->status === 'paid') {
+                // Refund keluar dari laci shift tablet ini → hanya di outlet tempat order dibayar.
+                self::guardOutlet($order, $device);
                 $shiftId = app(ShiftService::class)->requireOpen($device)->id;
                 foreach ($order->payments()->where('kind', 'payment')->get() as $p) {
                     (new Payment)->forceFill([
@@ -329,6 +336,14 @@ class OrderService
 
             return $order;
         });
+    }
+
+    /** Order hanya diubah / dibayar / di-refund dari tablet di outlet yang sama. */
+    private static function guardOutlet(Order $order, Device $device): void
+    {
+        if ($order->outlet_id !== $device->outlet_id) {
+            throw new ConflictHttpException('Order ini milik outlet lain.');
+        }
     }
 
     // ───────────────────────────── validasi menu ─────────────────────────────

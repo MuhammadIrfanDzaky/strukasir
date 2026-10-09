@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Services\ReportService;
+use App\Support\OutletFilter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,6 +19,7 @@ class ReportController extends Controller
         ]);
         abort_if(now()->parse($data['from'])->diffInDays($data['to']) > 366, 422, 'Rentang maksimal 1 tahun.');
 
-        return response()->json(['data' => $reports->summary($data['from'], $data['to'])]);
+        // Default: semua outlet (laporan usaha); `?outlet=<id>` untuk satu outlet.
+        return response()->json(['data' => $reports->summary($data['from'], $data['to'], OutletFilter::resolve($request, default: null))]);
     }
 }
