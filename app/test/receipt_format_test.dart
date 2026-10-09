@@ -75,6 +75,16 @@ void main() {
     expect(text, isNot(contains('CHECKER')));
   });
 
+  test('multi-outlet: nama outlet di bawah nama usaha', () {
+    final o = order();
+    final lines = customerReceipt({
+      ...o,
+      'receipt': {...o['receipt'] as Map<String, dynamic>, 'outlet': 'BerryBrew Dago', 'header': 'Jl. Dago 10\nTelp. 022-123'},
+    });
+    expect(lines.take(4).map((l) => l.text.trim()), ['BerryBrew', 'BerryBrew Dago', 'Jl. Dago 10', 'Telp. 022-123']);
+    expect(customerReceipt(order()).map((l) => l.text.trim()), isNot(contains('BerryBrew Dago')));
+  });
+
   test('bill belum bayar tanpa baris pembayaran', () {
     final text = customerReceipt(order(status: 'open')).join('\n');
     expect(text, contains('BELUM DIBAYAR'));

@@ -10,6 +10,7 @@ import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import '../menu/menu_controller.dart';
 import '../menu/menu_models.dart';
+import '../outlets/outlets_screen.dart';
 import '../session/session_controller.dart';
 import 'inventory_models.dart';
 
@@ -39,6 +40,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   InventoryData? _data;
   String? _error;
 
+  /// Multi-outlet: outlet yang sedang dikelola (null = outlet tablet ini).
+  String? _outlet;
+
   @override
   void initState() {
     super.initState();
@@ -48,7 +52,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   Future<void> _load() async {
     setState(() => _error = null);
     try {
-      final res = await _call(ref, 'get', '/inventory');
+      final res = await _call(ref, 'get', _outlet == null ? '/inventory' : '/inventory?outlet=$_outlet');
       if (mounted) setState(() => _data = InventoryData.fromJson(res['data'] as Map<String, dynamic>));
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -76,6 +80,23 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         backgroundColor: AppColors.surfaceApp,
         appBar: AppBar(
           title: const Text('Stok & resep'),
+          actions: [
+            if (menu?.multiOutlet ?? false)
+              Padding(
+                padding: const EdgeInsets.only(right: AppSpace.s3),
+                child: OutletPicker(
+                  maxWidth: context.isCompact ? 130 : 220,
+                  value: _outlet ?? menu?.outlet?.id,
+                  onChanged: (v) {
+                    setState(() {
+                      _outlet = v == menu?.outlet?.id ? null : v;
+                      _data = null;
+                    });
+                    _load();
+                  },
+                ),
+              ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Bahan'),
@@ -113,17 +134,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           runSpacing: AppSpace.s2,
           children: [
             FilledButton.icon(
-              onPressed: active.isEmpty ? null : () => _open(_StockDialog(kind: 'purchase', data: data), refreshMenu: true),
+              onPressed: active.isEmpty ? null : () => _open(_StockDialog(kind: 'purchase', data: data, outletId: _outlet), refreshMenu: true),
               icon: const Icon(Icons.add_shopping_cart_rounded),
               label: const Text('Pembelian'),
             ),
             OutlinedButton.icon(
-              onPressed: active.isEmpty ? null : () => _open(_StockDialog(kind: 'waste', data: data)),
+              onPressed: active.isEmpty ? null : () => _open(_StockDialog(kind: 'waste', data: data, outletId: _outlet)),
               icon: const Icon(Icons.delete_sweep_rounded),
               label: const Text('Terbuang'),
             ),
             OutlinedButton.icon(
-              onPressed: active.isEmpty ? null : () => _open(_StockDialog(kind: 'count', data: data)),
+              onPressed: active.isEmpty ? null : () => _open(_StockDialog(kind: 'count', data: data, outletId: _outlet)),
               icon: const Icon(Icons.fact_check_rounded),
               label: const Text('Stok opname'),
             ),
@@ -143,7 +164,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           Card(
             child: ListTile(
               onTap: () async {
-                await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => IngredientScreen(ingredient: i)));
+                await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => IngredientScreen(ingredient: i, outletId: _outlet)));
                 _load();
               },
               leading: Icon(
@@ -270,9 +291,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
 /// Detail satu bahan: ubah data + riwayat stok.
 class IngredientScreen extends ConsumerStatefulWidget {
-  const IngredientScreen({super.key, required this.ingredient});
+  const IngredientScreen({super.key, required this.ingredient, this.outletId});
 
   final Ingredient ingredient;
+
+  /// Outlet yang dilihat (null = outlet tablet ini).
+  final String? outletId;
 
   @override
   ConsumerState<IngredientScreen> createState() => _IngredientScreenState();
@@ -292,7 +316,8 @@ class _IngredientScreenState extends ConsumerState<IngredientScreen> {
   Future<void> _load() async {
     setState(() => _error = null);
     try {
-      final res = await _call(ref, 'get', '/ingredients/${_ingredient.id}/movements');
+      final res = await _call(ref, 'get',
+          '/ingredients/${_ingredient.id}/movements${widget.outletId == null ? '' : '?outlet=${widget.outletId}'}');
       final data = res['data'] as Map<String, dynamic>;
       if (mounted) {
         setState(() {
@@ -505,10 +530,13 @@ class _Line {
 
 /// Pembelian (`purchase`), terbuang (`waste`), atau stok opname (`count`).
 class _StockDialog extends ConsumerStatefulWidget {
-  const _StockDialog({required this.kind, required this.data});
+  const _StockDialog({required this.kind, required this.data, this.outletId});
 
   final String kind;
   final InventoryData data;
+
+  /// Outlet lain yang dipilih owner (null = outlet tablet ini).
+  final String? outletId;
 
   @override
   ConsumerState<_StockDialog> createState() => _StockDialogState();
@@ -579,9 +607,10 @@ class _StockDialogState extends ConsumerState<_StockDialog> {
         },
         {
           'id': _id,
+        'outlet_id': ?widget.outletId,
           'lines': lines,
           if (_note.text.trim().isNotEmpty) 'note': _note.text.trim(),
-          if (widget.kind == 'purchase') ...{if (_supplier.text.trim().isNotEmpty) 'supplier': _supplier.text.trim(), 'paid_from_cash': _fromCash},
+          if (widget.kind == 'purchase') ...{if (_supplier.text.trim().isNotEmpty) 'supplier': _supplier.text.trim(), 'paid_from_cash': _fromCash && widget.outletId == null},
         },
       );
       if (mounted) Navigator.pop(context, true);
@@ -723,6 +752,7 @@ class _StockDialogState extends ConsumerState<_StockDialog> {
                 maxLength: 60,
                 decoration: const InputDecoration(labelText: 'Supplier / toko (opsional)', counterText: ''),
               ),
+              if (widget.outletId == null)
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _fromCash,

@@ -178,10 +178,25 @@ class ReceiptSettings {
   final String? logoBase64;
 }
 
+/// Outlet tablet ini (multi-outlet). Nama tampil di kasir & struk bila usaha punya lebih dari satu outlet.
+class MenuOutlet {
+  const MenuOutlet({required this.id, required this.name, this.code = '', this.address});
+
+  factory MenuOutlet.fromJson(Map<String, dynamic> j) =>
+      MenuOutlet(id: j['id'] as String, name: j['name'] as String, code: j['code'] as String? ?? '', address: j['address'] as String?);
+
+  final String id;
+  final String name;
+  final String code;
+  final String? address;
+}
+
 class Menu {
   const Menu({
     required this.version,
     this.receipt = const ReceiptSettings(),
+    this.outlet,
+    this.outletCount = 1,
     required this.pricing,
     required this.cashierDiscountLimitBp,
     required this.features,
@@ -198,6 +213,8 @@ class Menu {
   factory Menu.fromJson(Map<String, dynamic> j) => Menu(
         version: j['version'] as String,
         receipt: ReceiptSettings.fromJson(j['receipt'] as Map<String, dynamic>?),
+        outlet: j['outlet'] == null ? null : MenuOutlet.fromJson(j['outlet'] as Map<String, dynamic>),
+        outletCount: j['outlet_count'] as int? ?? 1,
         pricing: PricingSettings.fromJson(j['pricing'] as Map<String, dynamic>),
         cashierDiscountLimitBp: (j['pricing'] as Map<String, dynamic>)['cashier_discount_limit_bp'] as int,
         features: (j['features'] as Map<String, dynamic>).map((k, v) => MapEntry(k, v as bool)),
@@ -222,6 +239,14 @@ class Menu {
 
   final String version;
   final ReceiptSettings receipt;
+
+  /// Outlet tablet ini (null = server lama).
+  final MenuOutlet? outlet;
+
+  /// Jumlah outlet aktif; > 1 → nama outlet tampil & laporan/stok bisa dipilih per outlet.
+  final int outletCount;
+
+  bool get multiOutlet => outletCount > 1;
   final PricingSettings pricing;
   final int cashierDiscountLimitBp;
   final Map<String, bool> features;

@@ -6,6 +6,7 @@ use App\Models\LoyaltyEntry;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderItemModifier;
+use App\Models\Outlet;
 use App\Models\Payment;
 use App\Models\TenantSetting;
 use App\Services\CreditService;
@@ -105,12 +106,28 @@ class OrderResource extends JsonResource
             ]),
             'created_at' => $this->created_at->toIso8601String(),
             'paid_at' => $this->paid_at?->toIso8601String(),
+            // Multi-outlet: nama outlet di bawah nama usaha, alamat/telepon outlet menggantikan header umum.
             'receipt' => [
                 'name' => $settings?->receipt_name,
-                'header' => $settings?->receipt_header,
+                'outlet' => $this->outlet && self::multiOutlet() ? $this->outlet->name : null,
+                'header' => $this->outlet?->address
+                    ? trim($this->outlet->address.($this->outlet->phone ? "
+Telp. {$this->outlet->phone}" : ''))
+                    : $settings?->receipt_header,
                 'footer' => $settings?->receipt_footer,
             ],
         ];
+    }
+
+    /** Lebih dari satu outlet aktif (dihitung sekali per request: daftar order berisi banyak order). */
+    private static function multiOutlet(): bool
+    {
+        $attrs = request()->attributes;
+        if (! $attrs->has('multi_outlet')) {
+            $attrs->set('multi_outlet', Outlet::query()->where('active', true)->count() > 1);
+        }
+
+        return $attrs->get('multi_outlet');
     }
 
     /**

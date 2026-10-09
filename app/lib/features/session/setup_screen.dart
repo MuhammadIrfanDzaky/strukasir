@@ -156,6 +156,9 @@ class _OwnerSignInState extends ConsumerState<_OwnerSignIn> {
   /// Server meminta kode 2FA (owner mengaktifkan 2FA) → tampilkan kolom kode.
   bool _needsOtp = false;
 
+  /// Usaha dengan beberapa outlet: outlet yang dipilih untuk tablet ini.
+  String? _outletId;
+
   @override
   void dispose() {
     for (final c in [_server, _email, _password, _otp]) {
@@ -176,8 +179,38 @@ class _OwnerSignInState extends ConsumerState<_OwnerSignIn> {
             email: _email.text,
             password: _password.text,
             otp: _needsOtp ? _otp.text : null,
+            outletId: _outletId,
           );
     } on ApiException catch (e) {
+      // Beberapa outlet: server meminta pilihan outlet (password sudah benar) → pilih lalu kirim ulang.
+      final outlets = (e.body?['outlets'] as List?)?.cast<Map<String, dynamic>>();
+      if (e.field('outlet_id') != null && outlets != null && outlets.isNotEmpty && mounted) {
+        final picked = await showDialog<String>(
+          context: context,
+          builder: (context) => SimpleDialog(
+            title: const Text('Tablet ini untuk outlet mana?'),
+            children: [
+              for (final o in outlets)
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(context, o['id'] as String),
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.storefront_rounded),
+                    title: Text(o['name'] as String),
+                    subtitle: o['address'] == null ? null : Text(o['address'] as String),
+                  ),
+                ),
+            ],
+          ),
+        );
+        if (picked != null && mounted) {
+          _outletId = picked;
+          setState(() => _busy = false);
+          return _submit();
+        }
+        if (mounted) setState(() => _error = 'Pilih outlet untuk tablet ini.');
+        return;
+      }
       final otpError = e.field('otp');
       setState(() {
         if (otpError != null) {

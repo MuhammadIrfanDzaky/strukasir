@@ -101,13 +101,17 @@ class MultiOutletTest extends TestCase
 
     public function test_order_open_bill_dan_riwayat_per_outlet(): void
     {
-        $o2 = $this->outlet('BerryBrew Dago')->json('data.id');
+        $o2 = $this->outlet('BerryBrew Dago', ['address' => 'Jl. Dago 10', 'phone' => '022-123'])->json('data.id');
         $dago = $this->secondTablet($o2);
         $this->api('POST', '/api/v1/shifts/open', $this->cashier, ['opening_cash' => 0])->assertCreated();
         $this->api('POST', '/api/v1/shifts/open', $dago->cashier, ['opening_cash' => 0])->assertCreated();
 
         $bill = $this->sell($this->cashier, pay: false); // open bill di O1
-        $this->sell($dago->cashier);
+        $paid = $this->sell($dago->cashier);
+        // Struk: nama outlet + alamat outlet menggantikan header umum.
+        $this->api('GET', "/api/v1/orders/{$paid}", $dago->cashier)
+            ->assertJsonPath('data.receipt.outlet', 'BerryBrew Dago')->assertJsonPath('data.receipt.header', "Jl. Dago 10
+Telp. 022-123");
 
         $this->assertSame([$bill], array_column($this->api('GET', '/api/v1/orders?status=open', $this->cashier)->json('data'), 'id'));
         $this->assertSame([], $this->api('GET', '/api/v1/orders?status=open', $dago->cashier)->json('data'));

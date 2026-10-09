@@ -199,6 +199,23 @@ Menu **Pengaturan → Atur stok & resep** (fitur *Stok & resep*).
 - Produk dengan resep memakai **HPP dari resep** di laporan laba (modal manual di form produk diabaikan).
 - Ketuk satu bahan untuk melihat riwayatnya: pembelian, terjual (nomor order), void, terbuang, opname.
 
+## Outlet / cabang (owner)
+
+Menu **Pengaturan → Atur outlet** (outlet kedua dst. butuh fitur *Multi-outlet*).
+
+- **Bersama untuk semua outlet**: menu & harga, pelanggan/member, loyalitas, promo & voucher, staf (PIN sama).
+- **Per outlet**: tablet, shift & kas laci, transaksi, open bill, riwayat, dan stok bahan (modal rata-rata juga per outlet).
+- **Tambah outlet**: isi nama, alamat & telepon (dicetak di struk outlet itu). Nama outlet tampil di struk, di baris
+  info kasir, dan di laporan tutup shift bila outlet aktif lebih dari satu.
+- **Tablet baru**: setelah email & password owner benar, aplikasi menanyakan *outlet mana*. Tablet yang sudah ada bisa
+  dipindah dari layar Outlet (ketuk tabletnya); shift tablet itu harus ditutup dulu.
+- Open bill hanya bisa dibuka, diubah, dibayar, atau di-void (refund) dari tablet di outlet yang sama.
+- **Dashboard**: pilih *Semua outlet* (dengan rincian penjualan per outlet) atau satu outlet. Unduhan CSV mengikuti
+  pilihan itu dan punya kolom *Outlet*; rekap pajak PB1 dipisah per outlet (lapor pajak daerah per lokasi).
+- **Stok & resep**: pilih outlet di kanan atas untuk melihat/mencatat stok outlet lain. *Dibayar dari laci* hanya untuk
+  outlet tablet ini.
+- Outlet tidak bisa dihapus; nonaktifkan bila tutup (tabletnya dipindah dulu). Minimal satu outlet tetap aktif.
+
 ## Kasbon (owner)
 
 - **Batas default** per member: Pengaturan → Fitur → *Kasbon* (kosong = tanpa batas). Batas khusus per

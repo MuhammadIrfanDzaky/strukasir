@@ -195,8 +195,10 @@ class SessionController extends AsyncNotifier<Session> {
     required String password,
     String? deviceName,
     String? otp,
+    String? outletId,
   }) async {
     final res = await ApiClient(baseUrl: serverUrl).post('/devices/register', data: {
+      'outlet_id': ?outletId,
       'email': email.trim(),
       'password': password,
       if (deviceName != null && deviceName.trim().isNotEmpty) 'device_name': deviceName.trim(),

@@ -32,6 +32,7 @@ import 'package:berrybrew_pos/features/printing/receipt_settings_screen.dart';
 import 'package:berrybrew_pos/features/printing/stations.dart';
 import 'package:berrybrew_pos/features/inventory/inventory_models.dart';
 import 'package:berrybrew_pos/features/inventory/inventory_screen.dart';
+import 'package:berrybrew_pos/features/outlets/outlets_screen.dart';
 import 'package:berrybrew_pos/features/promotions/promotion_models.dart';
 import 'package:berrybrew_pos/features/promotions/promotions_screen.dart';
 import 'package:berrybrew_pos/features/promotions/voucher_dialog.dart';
@@ -86,6 +87,8 @@ final bigMenu = Menu.fromJson({
   ...menuJson,
   'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true, 'member_tiers': true, 'customer_credit': true, 'customer_messaging': true, 'promotions': true, 'inventory': true},
   'promotions': promotionsJson,
+  'outlet': {'id': 'o1', 'code': 'O1', 'name': 'BerryBrew Sudirman', 'address': 'Jl. Sudirman 1'},
+  'outlet_count': 2,
   'member_tiers': tiersJson,
   'loyalty': loyaltyJson,
   'categories': [
@@ -168,6 +171,10 @@ final reportJson = {
     'withdrawals': 3000000,
   },
   'net_profit': 5495000,
+  'by_outlet': [
+    {'id': 'o1', 'name': 'BerryBrew Sudirman', 'orders': 250, 'sales': 8045000},
+    {'id': 'o2', 'name': 'BerryBrew Dago Atas Dekat Kampus', 'orders': 162, 'sales': 4800000},
+  ],
   'by_method': {'cash': 7340000, 'debit': 1205000, 'qris': 4300000, 'credit': 640000},
   'by_cashier': [
     {'name': 'Rina Amelia', 'orders': 230, 'sales': 7200000},
@@ -399,7 +406,20 @@ Dio fakeDio() => Dio()
             ],
             'placeholders': ['{nama}', '{kedai}', '{kode}', '{tingkat}', '{stempel}', '{sisa_kasbon}', '{struk}', '{total}', '{nomor}'],
           }}
-        : path == '/inventory'
+        : path == '/outlets'
+        ? {'data': {
+            'enabled': true,
+            'outlets': [
+              {'id': 'o1', 'code': 'O1', 'name': 'BerryBrew Sudirman', 'address': 'Jl. Jend. Sudirman No. 1, Bandung', 'phone': '022-1234567', 'active': true,
+                'devices': [
+                  {'id': 'd1', 'code': 'T1', 'name': 'Tablet Kasir', 'last_seen_at': null, 'current': true},
+                  {'id': 'd3', 'code': 'T3', 'name': 'Tablet Bar Lantai Dua', 'last_seen_at': null, 'current': false},
+                ]},
+              {'id': 'o2', 'code': 'O2', 'name': 'BerryBrew Dago Atas Dekat Kampus', 'address': null, 'phone': null, 'active': true, 'devices': []},
+              {'id': 'o3', 'code': 'O3', 'name': 'BerryBrew Lama', 'address': null, 'phone': null, 'active': false, 'devices': []},
+            ],
+          }}
+        : path.startsWith('/inventory')
         ? {'data': inventoryJson}
         : path.contains('/movements')
         ? {'data': {
@@ -824,6 +844,18 @@ final scenarios = <Scenario>[
       await t.tap(find.text('HEMAT10'));
       await settle(t);
       expect(find.text('Ubah voucher'), findsOneWidget);
+    },
+  ),
+  (name: 'outlet', session: loggedIn, home: (_) => const OutletsScreen(), fillCart: false, act: null),
+  (
+    name: 'outlet-form',
+    session: loggedIn,
+    home: (_) => const OutletsScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.byTooltip('Ubah outlet').first);
+      await settle(t);
+      expect(find.text('Ubah outlet'), findsWidgets);
     },
   ),
   (name: 'stok-bahan', session: loggedIn, home: (_) => const InventoryScreen(), fillCart: false, act: null),

@@ -90,6 +90,8 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
 
   final out = <PrintLine>[
     ..._bold(wrap((receipt['name'] as String?) ?? '').map(center)),
+    // Multi-outlet: nama outlet di bawah nama usaha (alamat outlet sudah jadi header dari server).
+    if ((receipt['outlet'] as String?)?.isNotEmpty ?? false) ..._plain(wrap(receipt['outlet'] as String).map(center)),
     if (header.isNotEmpty)
       for (final l in header.split('\n')) ..._plain(wrap(l).map(center)),
     PrintLine(divider()),

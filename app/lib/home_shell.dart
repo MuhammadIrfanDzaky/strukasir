@@ -81,6 +81,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       userName: user.name,
       role: user.role,
       deviceCode: widget.session.device.code,
+      outlet: (ref.watch(menuProvider).value?.menu.multiOutlet ?? false) ? ref.watch(menuProvider).value?.menu.outlet?.name : null,
       onRefresh: () => ref.read(menuProvider.notifier).refresh(),
       onLogout: _logout,
       onSettings: settingsInMenu
@@ -224,6 +225,7 @@ class _TopBar extends StatelessWidget {
     required this.userName,
     required this.role,
     required this.deviceCode,
+    this.outlet,
     required this.onRefresh,
     required this.onLogout,
     this.onVerifyEmail,
@@ -240,10 +242,13 @@ class _TopBar extends StatelessWidget {
   final String userName;
   final String role;
   final String deviceCode;
+
+  /// Nama outlet tablet ini (hanya bila usaha punya lebih dari satu outlet).
+  final String? outlet;
   final VoidCallback onRefresh;
   final VoidCallback onLogout;
 
-  String get _roleLine => '${role == 'owner' ? 'Owner' : 'Kasir'} · Tablet $deviceCode';
+  String get _roleLine => '${role == 'owner' ? 'Owner' : 'Kasir'} · Tablet $deviceCode${outlet == null ? '' : ' · $outlet'}';
 
   @override
   Widget build(BuildContext context) {
@@ -318,13 +323,17 @@ class _TopBar extends StatelessWidget {
                   AppAvatar(userName, size: compact ? 32 : 36),
                   if (wide) ...[
                     const SizedBox(width: AppSpace.s2),
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(userName, style: AppType.bodyStrong),
-                        Text(_roleLine, style: AppType.caption.copyWith(color: AppColors.inkMuted)),
-                      ],
+                    // Nama outlet bisa panjang: batasi lebar, potong dengan "…".
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 240),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(userName, style: AppType.bodyStrong, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text(_roleLine, style: AppType.caption.copyWith(color: AppColors.inkMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
                     ),
                   ],
                 ],

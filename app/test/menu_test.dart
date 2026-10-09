@@ -51,6 +51,13 @@ void main() {
   MenuModifierGroup grp(String id) => menu.modifierGroups.firstWhere((g) => g.id == id);
   MenuModifier mod(String groupId, String id) => grp(groupId).modifiers.firstWhere((m) => m.id == id);
 
+  test('outlet tablet ini & jumlah outlet', () {
+    expect(menu.outlet, isNull);
+    expect(menu.multiOutlet, isFalse);
+    final m = Menu.fromJson({...menuJson, 'outlet': {'id': 'o2', 'code': 'O2', 'name': 'BerryBrew Dago', 'address': null}, 'outlet_count': 2});
+    expect([m.outlet!.name, m.outlet!.code, m.multiOutlet], ['BerryBrew Dago', 'O2', true]);
+  });
+
   group('MenuProduct: kode, modal, favorit', () {
     final p = MenuProduct.fromJson({
       'id': 'p', 'category_id': 'c', 'name': 'Air Mineral', 'price': 6000, 'active': true, 'sold_out': false,

@@ -10,6 +10,7 @@ import '../customers/messaging.dart';
 import '../customers/tier_settings_screen.dart';
 import '../loyalty/loyalty_settings_screen.dart';
 import '../inventory/inventory_screen.dart';
+import '../outlets/outlets_screen.dart';
 import '../promotions/promotions_screen.dart';
 import '../menu/menu_controller.dart';
 import '../settings/feature_settings_screen.dart';
@@ -210,6 +211,30 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                     ),
                   ],
                 ),
+                if (canEditReceipt) ...[
+                  const SizedBox(height: AppSpace.s4),
+                  AppSectionCard(
+                    title: 'Outlet',
+                    children: [
+                      Text(
+                        [
+                          'Tablet ini: ${ref.watch(menuProvider).value?.menu.outlet?.name ?? '-'}.',
+                          'Tambah cabang, atur alamat struk per outlet, dan pindahkan tablet antar outlet.',
+                        ].join(' '),
+                        style: AppType.body.copyWith(color: AppColors.inkMuted),
+                      ),
+                      const SizedBox(height: AppSpace.s3),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const OutletsScreen())),
+                          icon: const Icon(Icons.storefront_rounded),
+                          label: const Text('Atur outlet'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (inventoryOn) ...[
                   const SizedBox(height: AppSpace.s4),
                   AppSectionCard(

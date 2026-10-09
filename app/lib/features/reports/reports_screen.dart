@@ -12,6 +12,7 @@ import '../../core/ui/responsive.dart';
 import '../inventory/inventory_models.dart';
 import '../inventory/inventory_screen.dart';
 import '../menu/menu_controller.dart';
+import '../outlets/outlets_screen.dart';
 import '../session/session_controller.dart';
 import 'dashboard_charts.dart';
 
@@ -30,7 +31,12 @@ class ReportsScreen extends ConsumerStatefulWidget {
 
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   _Range _range = _Range.today;
+
+  /// Multi-outlet: null = semua outlet.
+  String? _outlet;
   late Future<Map<String, dynamic>> _report = _load();
+
+  String get _outletQuery => _outlet == null ? '' : '&outlet=$_outlet';
 
   (DateTime, DateTime) get _period {
     final now = DateTime.now();
@@ -46,7 +52,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   Future<Map<String, dynamic>> _load() async {
     final (from, to) = _period;
     final res = await ref.read(sessionProvider.notifier).authed((api, token) =>
-        api.get('/reports/summary?from=${_isoDate(from)}&to=${_isoDate(to)}', token: token));
+        api.get('/reports/summary?from=${_isoDate(from)}&to=${_isoDate(to)}$_outletQuery', token: token));
     return res['data'] as Map<String, dynamic>;
   }
 
@@ -80,7 +86,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final res = await ref.read(sessionProvider.notifier).authed((api, token) => api.post('/reports/export-link',
-          token: token, data: {'type': type, 'from': _isoDate(from), 'to': _isoDate(to)}));
+          token: token, data: {'type': type, 'from': _isoDate(from), 'to': _isoDate(to), 'outlet': ?_outlet}));
       final ok = await launchUrl(Uri.parse((res['data'] as Map)['url'] as String), mode: LaunchMode.externalApplication);
       messenger.showSnackBar(SnackBar(
         content: Text(ok ? 'Mengunduh di browser. File tersimpan di folder Download.' : 'Browser tidak bisa dibuka di perangkat ini.'),
@@ -131,6 +137,15 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         child: Row(children: [
           if (narrow) Expanded(child: range) else range,
           if (!narrow) const Spacer(),
+          if (!compact && (ref.watch(menuProvider).value?.menu.multiOutlet ?? false))
+            OutletPicker(
+              value: _outlet,
+              allLabel: 'Semua outlet',
+              onChanged: (v) => setState(() {
+                _outlet = v;
+                _report = _load();
+              }),
+            ),
           IconButton(tooltip: 'Unduh CSV / Excel', onPressed: _export, icon: const Icon(Icons.download_rounded)),
           IconButton(
             tooltip: 'Muat ulang',
@@ -139,6 +154,23 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           ),
         ]),
       ),
+      // HP: pilihan outlet di baris sendiri (baris atas sudah penuh).
+      if (compact && (ref.watch(menuProvider).value?.menu.multiOutlet ?? false))
+        Padding(
+          padding: EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpace.s2),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: OutletPicker(
+              value: _outlet,
+              allLabel: 'Semua outlet',
+              maxWidth: 280,
+              onChanged: (v) => setState(() {
+                _outlet = v;
+                _report = _load();
+              }),
+            ),
+          ),
+        ),
       Expanded(
         child: FutureBuilder<Map<String, dynamic>>(
           future: _report,
@@ -357,6 +389,15 @@ class _Dashboard extends StatelessWidget {
           RankedBars(rows: [
             for (final e in ((r['expenses'] as Map)['by_category'] as List).cast<Map<String, dynamic>>())
               (e['label'] as String, e['total'] as int, rp(e['total'] as int), ''),
+          ]),
+        ]),
+      ],
+      if (r['by_outlet'] is List) ...[
+        const SizedBox(height: AppSpace.s3),
+        AppSectionCard(title: 'Penjualan per outlet', children: [
+          RankedBars(rows: [
+            for (final o in (r['by_outlet'] as List).cast<Map<String, dynamic>>())
+              (o['name'] as String, o['sales'] as int, rp(o['sales'] as int), '${o['orders']} transaksi'),
           ]),
         ]),
       ],
@@ -591,7 +632,8 @@ class _StockCard extends ConsumerWidget {
           const SizedBox(height: AppSpace.s1),
           Wrap(spacing: AppSpace.s2, runSpacing: AppSpace.s2, children: [
             for (final i in low)
-              AppBadge('${i['name']} ${qtyText((i['stock'] as num).toDouble())} ${i['unit']}', tone: AppTone.danger),
+              AppBadge('${i['name']} ${qtyText((i['stock'] as num).toDouble())} ${i['unit']}${i['outlet'] == null ? '' : ' · ${i['outlet']}'}',
+                  tone: AppTone.danger),
           ]),
         ],
       ],
