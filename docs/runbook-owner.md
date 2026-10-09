@@ -54,6 +54,12 @@ Untuk menambah pesanan atau membayar, ketuk **Open Bill** di atas keranjang dan 
 - pelanggan pesan lagi → tambah produk, lalu ketuk **Simpan Bill**;
 - pelanggan selesai → ketuk **Bayar** (Close Bill), struk tercetak.
 
+**Tiket bar / dapur**: menu **Pengaturan → Atur tiket bar / dapur** (per tablet). Tambah stasiun, mis. *Bar*
+(kategori minuman, printer struk yang sama) dan *Dapur* (kategori makanan, printer kedua yang sudah di-pair).
+Saat order disimpan (Open Bill) atau dibayar, item baru tercetak sebagai tiket tanpa harga; tambahan pesanan di
+Open Bill bertanda **TAMBAHAN**. Tiket hilang / printer sempat mati: **Riwayat → order → Cetak tiket**.
+Dengan printer kedua, tablet berpindah sambungan Bluetooth otomatis (beberapa detik lebih lama).
+
 **Logo & teks struk (owner)**: menu **Pengaturan** → **Atur struk & logo**. Pilih gambar logo (otomatis diubah
 jadi hitam-putih; ketuk *Balik warna* atau geser *Ketebalan* bila hasilnya kurang pas), isi nama kedai,
 alamat, dan pesan penutup. Pratinjau di layar sama dengan hasil cetak. Ketuk **Simpan**.

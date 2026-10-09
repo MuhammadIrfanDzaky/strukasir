@@ -8,6 +8,7 @@ import '../../core/ui/components.dart';
 import '../customers/messaging.dart';
 import '../menu/menu_controller.dart';
 import '../printing/printer_service.dart';
+import '../printing/stations.dart';
 import '../printing/receipt_format.dart';
 import '../shift/shift_controller.dart';
 import '../shift/shift_dialogs.dart';
@@ -32,6 +33,7 @@ class CheckoutFlow {
   Future<void> openBill() async {
     final order = await _save();
     if (order == null) return;
+    await _printTickets(order);
     ref.read(cartProvider.notifier).clear();
     _snack('Open Bill ${order['number']} disimpan. Buka lagi dari daftar Open Bill.');
   }
@@ -91,6 +93,7 @@ class CheckoutFlow {
       paid = current!;
     }
 
+    await _printTickets(paid);
     // Struk digital via WA: hanya bila fitur aktif & member punya no HP (dicatat sebelum keranjang dikosongkan).
     final member = ref.read(cartProvider).customer;
     final canWhatsApp = (ref.read(menuProvider).value?.menu.feature('customer_messaging') ?? false) && member?.phone != null;
@@ -100,6 +103,41 @@ class CheckoutFlow {
   }
 
   Future<void> reprint(OrderJson order) => _print(order);
+
+  /// Tiket bar/dapur untuk item yang belum dikirim (baris baru / tambahan qty). Gagal cetak tiket tidak
+  /// membatalkan transaksi; kasir diberi tahu & bisa cetak ulang dari Riwayat.
+  Future<void> _printTickets(OrderJson order) async {
+    final stations = await ref.read(stationsProvider.future).catchError((_) => const <TicketStation>[]);
+    final cart = ref.read(cartProvider);
+    if (stations.isEmpty || cart.orderId != order['id']) return;
+    final pending = pendingTicketItems(cart);
+    if (pending.isEmpty) return;
+    final addition = cart.ticketed.isNotEmpty;
+    final printer = ref.read(printerProvider.notifier);
+    final failed = <String>[];
+    for (final s in stations) {
+      final items = pending.where((i) => s.takes(i.categoryId)).toList();
+      if (items.isEmpty) continue;
+      try {
+        await printer.printTo(
+          s.printerMac,
+          kitchenTicket(
+            station: s.name,
+            number: order['number'] as String,
+            label: order['customer_label'] as String?,
+            items: items,
+            at: DateTime.now(),
+            addition: addition,
+          ),
+          copies: s.copies,
+        );
+      } on PrintException {
+        failed.add(s.name);
+      }
+    }
+    ref.read(cartProvider.notifier).markTicketed();
+    if (failed.isNotEmpty) _snack('Tiket ${failed.join(', ')} gagal dicetak. Cetak ulang dari Riwayat.');
+  }
 
   // ───────────────────────────── internal ─────────────────────────────
 

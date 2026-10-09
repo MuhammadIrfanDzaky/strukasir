@@ -29,6 +29,8 @@ import 'package:berrybrew_pos/features/printing/printer_service.dart';
 import 'package:berrybrew_pos/features/printing/printer_settings_screen.dart';
 import 'package:berrybrew_pos/features/printing/receipt_logo.dart';
 import 'package:berrybrew_pos/features/printing/receipt_settings_screen.dart';
+import 'package:berrybrew_pos/features/printing/stations.dart';
+import 'package:berrybrew_pos/features/printing/stations_screen.dart';
 import 'package:berrybrew_pos/features/session/account_dialogs.dart';
 import 'package:berrybrew_pos/features/session/login_screen.dart';
 import 'package:berrybrew_pos/features/session/session_controller.dart';
@@ -415,6 +417,14 @@ class FakeShift extends ShiftController {
   Future<Map<String, dynamic>?> build() async => {'opened_at': '2026-10-06T00:58:00Z'};
 }
 
+class FakeStations extends StationsController {
+  @override
+  Future<List<TicketStation>> build() async => const [
+        TicketStation(name: 'Bar', categoryIds: ['c1', 'c3']),
+        TicketStation(name: 'Dapur makanan', printerMac: 'AA:BB:CC:DD:EE:FF', printerName: 'Printer Dapur Panda 80mm', categoryIds: ['c4'], copies: 2),
+      ];
+}
+
 class FakePrinter extends PrinterService {
   @override
   Future<SavedPrinter?> build() async => const SavedPrinter('00:11:22:33:44:55', 'iware 58mm');
@@ -735,6 +745,18 @@ final scenarios = <Scenario>[
     fillCart: false,
     act: null,
   ),
+  (name: 'tiket-stasiun', session: loggedIn, home: (_) => const StationsScreen(), fillCart: false, act: null),
+  (
+    name: 'tiket-form',
+    session: loggedIn,
+    home: (_) => const StationsScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Dapur makanan'));
+      await settle(t);
+      expect(find.text('Ubah stasiun'), findsOneWidget);
+    },
+  ),
   (name: 'riwayat', session: loggedIn, home: (s) => home(s, 1), fillCart: false, act: null),
   (
     name: 'riwayat-detail',
@@ -1026,6 +1048,7 @@ void main() {
           menuProvider.overrideWith(FakeMenu.new),
           shiftProvider.overrideWith(FakeShift.new),
           printerProvider.overrideWith(FakePrinter.new),
+          stationsProvider.overrideWith(FakeStations.new),
           signupOptionsLoaderProvider.overrideWithValue((_) async => signupOptions),
           staffProvider.overrideWith((ref) async => const [
                 StaffMember('u1', 'Rina Amelia', 'owner'),

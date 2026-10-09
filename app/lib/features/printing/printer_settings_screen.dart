@@ -14,6 +14,7 @@ import '../settings/feature_settings_screen.dart';
 import '../session/session_controller.dart';
 import 'receipt_format.dart';
 import 'receipt_settings_screen.dart';
+import 'stations_screen.dart';
 
 class PrinterSettingsScreen extends ConsumerStatefulWidget {
   const PrinterSettingsScreen({super.key});
@@ -137,6 +138,25 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                     ]),
                     if (compact) ...[const SizedBox(height: AppSpace.s3), testButton],
                   ]),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpace.s4),
+              AppSectionCard(
+                title: 'Tiket bar / dapur',
+                children: [
+                  Text(
+                    'Cetak tiket pesanan (tanpa harga) untuk barista / dapur saat order disimpan atau dibayar.',
+                    style: AppType.body.copyWith(color: AppColors.inkMuted),
+                  ),
+                  const SizedBox(height: AppSpace.s3),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const StationsScreen())),
+                      icon: const Icon(Icons.local_cafe_rounded),
+                      label: const Text('Atur tiket bar / dapur'),
+                    ),
                   ),
                 ],
               ),

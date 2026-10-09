@@ -15,6 +15,7 @@ import '../printing/receipt_preview.dart';
 import '../session/session_controller.dart';
 import '../shift/shift_controller.dart';
 import '../customers/messaging.dart';
+import '../printing/stations.dart';
 
 String _isoDate(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -225,6 +226,39 @@ class OrderDetailDialog extends ConsumerStatefulWidget {
 class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
   bool _busy = false;
 
+  /// Cetak ulang tiket bar/dapur seluruh item order (mis. tiket hilang / printer bar sempat mati).
+  Future<void> _reprintTickets() async {
+    final o = widget.order;
+    final menu = ref.read(menuProvider).value?.menu;
+    final stations = ref.read(stationsProvider).value ?? const <TicketStation>[];
+    final items = orderTicketItems(o, (id) => menu?.product(id)?.categoryId ?? '');
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    try {
+      for (final s in stations) {
+        final mine = items.where((i) => s.takes(i.categoryId)).toList();
+        if (mine.isEmpty) continue;
+        await ref.read(printerProvider.notifier).printTo(
+              s.printerMac,
+              kitchenTicket(
+                station: s.name,
+                number: o['number'] as String,
+                label: o['customer_label'] as String?,
+                items: mine,
+                at: DateTime.now(),
+                reprint: true,
+              ),
+              copies: s.copies,
+            );
+      }
+      messenger.showSnackBar(const SnackBar(content: Text('Tiket dicetak ulang.')));
+    } on PrintException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _reprint() async {
     try {
       await ref.read(printerProvider.notifier).printDocument(
@@ -333,6 +367,8 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
             child: const Text('Void'),
           ),
         if (o['status'] == 'paid') TextButton(onPressed: _busy ? null : _reprint, child: const Text('Cetak ulang')),
+        if (o['status'] != 'void' && (ref.watch(stationsProvider).value?.isNotEmpty ?? false))
+          TextButton(onPressed: _busy ? null : _reprintTickets, child: const Text('Cetak tiket')),
         // Struk digital ke member (fitur pesan WhatsApp); server menolak bila member tanpa no HP.
         if (o['status'] == 'paid' &&
             o['customer'] is Map &&

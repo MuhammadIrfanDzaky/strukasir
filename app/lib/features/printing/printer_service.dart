@@ -138,6 +138,28 @@ class PrinterService extends AsyncNotifier<SavedPrinter?> {
     }
   }
 
+  /// Cetak ke printer lain (mis. printer bar). Bluetooth hanya tersambung ke satu printer sekaligus:
+  /// putus → sambung ke [mac] → cetak → putus, supaya struk berikutnya tersambung lagi ke printer struk.
+  Future<void> printTo(String? mac, List<PrintLine> lines, {int copies = 1}) async {
+    final receipt = state.value?.mac;
+    if (mac == null || mac == receipt) return printDocument(lines, copies: copies);
+    await PrintBluetoothThermal.disconnect;
+    try {
+      await _ensureConnected(mac);
+      final gen = Generator(PaperSize.mm58, await CapabilityProfile.load());
+      final bytes = <int>[...gen.reset()];
+      for (var c = 0; c < copies; c++) {
+        for (final line in lines) {
+          bytes.addAll(gen.text(line.text, styles: PosStyles(bold: line.bold)));
+        }
+        bytes.addAll(feedMm(kTailMm));
+      }
+      if (!await PrintBluetoothThermal.writeBytes(bytes)) throw PrintException('Gagal mengirim ke printer tiket.');
+    } finally {
+      await PrintBluetoothThermal.disconnect;
+    }
+  }
+
   Future<void> _ensureConnected(String mac) async {
     if (await PrintBluetoothThermal.connectionStatus) return;
     for (var attempt = 0; attempt < 3; attempt++) {

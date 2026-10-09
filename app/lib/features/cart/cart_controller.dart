@@ -85,6 +85,7 @@ class CartState {
     this.rewardItemId,
     this.orderDiscount,
     this.number,
+    this.ticketed = const {},
   });
 
   /// UUID order dibuat di tablet = idempotency key. Kirim ulang aman.
@@ -103,6 +104,9 @@ class CartState {
   /// Nomor dari server bila order sudah pernah disimpan (open bill).
   final String? number;
 
+  /// Qty per baris yang sudah dikirim ke bar/dapur (tiket); sisanya dicetak sebagai tambahan.
+  final Map<String, int> ticketed;
+
   bool get isEmpty => lines.isEmpty;
   bool get isSaved => number != null;
   int get itemCount => lines.fold(0, (s, l) => s + l.qty);
@@ -118,6 +122,7 @@ class CartState {
     Discount? orderDiscount,
     bool clearOrderDiscount = false,
     String? number,
+    Map<String, int>? ticketed,
   }) =>
       CartState(
         orderId: orderId,
@@ -128,6 +133,7 @@ class CartState {
         rewardItemId: clearReward || clearCustomer ? null : (rewardItemId ?? this.rewardItemId),
         orderDiscount: clearOrderDiscount ? null : (orderDiscount ?? this.orderDiscount),
         number: number ?? this.number,
+        ticketed: ticketed ?? this.ticketed,
       );
 
   Map<String, dynamic> toJson(int expectedTotal) => {
@@ -299,6 +305,9 @@ class CartController extends Notifier<CartState> {
 
   void markSaved(String number) => state = state.copyWith(number: number);
 
+  /// Semua item saat ini sudah dikirim ke bar/dapur.
+  void markTicketed() => state = state.copyWith(ticketed: {for (final l in state.lines) l.id: l.qty});
+
   /// Mulai order baru (setelah dibayar / disimpan sebagai open bill).
   void clear() => state = CartState(orderId: _uuid.v4());
 
@@ -374,6 +383,8 @@ class CartController extends Notifier<CartState> {
             ),
       reward: reward,
       rewardItemId: savedReward?['item_id'] as String?,
+      // Open bill yang dimuat ulang: item lamanya sudah dicetak ke bar/dapur saat disimpan.
+      ticketed: {for (final l in lines) l.id: l.qty},
       orderDiscount: order['order_discount'] == null
           ? null
           : Discount.fromJson(order['order_discount'] as Map<String, dynamic>),
