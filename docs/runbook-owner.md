@@ -58,9 +58,15 @@ Untuk menambah pesanan atau membayar, ketuk **Open Bill** di atas keranjang dan 
 jadi hitam-putih; ketuk *Balik warna* atau geser *Ketebalan* bila hasilnya kurang pas), isi nama kedai,
 alamat, dan pesan penutup. Pratinjau di layar sama dengan hasil cetak. Ketuk **Simpan**.
 
+**Kas keluar / masuk** (di luar penjualan): ketuk chip shift di kanan atas → **Kas keluar** (beli bahan,
+gas/air/listrik, upah harian, setor ke owner) atau **Kas masuk** (tambah uang kecil). Isi nominal & keterangan.
+Semua ikut dihitung di "kas seharusnya" saat tutup shift. Salah catat: chip shift → *Catatan kas shift ini* →
+batalkan (kasir butuh PIN owner). Di Dashboard muncul **Pengeluaran** dan **Laba bersih** (laba kotor −
+pengeluaran; setor ke owner tidak dihitung sebagai biaya).
+
 **Tutup toko**
 1. Hitung semua uang tunai di laci, termasuk modal awal.
-2. Ketuk chip shift di kanan atas → **Tutup**, lalu isi jumlah yang dihitung.
+2. Ketuk chip shift di kanan atas → **Tutup shift**, lalu isi jumlah yang dihitung.
 3. App menampilkan **selisih** (lebih/kurang). Ketuk **Cetak laporan shift** dan simpan kertasnya.
 
 ## Diskon & pembatalan
@@ -99,6 +105,10 @@ Menu **Dashboard** (di HP: *Laporan*) → *Hari ini / 7 hari / 30 hari / Bulan i
   diskon, service, pajak, void.
 - **Grafik**: tren penjualan harian, jam ramai, hari tersibuk, metode bayar, penjualan per kategori, produk
   terlaris (dengan laba), dan kasir. Sentuh grafik untuk melihat angka persisnya.
+**Unduh ke Excel**: Dashboard → ikon unduh (⤓) → pilih *Penjualan per transaksi*, *per item*, *Rekap pajak
+(PB1) per hari*, atau *Kas keluar/masuk* untuk periode yang sedang dilihat. File CSV terunduh lewat browser ke
+folder **Download** dan bisa dibuka di Excel / Google Sheets. Tautannya hanya berlaku 10 menit.
+
 **Cocokkan total QRIS** dengan mutasi di aplikasi merchant QRIS minimal seminggu sekali.
 
 - **Laba kotor** = penjualan − pajak − modal (HPP). Modal diambil dari harga modal produk **saat transaksi**,

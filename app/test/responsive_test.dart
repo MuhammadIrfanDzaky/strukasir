@@ -35,6 +35,7 @@ import 'package:berrybrew_pos/features/session/session_controller.dart';
 import 'package:berrybrew_pos/features/session/setup_screen.dart';
 import 'package:berrybrew_pos/features/session/signup_options.dart';
 import 'package:berrybrew_pos/features/settings/feature_settings_screen.dart';
+import 'package:berrybrew_pos/features/shift/cash_dialogs.dart';
 import 'package:berrybrew_pos/features/shift/shift_controller.dart';
 import 'package:berrybrew_pos/home_shell.dart';
 import 'package:berrybrew_pos/main.dart' show appBuilder;
@@ -123,6 +124,16 @@ final sampleLogo = () {
 final reportJson = {
   'sales': 12845000, 'cost': 6100000, 'gross_profit': 6745000, 'cost_missing_items': 12, 'orders': 412, 'average': 31177, 'discounts': 215000, 'service': 0, 'tax': 0,
   'voids': {'orders': 3, 'refunded': 87000},
+  'expenses': {
+    'total': 1250000,
+    'by_category': [
+      {'key': 'ingredients', 'label': 'Belanja bahan', 'total': 820000},
+      {'key': 'operational', 'label': 'Operasional (gas, air, listrik)', 'total': 280000},
+      {'key': 'wages', 'label': 'Gaji / upah harian', 'total': 150000},
+    ],
+    'withdrawals': 3000000,
+  },
+  'net_profit': 5495000,
   'by_method': {'cash': 7340000, 'debit': 1205000, 'qris': 4300000, 'credit': 640000},
   'by_cashier': [
     {'name': 'Rina Amelia', 'orders': 230, 'sales': 7200000},
@@ -312,6 +323,25 @@ final customerDetailJson = {
 Dio fakeDio() => Dio()
   ..interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
     final path = o.path;
+    if (path.startsWith('/shifts/current/cash-movements')) {
+      return h.resolve(Response(requestOptions: o, statusCode: 200, data: {
+        'data': [
+          {'id': 'm1', 'kind': 'out', 'category': 'ingredients', 'category_label': 'Belanja bahan', 'amount': 25000,
+            'note': 'Es batu 2 kantong & susu UHT 1 karton untuk stok sore', 'user': 'Budi Santoso', 'cancelled': false,
+            'created_at': '2026-10-06T03:15:00Z'},
+          {'id': 'm2', 'kind': 'in', 'category': 'float', 'category_label': 'Tambah modal / uang kecil', 'amount': 50000,
+            'note': null, 'user': 'Rina Amelia', 'cancelled': true, 'created_at': '2026-10-06T02:00:00Z'},
+        ],
+        'categories': [
+          for (final (kind, key, label) in const [
+            ('out', 'ingredients', 'Belanja bahan'), ('out', 'operational', 'Operasional (gas, air, listrik)'),
+            ('out', 'wages', 'Gaji / upah harian'), ('out', 'withdrawal', 'Setor ke owner'), ('out', 'other_out', 'Lainnya'),
+            ('in', 'float', 'Tambah modal / uang kecil'), ('in', 'other_in', 'Lainnya'),
+          ])
+            {'kind': kind, 'key': key, 'label': label, 'expense': kind == 'out' && key != 'withdrawal'},
+        ],
+      }));
+    }
     final data = path.startsWith('/settings/features')
         ? {'data': featureSettingsJson}
         : path.startsWith('/messages/audience')
@@ -646,6 +676,48 @@ final scenarios = <Scenario>[
         })),
     fillCart: false,
     act: (t) async => expect(find.text('Struk via WA'), findsOneWidget),
+  ),
+  (
+    name: 'shift-menu',
+    session: loggedIn,
+    home: home,
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.textContaining('Shift'));
+      await settle(t);
+      expect(find.text('Kas keluar'), findsOneWidget);
+    },
+  ),
+  (
+    name: 'kas-keluar',
+    session: loggedIn,
+    home: (_) => Builder(builder: (context) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => showCashDialog(context, kind: 'out'));
+          return const Scaffold(body: SizedBox.expand());
+        }),
+    fillCart: false,
+    act: null,
+  ),
+  (
+    name: 'kas-daftar',
+    session: loggedIn,
+    home: (_) => Builder(builder: (context) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => showCashListDialog(context));
+          return const Scaffold(body: SizedBox.expand());
+        }),
+    fillCart: false,
+    act: null,
+  ),
+  (
+    name: 'unduh-laporan',
+    session: loggedIn,
+    home: (s) => home(s, 2),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.byTooltip('Unduh CSV / Excel'));
+      await settle(t);
+      expect(find.text('Rekap pajak (PB1) per hari'), findsOneWidget);
+    },
   ),
   (name: 'riwayat', session: loggedIn, home: (s) => home(s, 1), fillCart: false, act: null),
   (

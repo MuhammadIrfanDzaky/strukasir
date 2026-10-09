@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductImportController;
 use App\Http\Controllers\Api\V1\ReceiptSettingsController;
 use App\Http\Controllers\Api\V1\ReportController;
+use App\Http\Controllers\Api\V1\ReportExportController;
 use App\Http\Controllers\Api\V1\ShiftController;
 use App\Http\Controllers\Api\V1\SignupController;
 use App\Http\Controllers\Api\V1\SignupEmailCodeController;
@@ -39,6 +40,10 @@ Route::prefix('v1')->group(function () {
     // Publik: lupa password owner (kode 6 digit ke email).
     Route::post('auth/password/forgot', [PasswordResetController::class, 'forgot'])->middleware('throttle:auth');
     Route::post('auth/password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:auth');
+
+    // Unduhan laporan CSV lewat tautan bertanda tangan (tanpa token; dibuka di browser tablet).
+    Route::get('exports/reports', [ReportExportController::class, 'download'])
+        ->middleware(['signed:relative', 'throttle:30,1'])->name('reports.export');
 
     // Token perangkat: pilih nama staf lalu login PIN.
     Route::middleware(['auth:sanctum', 'tenant:device'])->group(function () {
@@ -91,10 +96,16 @@ Route::prefix('v1')->group(function () {
             Route::get('shifts/current', [ShiftController::class, 'current']);
             Route::post('shifts/open', [ShiftController::class, 'open']);
             Route::post('shifts/close', [ShiftController::class, 'close']);
+            // Kas keluar / masuk di luar penjualan (pembatalan: kasir butuh PIN owner).
+            Route::get('shifts/current/cash-movements', [ShiftController::class, 'cashMovements']);
+            Route::post('shifts/current/cash-movements', [ShiftController::class, 'recordCashMovement']);
+            Route::post('cash-movements/{movement}/cancel', [ShiftController::class, 'cancelCashMovement'])->whereUuid('movement');
         });
         Route::get('shifts', [ShiftController::class, 'index']);
 
         Route::get('reports/summary', [ReportController::class, 'summary'])
+            ->middleware('can:'.Permission::ReportsView->value);
+        Route::post('reports/export-link', [ReportExportController::class, 'link'])
             ->middleware('can:'.Permission::ReportsView->value);
 
         Route::middleware('can:'.Permission::SettingsManage->value)->group(function () {

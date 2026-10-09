@@ -246,7 +246,7 @@ class CustomerTest extends TestCase
             ...(array) $o, 'id' => (string) Str::uuid(), 'number' => 'OLD-1', 'business_date' => now()->subDays(60)->toDateString(),
         ])->all()));
 
-        $today = now()->toDateString();
+        $today = now($this->shop->tenant->timezone)->toDateString(); // hari bisnis = tanggal lokal kedai
         $this->api('GET', "/api/v1/reports/summary?from={$today}&to={$today}", $this->owner)
             ->assertOk()
             ->assertJsonPath('data.customers.orders', 3)
@@ -341,7 +341,7 @@ class CustomerTest extends TestCase
         // Nomornya bebas dipakai lagi.
         $this->register(['name' => 'Mira Baru', 'phone' => '081200000006'])->assertCreated();
 
-        $today = now()->toDateString();
+        $today = now($this->shop->tenant->timezone)->toDateString(); // hari bisnis = tanggal lokal kedai
         $this->api('GET', "/api/v1/reports/summary?from={$today}&to={$today}", $this->owner)->assertJsonPath('data.customers.orders', 2);
         $log = $this->inShop(fn () => AuditLog::where('action', 'customer.anonymized')->firstOrFail());
         $this->assertStringNotContainsString('Mira', json_encode($log->after));

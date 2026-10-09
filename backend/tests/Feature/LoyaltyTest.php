@@ -310,7 +310,7 @@ class LoyaltyTest extends TestCase
         $this->configure()->assertOk();
         $this->giveUnits(2);
         $this->sell([$this->line($this->latte, 2)], 35000, ['reward' => ['id' => $this->reward('Potongan 5rb')]]);
-        $today = now()->toDateString();
+        $today = now($this->shop->tenant->timezone)->toDateString(); // hari bisnis = tanggal lokal kedai
         $this->api('GET', "/api/v1/reports/summary?from={$today}&to={$today}", $this->owner)
             ->assertJsonPath('data.loyalty.earned', 2)
             ->assertJsonPath('data.loyalty.redeemed', 2)

@@ -130,6 +130,10 @@ class ShiftResultDialog extends ConsumerWidget {
           AppSummaryRow('Tunai masuk', rp(summary['cash_in'] as int)),
           if ((summary['cash_refund'] as int) > 0)
             AppSummaryRow('Refund tunai', '-${rp(summary['cash_refund'] as int)}'),
+          if (((summary['cash_extra_in'] as int?) ?? 0) != 0)
+            AppSummaryRow('Kas masuk', rp(summary['cash_extra_in'] as int)),
+          if (((summary['cash_out'] as int?) ?? 0) != 0)
+            AppSummaryRow('Kas keluar', '-${rp(summary['cash_out'] as int)}'),
           if (((summary['credit_repaid_cash'] as int?) ?? 0) != 0)
             AppSummaryRow('Pelunasan kasbon tunai', rp(summary['credit_repaid_cash'] as int)),
           AppSummaryRow('Kas seharusnya', rp(shift['expected_cash'] as int)),

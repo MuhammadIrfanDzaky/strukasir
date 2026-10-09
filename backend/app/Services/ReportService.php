@@ -111,6 +111,14 @@ class ReportService
             ->orderByDesc('b.credit_balance')
             ->get(['customers.id', 'customers.code', 'customers.name', 'b.credit_balance']);
 
+        // Kas keluar per kategori (hari lokal kedai); hanya kategori biaya yang mengurangi laba.
+        $moves = DB::table('cash_movements')->where('kind', 'out')
+            ->whereRaw("((created_at at time zone 'UTC') at time zone ?)::date between ? and ?", [$tz, $from, $to])
+            ->groupBy('category')->selectRaw('category, '.CashMovementService::netSql().' as total')
+            ->pluck('total', 'category');
+        $expenseCats = array_keys(array_filter(CashMovementService::CATEGORIES['out'], fn ($c) => $c[1]));
+        $expenses = collect($moves)->only($expenseCats)->map(fn ($v) => (int) $v)->filter();
+
         $orders = (int) $totals->orders;
         $sales = (int) $totals->sales;
 
@@ -129,6 +137,15 @@ class ReportService
             'gross_profit' => $sales - (int) $totals->tax - (int) $costs->cost,
             'cost_missing_items' => (int) $costs->missing,
             'voids' => ['orders' => (int) $voids->orders, 'refunded' => (int) $voids->refunded],
+            // Pengeluaran dari kas keluar shift; laba bersih sederhana = laba kotor − pengeluaran.
+            'expenses' => [
+                'total' => (int) $expenses->sum(),
+                'by_category' => $expenses->map(fn ($v, $k) => [
+                    'key' => $k, 'label' => CashMovementService::CATEGORIES['out'][$k][0], 'total' => $v,
+                ])->sortByDesc('total')->values(),
+                'withdrawals' => (int) ($moves['withdrawal'] ?? 0),
+            ],
+            'net_profit' => $sales - (int) $totals->tax - (int) $costs->cost - (int) $expenses->sum(),
             'by_method' => collect(['cash', 'debit', 'qris', 'credit'])->mapWithKeys(fn ($m) => [
                 $m => (int) ($byMethod->firstWhere('method', $m)->total ?? 0),
             ]),

@@ -188,7 +188,7 @@ class CreditTest extends TestCase
         $this->assertSame(['Pak Budi', 'Bu Sari'], $names('sort=debt'));
         $this->assertNotNull($other);
 
-        $today = now()->toDateString();
+        $today = now($this->shop->tenant->timezone)->toDateString(); // hari bisnis = tanggal lokal kedai
         $this->api('GET', "/api/v1/reports/summary?from={$today}&to={$today}", $this->owner)
             ->assertJsonPath('data.by_method.credit', 40000)
             ->assertJsonPath('data.credit.issued', 40000)

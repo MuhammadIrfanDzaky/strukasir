@@ -106,12 +106,20 @@ class ShiftService
         $cashIn = $sum('payment', 'cash');
         $cashRefund = $sum('refund', 'cash');
 
+        // Kas keluar / masuk di luar penjualan (bersih setelah pembatalan).
+        $moves = DB::table('cash_movements')->where('shift_id', $shift->id)
+            ->groupBy('kind')->selectRaw('kind, '.CashMovementService::netSql().' as total')->pluck('total', 'kind');
+        $cashOut = (int) ($moves['out'] ?? 0);
+        $cashExtraIn = (int) ($moves['in'] ?? 0);
+
         return [
             'opening_cash' => $shift->opening_cash,
             'cash_in' => $cashIn,
             'cash_refund' => $cashRefund,
             'credit_repaid_cash' => $repayments['cash'],
-            'expected_cash' => $shift->opening_cash + $cashIn - $cashRefund + $repayments['cash'],
+            'cash_out' => $cashOut,
+            'cash_extra_in' => $cashExtraIn,
+            'expected_cash' => $shift->opening_cash + $cashIn - $cashRefund + $repayments['cash'] + $cashExtraIn - $cashOut,
             'by_method' => $byMethod,
             'credit_repayments' => $repayments,
             'paid_orders' => (int) DB::table('payments')->where('shift_id', $shift->id)

@@ -6,6 +6,7 @@ use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\CashMovementService;
 use App\Services\ShiftService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,6 +28,44 @@ class ShiftController extends Controller
         $shift = $shifts->open($request->attributes->get('device'), $request->user(), $data['opening_cash']);
 
         return response()->json(['data' => $this->present($shift)], 201);
+    }
+
+    /** Catatan kas keluar/masuk shift terbuka tablet ini + daftar kategori. */
+    public function cashMovements(Request $request, ShiftService $shifts, CashMovementService $cash): JsonResponse
+    {
+        $shift = $shifts->current($request->attributes->get('device'));
+
+        return response()->json([
+            'data' => $shift ? $cash->forShift($shift->id) : [],
+            'categories' => CashMovementService::categoryList(),
+        ]);
+    }
+
+    public function recordCashMovement(Request $request, CashMovementService $cash): JsonResponse
+    {
+        $data = $request->validate([
+            'id' => ['required', 'uuid'],
+            'kind' => ['required', 'in:out,in'],
+            'category' => ['required', 'string', 'max:20'],
+            'amount' => ['required', 'integer', 'min:1', 'max:100000000'],
+            'note' => ['nullable', 'string', 'max:120'],
+        ]);
+        $row = $cash->record($data, $request->user(), $request->attributes->get('device'));
+
+        return response()->json(['data' => ['id' => $row->id, 'amount' => (int) $row->amount, 'kind' => $row->kind]], 201);
+    }
+
+    public function cancelCashMovement(Request $request, string $movement, CashMovementService $cash): JsonResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:120'],
+            'approval' => ['nullable', 'array:user_id,pin'],
+            'approval.user_id' => ['required_with:approval', 'uuid'],
+            'approval.pin' => ['required_with:approval', 'string', 'regex:/^\d{4,6}$/'],
+        ]);
+        $cash->cancel($movement, $data['reason'], $data['approval'] ?? null, $request->user(), $request->attributes->get('device'));
+
+        return response()->json(['message' => 'Catatan kas dibatalkan.']);
     }
 
     /** Tutup shift tablet ini; respons memuat ringkasan + selisih untuk dicetak. */

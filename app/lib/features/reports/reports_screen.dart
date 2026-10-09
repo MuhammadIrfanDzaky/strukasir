@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_client.dart';
 import '../../core/money.dart';
@@ -29,7 +30,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   _Range _range = _Range.today;
   late Future<Map<String, dynamic>> _report = _load();
 
-  Future<Map<String, dynamic>> _load() async {
+  (DateTime, DateTime) get _period {
     final now = DateTime.now();
     final from = switch (_range) {
       _Range.today => now,
@@ -37,9 +38,54 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       _Range.days30 => now.subtract(const Duration(days: 29)),
       _Range.month => DateTime(now.year, now.month),
     };
+    return (from, now);
+  }
+
+  Future<Map<String, dynamic>> _load() async {
+    final (from, to) = _period;
     final res = await ref.read(sessionProvider.notifier).authed((api, token) =>
-        api.get('/reports/summary?from=${_isoDate(from)}&to=${_isoDate(now)}', token: token));
+        api.get('/reports/summary?from=${_isoDate(from)}&to=${_isoDate(to)}', token: token));
     return res['data'] as Map<String, dynamic>;
+  }
+
+  /// Unduh CSV periode yang sedang dilihat: tautan bertanda tangan dibuka di browser → folder Download.
+  Future<void> _export() async {
+    final (from, to) = _period;
+    final type = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpace.s4, 0, AppSpace.s4, AppSpace.s2),
+              child: Text('Unduh CSV (Excel / Google Sheets) · ${_isoDate(from)} s/d ${_isoDate(to)}', style: AppType.bodyStrong),
+            ),
+            for (final (key, label, sub, icon) in const [
+              ('orders', 'Penjualan per transaksi', 'Nomor, kasir, pelanggan, total, metode bayar', Icons.receipt_long_rounded),
+              ('items', 'Penjualan per item', 'Produk, kategori, qty, diskon, modal', Icons.local_cafe_rounded),
+              ('tax', 'Rekap pajak (PB1) per hari', 'Untuk lapor pajak daerah', Icons.account_balance_rounded),
+              ('cash', 'Kas keluar / masuk', 'Pengeluaran & setoran per shift', Icons.swap_vert_rounded),
+            ])
+              ListTile(leading: Icon(icon), title: Text(label), subtitle: Text(sub), onTap: () => Navigator.pop(context, key)),
+            const SizedBox(height: AppSpace.s2),
+          ]),
+        ),
+      ),
+    );
+    if (type == null || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final res = await ref.read(sessionProvider.notifier).authed((api, token) => api.post('/reports/export-link',
+          token: token, data: {'type': type, 'from': _isoDate(from), 'to': _isoDate(to)}));
+      final ok = await launchUrl(Uri.parse((res['data'] as Map)['url'] as String), mode: LaunchMode.externalApplication);
+      messenger.showSnackBar(SnackBar(
+        content: Text(ok ? 'Mengunduh di browser. File tersimpan di folder Download.' : 'Browser tidak bisa dibuka di perangkat ini.'),
+      ));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 
   @override
@@ -83,6 +129,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         child: Row(children: [
           if (narrow) Expanded(child: range) else range,
           if (!narrow) const Spacer(),
+          IconButton(tooltip: 'Unduh CSV / Excel', onPressed: _export, icon: const Icon(Icons.download_rounded)),
           IconButton(
             tooltip: 'Muat ulang',
             onPressed: () => setState(() => _report = _load()),
@@ -292,7 +339,23 @@ class _Dashboard extends StatelessWidget {
         if ((r['service'] as int) > 0) AppStatCard('Service', rp(r['service'] as int), width: smallWidth),
         if (tax > 0) AppStatCard('Pajak', rp(tax), width: smallWidth),
         AppStatCard('Void', '${voids['orders']} · ${rp(voids['refunded'] as int)}', width: smallWidth),
+        if (((r['expenses'] as Map?)?['total'] as int? ?? 0) > 0) ...[
+          AppStatCard('Pengeluaran', rp((r['expenses'] as Map)['total'] as int), width: smallWidth),
+          AppStatCard('Laba bersih', rp(r['net_profit'] as int), width: smallWidth),
+        ],
       ]),
+      if (((r['expenses'] as Map?)?['by_category'] as List?)?.isNotEmpty ?? false) ...[
+        const SizedBox(height: AppSpace.s3),
+        AppSectionCard(title: 'Pengeluaran (kas keluar)', children: [
+          _Caption('Laba bersih = laba kotor − pengeluaran. Setor ke owner '
+              '${rp(((r['expenses'] as Map)['withdrawals'] as int?) ?? 0)} tidak dihitung sebagai biaya.'),
+          const SizedBox(height: AppSpace.s3),
+          RankedBars(rows: [
+            for (final e in ((r['expenses'] as Map)['by_category'] as List).cast<Map<String, dynamic>>())
+              (e['label'] as String, e['total'] as int, rp(e['total'] as int), ''),
+          ]),
+        ]),
+      ],
       if (((r['cost_missing_items'] as int?) ?? 0) > 0) _MissingCostNote(count: r['cost_missing_items'] as int),
       if (trend.length > 1) ...[
         const SizedBox(height: AppSpace.s4),

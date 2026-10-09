@@ -216,6 +216,8 @@ List<String> shiftReport(Map<String, dynamic> shift) {
     ...leftRight('Modal awal', rupiah(s['opening_cash'] as int)),
     ...leftRight('Tunai masuk', rupiah(s['cash_in'] as int)),
     if ((s['cash_refund'] as int) > 0) ...leftRight('Refund tunai', '-${rupiah(s['cash_refund'] as int)}'),
+    if (((s['cash_extra_in'] as int?) ?? 0) != 0) ...leftRight('Kas masuk', rupiah(s['cash_extra_in'] as int)),
+    if (((s['cash_out'] as int?) ?? 0) != 0) ...leftRight('Kas keluar', '-${rupiah(s['cash_out'] as int)}'),
     ...leftRight('Kas seharusnya', rupiah(shift['expected_cash'] as int)),
     ...leftRight('Kas dihitung', rupiah(shift['counted_cash'] as int)),
     ...leftRight(diff == 0 ? 'Selisih' : (diff > 0 ? 'LEBIH' : 'KURANG'), rupiah(diff.abs())),

@@ -202,7 +202,7 @@ class TierTest extends TestCase
         $this->configure()->assertOk();
         $this->sell([$this->line(2)], 40000, null);
         $this->sell([$this->line(1)], 19000, $this->tierId('Silver'));
-        $today = now()->toDateString();
+        $today = now($this->shop->tenant->timezone)->toDateString(); // hari bisnis = tanggal lokal kedai
         $this->api('GET', "/api/v1/reports/summary?from={$today}&to={$today}", $this->owner)
             ->assertJsonPath('data.by_tier.0', ['name' => 'Silver', 'orders' => 1, 'sales' => 19000, 'customers' => 1, 'discount' => 1000]);
     }
