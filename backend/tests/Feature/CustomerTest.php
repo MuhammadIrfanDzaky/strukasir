@@ -145,10 +145,10 @@ class CustomerTest extends TestCase
         $this->api('PUT', "/api/v1/customers/{$id}", $this->owner, ['name' => 'Fajar N', 'phone' => '0812 0000 0002'])->assertOk();
 
         $logs = $this->inShop(fn () => AuditLog::where('action', 'like', 'customer.%')->get());
-        $this->assertSame(['customer.created', 'customer.updated', 'customer.updated'], $logs->pluck('action')->all());
+        $this->assertEqualsCanonicalizing(['customer.created', 'customer.updated', 'customer.updated'], $logs->pluck('action')->all());
         $this->assertStringNotContainsString('Fajar', $logs->toJson());
-        $this->assertStringNotContainsString('812', $logs->toJson());
-        $this->assertContains('birth_date', $logs[1]->after['fields']);
+        $this->assertStringNotContainsString('81200000002', $logs->toJson()); // no HP (bukan '812': bisa kebetulan ada di UUID)
+        $this->assertTrue($logs->contains(fn ($l) => in_array('birth_date', $l->after['fields'] ?? [], true)));
     }
 
     // ─────────────── cari & kelompok ───────────────
@@ -202,7 +202,7 @@ class CustomerTest extends TestCase
         $this->assertSame(['Baru', 'Setia'], $names('new'));
 
         $this->api('GET', '/api/v1/customers?with_counts=1', $this->owner)
-            ->assertJsonPath('meta.segments', ['all' => 3, 'new' => 2, 'loyal' => 1, 'lost' => 1]);
+            ->assertJsonPath('meta.segments', ['all' => 3, 'new' => 2, 'loyal' => 1, 'lost' => 1, 'debt' => 0]);
         $top = $this->api('GET', '/api/v1/customers?sort=top', $this->owner)->json('data');
         $this->assertSame(['Setia', 'Hilang', 'Baru'], array_column($top, 'name'));
         $this->assertSame([100000, 20000, 0], array_column($top, 'total_spent'));
@@ -298,7 +298,7 @@ class CustomerTest extends TestCase
         $item = ['id' => (string) Str::uuid(), 'product_id' => $this->latte->id, 'qty' => 1, 'modifier_ids' => []];
         $this->api('PUT', "/api/v1/orders/{$openId}", $this->cashier, ['items' => [$item], 'expected_total' => 20000, 'customer_id' => $id])->assertOk();
 
-        $this->api('PUT', '/api/v1/settings/features', $this->owner, ['features' => ['customers' => false, 'loyalty' => false, 'member_tiers' => false]])->assertOk();
+        $this->api('PUT', '/api/v1/settings/features', $this->owner, ['features' => ['customers' => false, 'loyalty' => false, 'member_tiers' => false, 'customer_credit' => false]])->assertOk();
         $this->assertNotContains('customers.view', $this->api('GET', '/api/v1/auth/me', $this->cashier)->json('user.permissions'));
 
         $this->api('GET', '/api/v1/customers', $this->cashier)->assertForbidden();

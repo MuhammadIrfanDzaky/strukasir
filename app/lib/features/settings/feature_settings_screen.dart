@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
+import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
@@ -62,6 +63,9 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
 
   /// Form pelanggan baru: no HP wajib.
   bool _phoneRequired = true;
+
+  /// Batas kasbon default (kosong = tanpa batas).
+  final _creditLimit = TextEditingController();
   String? _loadError;
   String? _error;
   Map<String, String> _fieldErrors = {};
@@ -77,6 +81,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
     'customers': Icons.groups_rounded,
     'loyalty': Icons.loyalty_rounded,
     'member_tiers': Icons.workspace_premium_rounded,
+    'customer_credit': Icons.menu_book_rounded,
   };
 
   @override
@@ -87,6 +92,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
 
   @override
   void dispose() {
+    _creditLimit.dispose();
     _tax.dispose();
     _service.dispose();
     super.dispose();
@@ -107,6 +113,8 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
       _taxInclusive = data['tax_inclusive'] as bool? ?? false;
       _serviceInclusive = data['service_inclusive'] as bool? ?? false;
       _phoneRequired = data['customer_phone_required'] as bool? ?? true;
+      final limit = data['credit_default_limit'] as int?;
+      _creditLimit.text = limit == null ? '' : rupiah(limit);
     });
   }
 
@@ -174,6 +182,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
           data: {
             'features': _on,
             if (_on['customers'] ?? false) 'customer_phone_required': _phoneRequired,
+            if (_on['customer_credit'] ?? false) 'credit_default_limit': parseRupiah(_creditLimit.text),
             if (_on['tax_service'] ?? false) ...{
               'tax_percent': tax,
               'service_percent': service,
@@ -232,6 +241,23 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
                                 _tile(o),
                                 if (o.key == 'tax_service' && (_on[o.key] ?? false)) _taxFields(),
                                 if (o.key == 'customers' && (_on[o.key] ?? false)) _customerFields(),
+                                if (o.key == 'customer_credit' && (_on[o.key] ?? false))
+                                  Padding(
+                                    padding: EdgeInsets.fromLTRB(context.isCompact ? AppSpace.s4 : 72, 0, AppSpace.s4, AppSpace.s4),
+                                    child: TextField(
+                                      controller: _creditLimit,
+                                      keyboardType: TextInputType.number,
+                                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                                      decoration: InputDecoration(
+                                        labelText: 'Batas kasbon default per member',
+                                        prefixText: 'Rp ',
+                                        helperText: 'Kosongkan = tanpa batas. Lewat batas → perlu PIN owner. Bisa diatur khusus per member.',
+                                        helperMaxLines: 2,
+                                        errorText: _fieldErrors['credit_default_limit'],
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ],
                           ),

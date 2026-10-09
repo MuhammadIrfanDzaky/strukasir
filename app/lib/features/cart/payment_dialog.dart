@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
+import 'cart_controller.dart';
 import 'order_api.dart';
 
 /// Nominal tunai yang umum diserahkan pelanggan, mis. total 28.000 → 28.000 / 30.000 / 50.000 / 100.000.
@@ -29,11 +30,14 @@ class _Row {
 
 /// Pilih metode bayar. Mengembalikan daftar pembayaran yang jumlahnya tepat = total.
 class PaymentDialog extends StatefulWidget {
-  const PaymentDialog({super.key, required this.total, required this.splitEnabled, required this.number});
+  const PaymentDialog({super.key, required this.total, required this.splitEnabled, required this.number, this.creditCustomer});
 
   final int total;
   final bool splitEnabled;
   final String number;
+
+  /// Member yang boleh kasbon (fitur aktif & member tertaut); null = pilihan Kasbon disembunyikan.
+  final CartCustomer? creditCustomer;
 
   @override
   State<PaymentDialog> createState() => _PaymentDialogState();
@@ -47,6 +51,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
   String? get _problem {
     if (_sum != widget.total) return 'Jumlah pembayaran ${rp(_sum)} ≠ total ${rp(widget.total)}';
     if (_rows.where((r) => r.method == 'cash').length > 1) return 'Tunai cukup satu baris';
+    if (_rows.where((r) => r.method == 'credit').length > 1) return 'Kasbon cukup satu baris';
     for (final r in _rows) {
       if (r.amountValue <= 0) return 'Nominal harus lebih dari 0';
       if (r.method == 'cash' && (r.tenderedValue ?? r.amountValue) < r.amountValue) return 'Uang diterima kurang';
@@ -95,14 +100,16 @@ class _PaymentDialogState extends State<PaymentDialog> {
                       ? const ButtonStyle(padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: AppSpace.s2)))
                       : null,
                   segments: [
-                    for (final (value, label, icon) in const [
+                    for (final (value, label, icon) in [
                       ('cash', 'Tunai', Icons.payments_rounded),
                       ('debit', 'Debit', Icons.credit_card_rounded),
                       ('qris', 'QRIS', Icons.qr_code_rounded),
+                      if (widget.creditCustomer != null) ('credit', 'Kasbon', Icons.menu_book_rounded),
                     ])
                       ButtonSegment(
                         value: value,
-                        label: Text(label),
+                        // Satu baris; mengecil sedikit bila 4 pilihan tidak muat di HP sempit.
+                        label: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1)),
                         icon: MediaQuery.sizeOf(context).width < 480 ? null : Icon(icon),
                       ),
                   ],
@@ -154,6 +161,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
               const _Note('Pastikan notifikasi dana masuk muncul di aplikasi merchant QRIS sebelum konfirmasi. '
                   'Nama Anda tercatat sebagai pengonfirmasi.'),
             if (r.method == 'debit') const _Note('Konfirmasi setelah transaksi di mesin EDC berhasil.'),
+            if (r.method == 'credit') _creditNote(r.amountValue),
           ],
           if (widget.splitEnabled && _rows.length < 3)
             TextButton.icon(
@@ -181,9 +189,36 @@ class _PaymentDialogState extends State<PaymentDialog> {
                         tendered: r.method == 'cash' ? (r.tenderedValue ?? r.amountValue) : null,
                       ),
                   ]),
-          child: Text(_rows.length == 1 && _rows.first.method != 'cash' ? 'Konfirmasi diterima' : 'Selesaikan'),
+          child: Text(_rows.length == 1 && _rows.first.method == 'credit'
+              ? 'Catat kasbon'
+              : _rows.length == 1 && _rows.first.method != 'cash' ? 'Konfirmasi diterima' : 'Selesaikan'),
         ),
       ],
+    );
+  }
+}
+
+extension on _PaymentDialogState {
+  /// Sisa kasbon sebelum & sesudah, dan peringatan bila melewati batas (owner diminta PIN).
+  Widget _creditNote(int amount) {
+    final c = widget.creditCustomer!;
+    final before = c.creditBalance ?? 0;
+    final after = before + amount;
+    final over = c.creditLimit != null && after > c.creditLimit!;
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.s3),
+      decoration: BoxDecoration(color: over ? AppColors.warningSoft : AppColors.surfaceSunken, borderRadius: AppRadius.mdAll),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('Kasbon ${c.name}', style: AppType.bodyStrong),
+        AppSummaryRow('Sisa sekarang', rp(before)),
+        AppSummaryRow('Setelah transaksi ini', rp(after)),
+        AppSummaryRow('Batas', c.creditLimit == null ? 'Tanpa batas' : rp(c.creditLimit!)),
+        if (over)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpace.s1),
+            child: Text('Melewati batas: perlu PIN owner.', style: AppType.caption.copyWith(color: AppColors.warning, fontWeight: FontWeight.w700)),
+          ),
+      ]),
     );
   }
 }

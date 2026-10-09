@@ -57,6 +57,8 @@ class CheckoutFlow {
           total: total,
           splitEnabled: menu?.feature('split_payment') ?? false,
           number: saved['number'] as String,
+          // Kasbon hanya untuk member, bila fitur aktif.
+          creditCustomer: (menu?.feature('customer_credit') ?? false) ? ref.read(cartProvider).customer : null,
         ),
       );
       if (chosen == null) return; // dibatalkan; order tetap terbuka & keranjang utuh
@@ -64,8 +66,20 @@ class CheckoutFlow {
     }
 
     OrderJson paid;
+    Approval? approval;
     try {
-      paid = await _api.pay(saved['id'] as String, payments, total);
+      while (true) {
+        try {
+          paid = await _api.pay(saved['id'] as String, payments, total, approval: approval);
+          break;
+        } on ApiException catch (e) {
+          // Kasbon melewati batas: minta PIN owner lalu kirim ulang (ID pembayaran sama → aman).
+          if (e.field('approval') == null || !context.mounted) rethrow;
+          if (approval != null) _snack(e.field('approval')!);
+          approval = await showDialog<Approval>(context: context, builder: (_) => ApprovalDialog(reason: e.field('approval')!));
+          if (approval == null) return;
+        }
+      }
     } on ApiException catch (e) {
       // 409 bisa berarti pembayaran sebelumnya sebenarnya sudah masuk (koneksi putus setelah sukses).
       final current = e.status == 409 ? await _tryGet(saved['id'] as String) : null;
@@ -152,7 +166,9 @@ class CheckoutFlow {
                 child: const Icon(Icons.check_rounded, size: 36, color: AppColors.success),
               ),
               const SizedBox(height: AppSpace.s3),
-              Text('Lunas', style: AppType.titleLg),
+              Text(order['credit'] == null ? 'Lunas' : 'Kasbon dicatat', style: AppType.titleLg),
+              if (order['credit'] case {'balance': final int balance})
+                Text('Sisa kasbon ${rp(balance)}', style: AppType.bodyStrong.copyWith(color: AppColors.warning)),
               Text('Order ${order['number']} · Total ${rp(order['grand_total'] as int)}',
                   style: AppType.body.copyWith(color: AppColors.inkMuted)),
               if ((order['change_total'] as int) > 0) ...[

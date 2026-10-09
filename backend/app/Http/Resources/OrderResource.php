@@ -8,6 +8,7 @@ use App\Models\OrderItem;
 use App\Models\OrderItemModifier;
 use App\Models\Payment;
 use App\Models\TenantSetting;
+use App\Services\CreditService;
 use App\Services\LoyaltyService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -43,6 +44,7 @@ class OrderResource extends JsonResource
                 'discount' => $this->reward_discount,
             ],
             'loyalty' => $this->loyalty(),
+            'credit' => $this->credit(),
             'tier' => $this->tier_name === null ? null : [
                 'id' => $this->tier_id,
                 'name' => $this->tier_name,
@@ -103,6 +105,21 @@ class OrderResource extends JsonResource
                 'footer' => $settings?->receipt_footer,
             ],
         ];
+    }
+
+    /**
+     * Kasbon di order ini + sisa piutang member sekarang (untuk struk).
+     *
+     * @return array{amount: int, balance: int}|null
+     */
+    private function credit(): ?array
+    {
+        $amount = (int) $this->payments->where('kind', 'payment')->where('method', 'credit')->sum('amount');
+        if ($amount === 0 || $this->customer_id === null) {
+            return null;
+        }
+
+        return ['amount' => $amount, 'balance' => app(CreditService::class)->balance($this->customer_id)];
     }
 
     /**

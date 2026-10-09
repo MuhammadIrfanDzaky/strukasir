@@ -41,6 +41,7 @@ class OrderService
         private readonly FeatureGate $features,
         private readonly LoyaltyService $loyalty,
         private readonly TierService $tiers,
+        private readonly CreditService $credit,
     ) {}
 
     /**
@@ -169,10 +170,20 @@ class OrderService
      *
      * @param  list<array{id: string, method: string, amount: int, tendered?: int|null, reference?: string|null}>  $payments
      */
-    public function pay(string $orderId, array $payments, int $expectedTotal, User $cashier, Device $device): Order
+    public function pay(string $orderId, array $payments, int $expectedTotal, User $cashier, Device $device, ?array $approval = null): Order
     {
         if (count($payments) > 1 && ! $this->features->enabled(Feature::SplitPayment)) {
             throw ValidationException::withMessages(['payments' => 'Split payment tidak aktif untuk kedai ini.']);
+        }
+
+        // Kasbon: dicek sebelum transaksi (persetujuan PIN owner yang salah tetap tercatat).
+        $creditAmount = array_sum(array_map(fn ($p) => $p['method'] === 'credit' ? (int) $p['amount'] : 0, $payments));
+        $pending = $creditAmount > 0 ? Order::query()->find($orderId) : null;
+        if ($pending !== null && $pending->status === 'open') {
+            $approver = $this->credit->authorizeCharge($pending, $creditAmount, $cashier, $approval);
+            if ($approver !== null) {
+                Audit::record('credit.over_limit_approved', $pending, after: ['approver_id' => $approver->id, 'amount' => $creditAmount], user: $cashier, device: $device);
+            }
         }
 
         return DB::transaction(function () use ($orderId, $payments, $expectedTotal, $cashier, $device) {
@@ -587,6 +598,9 @@ class OrderService
 
         if (count(array_filter($payments, fn ($p) => $p['method'] === 'cash')) > 1) {
             throw ValidationException::withMessages(['payments' => 'Pembayaran tunai cukup satu baris.']);
+        }
+        if (count(array_filter($payments, fn ($p) => $p['method'] === 'credit')) > 1) {
+            throw ValidationException::withMessages(['payments' => 'Kasbon cukup satu baris.']);
         }
 
         foreach ($payments as $i => $p) {

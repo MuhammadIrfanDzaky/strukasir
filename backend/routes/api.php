@@ -68,6 +68,9 @@ Route::prefix('v1')->group(function () {
             Route::get('customers', [CustomerController::class, 'index']);
             Route::post('customers', [CustomerController::class, 'store']);
         });
+        // Pelunasan kasbon: kasir yang mengoperasikan shift (uang masuk laci).
+        Route::post('customers/{customer}/credit-repayments', [CustomerController::class, 'repayCredit'])
+            ->middleware(['can:'.Permission::CustomersView->value, 'can:'.Permission::ShiftOperate->value]);
         Route::middleware('can:'.Permission::CustomersManage->value)->group(function () {
             Route::post('customers/import', CustomerImportController::class);
             Route::get('customers/{customer}', [CustomerController::class, 'show']);
@@ -75,6 +78,8 @@ Route::prefix('v1')->group(function () {
             Route::post('customers/{customer}/anonymize', [CustomerController::class, 'anonymize']);
             Route::post('customers/{customer}/loyalty-adjust', [CustomerController::class, 'adjustLoyalty']);
             Route::put('customers/{customer}/tier', [CustomerController::class, 'setTier']);
+            Route::put('customers/{customer}/credit-limit', [CustomerController::class, 'setCreditLimit']);
+            Route::post('customers/{customer}/credit-repayments/{repayment}/reverse', [CustomerController::class, 'reverseRepayment'])->whereUuid('repayment');
         });
 
         Route::middleware('can:'.Permission::ShiftOperate->value)->group(function () {

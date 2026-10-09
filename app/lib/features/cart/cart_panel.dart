@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
+import '../customers/credit_dialogs.dart';
 import '../customers/customer_picker.dart';
 import '../customers/member_tier.dart';
 import '../loyalty/reward_dialog.dart';
@@ -71,9 +72,22 @@ class _CartPanelState extends ConsumerState<CartPanel> {
     if (c == null || !mounted) return;
     ref.read(cartProvider.notifier).setCustomer(
           CartCustomer(
-              id: c.id, code: c.code, name: c.name, phone: c.phone, visits: c.visits, note: c.note, balance: c.loyaltyBalance, tier: c.tier),
+              id: c.id, code: c.code, name: c.name, phone: c.phone, visits: c.visits, note: c.note, balance: c.loyaltyBalance, tier: c.tier,
+              creditBalance: c.creditBalance, creditLimit: c.creditLimit),
         );
     if (_labelError != null) setState(() => _labelError = null);
+  }
+
+  /// Member membayar kasbonnya (di luar order ini): catat pelunasan, perbarui sisa di chip.
+  Future<void> _repay() async {
+    final c = ref.read(cartProvider).customer;
+    if (c == null || (c.creditBalance ?? 0) <= 0) return;
+    final left = await showRepayDialog(context, customerId: c.id, name: c.name, balance: c.creditBalance!);
+    if (left == null || !mounted) return;
+    ref.read(cartProvider.notifier).setCustomer(CartCustomer(
+      id: c.id, code: c.code, name: c.name, phone: c.phone, visits: c.visits, note: c.note,
+      balance: c.balance, tier: c.tier, creditBalance: left, creditLimit: c.creditLimit));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pelunasan kasbon dicatat. Sisa ${rp(left)}.')));
   }
 
   /// Tukar hadiah dengan saldo member.
@@ -367,6 +381,22 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                                       style: AppType.caption.copyWith(color: AppColors.warning),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis),
+                                if ((customer.creditBalance ?? 0) > 0 && (menu?.feature('customer_credit') ?? false))
+                                  Row(children: [
+                                    Flexible(
+                                      child: Text('Kasbon ${rp(customer.creditBalance!)}',
+                                          style: AppType.caption.copyWith(color: AppColors.warning, fontWeight: FontWeight.w700)),
+                                    ),
+                                    TextButton(
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: AppSpace.s2),
+                                        minimumSize: const Size(0, 32),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      onPressed: _busy ? null : _repay,
+                                      child: const Text('Bayar kasbon'),
+                                    ),
+                                  ]),
                                 if (reward != null)
                                   Text('Hadiah: ${reward.name} (−${reward.cost} ${program?.unit ?? 'stempel'})',
                                       style: AppType.caption.copyWith(color: AppColors.success, fontWeight: FontWeight.w700),

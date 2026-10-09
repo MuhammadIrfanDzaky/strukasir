@@ -18,7 +18,7 @@ class TenantSetting extends Model
     protected $fillable = [
         'receipt_name', 'receipt_header', 'receipt_footer',
         'tax_enabled', 'tax_rate_bp', 'service_enabled', 'service_rate_bp',
-        'rounding_unit', 'cashier_discount_limit_bp', 'tax_inclusive', 'service_inclusive', 'customer_phone_required',
+        'rounding_unit', 'cashier_discount_limit_bp', 'tax_inclusive', 'service_inclusive', 'customer_phone_required', 'credit_default_limit',
     ];
 
     protected function casts(): array

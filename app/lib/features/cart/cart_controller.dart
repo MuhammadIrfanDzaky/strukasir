@@ -51,7 +51,7 @@ class CartLine {
 
 /// Member yang ditautkan ke order (cukup untuk tampilan kasir & struk).
 class CartCustomer {
-  const CartCustomer({required this.id, required this.code, required this.name, this.phone, this.visits, this.note, this.balance, this.tier});
+  const CartCustomer({required this.id, required this.code, required this.name, this.phone, this.visits, this.note, this.balance, this.tier, this.creditBalance, this.creditLimit});
 
   final String id;
   final String code;
@@ -69,6 +69,10 @@ class CartCustomer {
 
   /// Tingkat member (diskon otomatis & pengali stempel); dikirim ke server sebagai `tier_id`.
   final MemberTier? tier;
+
+  /// Sisa kasbon & batasnya saat dipilih (null = fitur kasbon mati / batas tanpa batas).
+  final int? creditBalance;
+  final int? creditLimit;
 }
 
 class CartState {

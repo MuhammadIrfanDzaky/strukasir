@@ -12,6 +12,7 @@ import '../../core/ui/responsive.dart';
 import '../menu/menu_controller.dart';
 import 'customer_api.dart';
 import 'customer_form.dart';
+import 'credit_dialogs.dart';
 import 'customer_picker.dart';
 import 'member_tier.dart';
 
@@ -21,15 +22,23 @@ const _segments = [
   (key: 'new', label: 'Baru', countKey: 'new'),
   (key: 'loyal', label: 'Setia', countKey: 'loyal'),
   (key: 'lost', label: 'Menghilang', countKey: 'lost'),
+  (key: 'debt', label: 'Berkasbon', countKey: 'debt'),
 ];
 
 const _segmentHelp = {
   'new': 'Terdaftar dalam 30 hari terakhir.',
   'loyal': 'Belanja 5× atau lebih dan masih datang dalam 30 hari terakhir.',
   'lost': 'Pernah belanja, tapi tidak datang lagi lebih dari 30 hari. Saatnya disapa.',
+  'debt': 'Masih punya kasbon yang belum dilunasi.',
 };
 
-const _sorts = {'name': 'Nama (A–Z)', 'recent': 'Terakhir datang', 'top': 'Belanja terbanyak', 'newest': 'Terbaru terdaftar'};
+const _sorts = {
+  'name': 'Nama (A–Z)',
+  'recent': 'Terakhir datang',
+  'top': 'Belanja terbanyak',
+  'newest': 'Terbaru terdaftar',
+  'debt': 'Kasbon terbesar',
+};
 
 /// Pelanggan / member (owner): cari, kelompok, urutkan, tambah, import, lalu detail per pelanggan.
 class CustomersScreen extends ConsumerStatefulWidget {
@@ -251,6 +260,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
               ),
             ),
           for (final s in _segments)
+            if (s.key != 'debt' || (ref.watch(menuProvider).value?.menu.feature('customer_credit') ?? false))
             Padding(
               padding: const EdgeInsets.only(right: AppSpace.s2),
               child: ChoiceChip(
@@ -304,14 +314,18 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
               );
             }
             final c = _items[i];
-            final spent = c.totalSpent == null || c.totalSpent == 0 ? null : rp(c.totalSpent!);
+            final spent = (c.creditBalance ?? 0) > 0
+                ? 'kasbon ${rp(c.creditBalance!)}'
+                : (c.totalSpent == null || c.totalSpent == 0 ? null : rp(c.totalSpent!));
             // Layar lebar: total belanja di kanan; HP: di baris kunjungan.
             return CustomerTile(
               c,
               loyaltyUnit: ref.watch(menuProvider).value?.menu.loyalty?.unit,
               onTap: () => _open(c),
               spent: compact ? spent : null,
-              trailing: compact || spent == null ? null : Text(spent, style: AppType.bodyStrong),
+              trailing: compact || spent == null
+                  ? null
+                  : Text(spent, style: AppType.bodyStrong.copyWith(color: (c.creditBalance ?? 0) > 0 ? AppColors.warning : null)),
             );
           },
         ),
@@ -382,6 +396,56 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     if (saved != null) {
       _changed = true;
       _load();
+    }
+  }
+
+  Future<void> _repay(Customer c) async {
+    final left = await showRepayDialog(context, customerId: c.id, name: c.name, balance: c.creditBalance ?? 0);
+    if (left != null) {
+      _changed = true;
+      _load();
+    }
+  }
+
+  Future<void> _editLimit(Customer c) async {
+    final r = await showCreditLimitDialog(context, current: c.creditLimit, custom: c.creditLimitCustom);
+    if (r == null || !mounted) return;
+    try {
+      await ref.read(customerApiProvider).setCreditLimit(c.id, r.$2);
+      _load();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  Future<void> _reverse(Customer c, Map<String, dynamic> entry) async {
+    final reason = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Batalkan pelunasan?'),
+        content: SizedBox(
+          width: 400,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('Pelunasan ${rp(entry['amount'] as int)} dibatalkan dan kasbon bertambah lagi. '
+                '${entry['method'] == 'cash' ? 'Uang tunainya keluar dari laci shift ini.' : ''}'),
+            const SizedBox(height: AppSpace.s3),
+            TextField(controller: reason, decoration: const InputDecoration(labelText: 'Alasan', hintText: 'mis. salah pelanggan')),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Batalkan pelunasan')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await ref.read(customerApiProvider).reverseRepayment(c.id, entry['id'] as String, reason.text.trim().isEmpty ? 'Salah catat' : reason.text.trim());
+      _changed = true;
+      _load();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.fieldErrors.values.expand((v) => v).firstOrNull ?? e.message)));
     }
   }
 
@@ -619,6 +683,71 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
             ],
           );
 
+    final creditHistory = ((data['credit_history'] as List?) ?? const []).cast<Map<String, dynamic>>();
+    final creditCard = c.creditBalance == null
+        ? null
+        : AppSectionCard(
+            title: 'Kasbon',
+            trailing: TextButton.icon(
+              onPressed: () => _editLimit(c),
+              icon: const Icon(Icons.tune_rounded, size: 18),
+              label: const Text('Batas'),
+            ),
+            empty: 'Belum pernah kasbon.',
+            children: [
+              AppSummaryRow('Sisa kasbon', rp(c.creditBalance!), emphasis: true,
+                  valueColor: c.creditBalance! > 0 ? AppColors.warning : AppColors.success),
+              AppSummaryRow('Batas', '${c.creditLimit == null ? 'Tanpa batas' : rp(c.creditLimit!)}${c.creditLimitCustom ? '' : ' (default kedai)'}'),
+              if (c.creditBalance! > 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.s2),
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => _repay(c),
+                    icon: const Icon(Icons.payments_rounded),
+                    label: const Text('Catat pelunasan'),
+                  ),
+                ),
+              for (final e in creditHistory)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.s1),
+                  child: Row(children: [
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(
+                          switch (e['kind']) {
+                            'charge' => 'Kasbon',
+                            'charge_void' => 'Kasbon dibatalkan (void)',
+                            'repayment' => (e['reversed'] as bool) ? 'Pelunasan (dibatalkan)' : 'Pelunasan',
+                            _ => 'Pembatalan pelunasan',
+                          },
+                          style: AppType.bodyStrong,
+                        ),
+                        Text(
+                          [
+                            formatDate((e['created_at'] as String).substring(0, 10)),
+                            if (e['label'] != null) e['label'] as String,
+                            if (e['method'] != null) const {'cash': 'Tunai', 'debit': 'Debit', 'qris': 'QRIS'}[e['method']] ?? '',
+                          ].join(' · '),
+                          style: AppType.caption.copyWith(color: AppColors.inkMuted),
+                        ),
+                      ]),
+                    ),
+                    Text(
+                      '${e['kind'] == 'charge' || e['kind'] == 'reversal' ? '+' : '−'}${rupiah(e['amount'] as int)}',
+                      style: AppType.bodyStrong,
+                    ),
+                    if (e['kind'] == 'repayment' && !(e['reversed'] as bool))
+                      IconButton(
+                        tooltip: 'Batalkan pelunasan',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _reverse(c, e),
+                        icon: const Icon(Icons.undo_rounded, size: 18),
+                      ),
+                  ]),
+                ),
+            ],
+          );
+
     final loyaltyCard = program == null
         ? null
         : AppSectionCard(
@@ -718,6 +847,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                   if (compact) ...[
                     info,
                     const SizedBox(height: AppSpace.s3),
+                    if (creditCard != null) ...[creditCard, const SizedBox(height: AppSpace.s3)],
                     if (tierCard != null) ...[tierCard, const SizedBox(height: AppSpace.s3)],
                     if (loyaltyCard != null) ...[loyaltyCard, const SizedBox(height: AppSpace.s3)],
                     favCard,
@@ -738,6 +868,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                         const SizedBox(width: AppSpace.s3),
                         Expanded(
                           child: Column(children: [
+                            if (creditCard != null) ...[creditCard, const SizedBox(height: AppSpace.s3)],
                             if (loyaltyCard != null) ...[loyaltyCard, const SizedBox(height: AppSpace.s3)],
                             orderCard,
                           ]),

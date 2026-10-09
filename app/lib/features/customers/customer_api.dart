@@ -22,6 +22,9 @@ class Customer {
     this.loyaltyBalance,
     this.loyaltyExpiresAt,
     this.tier,
+    this.creditBalance,
+    this.creditLimit,
+    this.creditLimitCustom = false,
   });
 
   factory Customer.fromJson(Map<String, dynamic> j) => Customer(
@@ -39,6 +42,9 @@ class Customer {
         loyaltyBalance: j['loyalty_balance'] as int?,
         loyaltyExpiresAt: _date(j['loyalty_expires_at']),
         tier: j['tier'] == null ? null : MemberTier.fromJson(j['tier'] as Map<String, dynamic>),
+        creditBalance: j['credit_balance'] as int?,
+        creditLimit: j['credit_limit'] as int?,
+        creditLimitCustom: j['credit_limit_custom'] as bool? ?? false,
       );
 
   static DateTime? _date(Object? v) => v is String ? DateTime.tryParse(v)?.toLocal() : null;
@@ -65,6 +71,13 @@ class Customer {
 
   /// Tingkat member sekarang (null = belum mencapai tingkat / fitur mati).
   final MemberTier? tier;
+
+  /// Sisa kasbon (null = fitur kasbon mati).
+  final int? creditBalance;
+
+  /// Batas kasbon efektif (null = tanpa batas); [creditLimitCustom] = diatur khusus pelanggan ini.
+  final int? creditLimit;
+  final bool creditLimitCustom;
 
   /// Rata-rata belanja per kunjungan (owner).
   int? get average => totalSpent == null || visits == 0 ? null : totalSpent! ~/ visits;
@@ -174,6 +187,29 @@ class CustomerApi {
         api.post('/customers/$id/loyalty-adjust', token: token, data: {'units': units, 'note': note.trim()}));
     return (res['data'] as Map<String, dynamic>)['balance'] as int;
   }
+
+  /// Catat pelunasan kasbon. Mengembalikan data pelunasan + `balance` (sisa kasbon).
+  Future<Map<String, dynamic>> repayCredit(String customerId,
+      {required String id, String? note, required String method, required int amount, int? tendered}) async {
+    final res = await _authed((api, token) => api.post('/customers/$customerId/credit-repayments', token: token, data: {
+          'id': id,
+          'method': method,
+          'amount': amount,
+          'tendered': ?tendered,
+          'note': ?note,
+        }));
+    return res['data'] as Map<String, dynamic>;
+  }
+
+  Future<int> reverseRepayment(String customerId, String repaymentId, String reason) async {
+    final res = await _authed((api, token) =>
+        api.post('/customers/$customerId/credit-repayments/$repaymentId/reverse', token: token, data: {'reason': reason}));
+    return (res['data'] as Map<String, dynamic>)['balance'] as int;
+  }
+
+  /// Batas kasbon pelanggan (owner); null = ikut default kedai.
+  Future<void> setCreditLimit(String id, int? limit) =>
+      _authed((api, token) => api.put('/customers/$id/credit-limit', token: token, data: {'credit_limit': limit}));
 
   /// Kunci tingkat manual (owner); null = kembali otomatis dari belanja.
   Future<Customer> setTier(String id, String? tierId) async {

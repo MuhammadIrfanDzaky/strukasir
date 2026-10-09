@@ -11,6 +11,7 @@ import 'package:berrybrew_pos/core/api_client.dart';
 import 'package:berrybrew_pos/core/theme/theme.dart';
 import 'package:berrybrew_pos/features/cart/cart_controller.dart';
 import 'package:berrybrew_pos/features/cart/payment_dialog.dart';
+import 'package:berrybrew_pos/features/customers/credit_dialogs.dart';
 import 'package:berrybrew_pos/features/customers/customer_api.dart';
 import 'package:berrybrew_pos/features/customers/customer_form.dart';
 import 'package:berrybrew_pos/features/customers/customers_screen.dart';
@@ -73,7 +74,7 @@ const owner = SessionUser(id: 'u1', name: 'Rina Amelia', role: 'owner', permissi
 /// Menu contoh + beberapa produk tambahan (nama panjang, habis) supaya grid terisi.
 final bigMenu = Menu.fromJson({
   ...menuJson,
-  'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true, 'member_tiers': true},
+  'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true, 'member_tiers': true, 'customer_credit': true},
   'member_tiers': tiersJson,
   'loyalty': loyaltyJson,
   'categories': [
@@ -121,7 +122,7 @@ final sampleLogo = () {
 final reportJson = {
   'sales': 12845000, 'cost': 6100000, 'gross_profit': 6745000, 'cost_missing_items': 12, 'orders': 412, 'average': 31177, 'discounts': 215000, 'service': 0, 'tax': 0,
   'voids': {'orders': 3, 'refunded': 87000},
-  'by_method': {'cash': 7340000, 'debit': 1205000, 'qris': 4300000},
+  'by_method': {'cash': 7340000, 'debit': 1205000, 'qris': 4300000, 'credit': 640000},
   'by_cashier': [
     {'name': 'Rina Amelia', 'orders': 230, 'sales': 7200000},
     {'name': 'Budi Santoso', 'orders': 182, 'sales': 5645000},
@@ -141,6 +142,13 @@ final reportJson = {
     {'name': 'Snacks', 'qty': 95, 'revenue': 1650000},
     {'name': 'Manual Brew', 'qty': 25, 'revenue': 695000},
   ],
+  'credit': {
+    'issued': 640000, 'repaid': 215000, 'outstanding': 1185000, 'debtors': 9,
+    'top': [
+      {'id': 'cu1', 'code': 'M0031', 'name': 'Pak Darmawan Siregar', 'balance': 385000},
+      {'id': 'cu2', 'code': 'M0007', 'name': 'Bu Sari', 'balance': 120000},
+    ],
+  },
   'by_tier': [
     {'name': 'Gold', 'orders': 64, 'sales': 2480000, 'customers': 12, 'discount': 248000},
     {'name': 'Silver', 'orders': 41, 'sales': 1210000, 'customers': 19, 'discount': 60500},
@@ -175,9 +183,11 @@ final featureSettingsJson = {
     _f('split_payment', 'Bayar dengan beberapa metode', 'Satu order dibayar dengan beberapa metode', on: false, available: false),
     _f('customers', 'Pelanggan / member', 'Data pelanggan / member: cari & tautkan ke order, riwayat belanja, kelompok pelanggan'),
     _f('loyalty', 'Program loyalitas', 'Program loyalitas: stempel / poin dari belanja member, tukar hadiah', requires: 'customers'),
+    _f('customer_credit', 'Kasbon (bayar nanti)', 'Kasbon / piutang member: bayar nanti dengan batas, pelunasan di kasir, laporan piutang', requires: 'customers'),
     _f('member_tiers', 'Tingkat member', 'Tingkat member (mis. Silver/Gold): naik otomatis dari belanja, diskon & pengali stempel', requires: 'customers'),
   ],
   'customer_phone_required': true,
+  'credit_default_limit': 500000,
   'tax_percent': 10,
   'tax_inclusive': true,
   'service_inclusive': false,
@@ -258,6 +268,9 @@ Map<String, dynamic> customerJson(int i, {bool full = true}) => {
       'visits': i == 3 ? 0 : 12 - i,
       'loyalty_balance': i == 3 ? 0 : 14 - i * 3,
       'tier': i == 3 ? null : {...tiersJson[i % 3], 'manual': i == 2},
+      'credit_balance': i == 1 ? 185000 : 0,
+      'credit_limit': 500000,
+      'credit_limit_custom': i == 1,
       'loyalty_expires_at': i == 3 ? null : '2027-04-0${i + 1}T10:00:00Z',
       'last_visit_at': i == 3 ? null : '2026-10-0${i + 1}T10:00:00Z',
       if (full) ...{
@@ -273,6 +286,12 @@ final customerDetailJson = {
   'favorites': [
     {'name': 'Kopi Susu Gula Aren', 'qty': 14},
     {'name': 'Es Kopi Susu Berry Spesial Ukuran Jumbo', 'qty': 6},
+  ],
+  'credit_history': [
+    {'id': 'h1', 'kind': 'charge', 'amount': 120000, 'method': null, 'label': 'T1-0040', 'reversed': false, 'created_at': '2026-10-05T08:00:00Z'},
+    {'id': 'h2', 'kind': 'repayment', 'amount': 50000, 'method': 'cash', 'label': null, 'reversed': false, 'created_at': '2026-10-06T08:00:00Z'},
+    {'id': 'h3', 'kind': 'repayment', 'amount': 20000, 'method': 'qris', 'label': null, 'reversed': true, 'created_at': '2026-10-07T08:00:00Z'},
+    {'id': 'h4', 'kind': 'reversal', 'amount': 20000, 'method': 'qris', 'label': 'Salah pelanggan', 'reversed': false, 'created_at': '2026-10-07T09:00:00Z'},
   ],
   'tier_progress': {'basis': 'spend', 'window_months': 12, 'metric': 1250000,
     'next': {'name': 'Gold', 'threshold': 2000000, 'remaining': 750000}},
@@ -565,6 +584,33 @@ final scenarios = <Scenario>[
       await t.tap(find.text('Bagi ke metode lain'));
       await settle(t);
     },
+  ),
+  (
+    name: 'dialog-bayar-kasbon',
+    session: loggedIn,
+    home: (_) => dialogHost(const PaymentDialog(
+          total: 51400,
+          splitEnabled: true,
+          number: 'T1-0042',
+          creditCustomer: CartCustomer(id: 'cu1', code: 'M0031', name: 'Pak Darmawan Siregar', creditBalance: 470000, creditLimit: 500000),
+        )),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Kasbon'));
+      await settle(t);
+    },
+  ),
+  (
+    name: 'dialog-pelunasan-kasbon',
+    session: loggedIn,
+    home: (_) => Builder(builder: (context) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            showRepayDialog(context, customerId: 'cu1', name: 'Pak Darmawan Siregar', balance: 185000);
+          });
+          return const Scaffold(body: SizedBox.expand());
+        }),
+    fillCart: false,
+    act: null,
   ),
   (name: 'riwayat', session: loggedIn, home: (s) => home(s, 1), fillCart: false, act: null),
   (

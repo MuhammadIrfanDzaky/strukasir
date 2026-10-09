@@ -92,9 +92,16 @@ class ShiftService
             ->sum('total');
 
         $byMethod = [];
-        foreach (['cash', 'debit', 'qris'] as $method) {
+        foreach (['cash', 'debit', 'qris', 'credit'] as $method) {
             $byMethod[$method] = $sum('payment', $method) - $sum('refund', $method);
         }
+
+        // Pelunasan kasbon di shift ini (bersih setelah pembatalan); yang tunai masuk laci.
+        $repaid = DB::table('credit_repayments')->where('shift_id', $shift->id)
+            ->groupBy('method')
+            ->selectRaw("method, sum(case when kind = 'repayment' then amount else -amount end) as total")
+            ->pluck('total', 'method');
+        $repayments = collect(['cash', 'debit', 'qris'])->mapWithKeys(fn ($m) => [$m => (int) ($repaid[$m] ?? 0)])->all();
 
         $cashIn = $sum('payment', 'cash');
         $cashRefund = $sum('refund', 'cash');
@@ -103,8 +110,10 @@ class ShiftService
             'opening_cash' => $shift->opening_cash,
             'cash_in' => $cashIn,
             'cash_refund' => $cashRefund,
-            'expected_cash' => $shift->opening_cash + $cashIn - $cashRefund,
+            'credit_repaid_cash' => $repayments['cash'],
+            'expected_cash' => $shift->opening_cash + $cashIn - $cashRefund + $repayments['cash'],
             'by_method' => $byMethod,
+            'credit_repayments' => $repayments,
             'paid_orders' => (int) DB::table('payments')->where('shift_id', $shift->id)
                 ->where('kind', 'payment')->distinct()->count('order_id'),
             'refunds' => (int) DB::table('payments')->where('shift_id', $shift->id)

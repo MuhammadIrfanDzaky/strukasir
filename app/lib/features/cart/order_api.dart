@@ -11,7 +11,7 @@ class PaymentDraft {
 
   /// UUID dibuat sekali per draf → tombol "Bayar" ditekan ulang tidak membuat pembayaran dobel.
   final String id;
-  final String method; // cash | debit | qris
+  final String method; // cash | debit | qris | credit (kasbon)
   final int amount;
   final int? tendered;
 
@@ -51,10 +51,14 @@ class OrderApi {
     return res['data'] as OrderJson;
   }
 
-  Future<OrderJson> pay(String orderId, List<PaymentDraft> payments, int expectedTotal) async {
+  Future<OrderJson> pay(String orderId, List<PaymentDraft> payments, int expectedTotal, {Approval? approval}) async {
     final res = await _session.authed((api, token) => api.post('/orders/$orderId/pay',
         token: token,
-        data: {'expected_total': expectedTotal, 'payments': payments.map((p) => p.toJson()).toList()}));
+        data: {
+          'expected_total': expectedTotal,
+          'payments': payments.map((p) => p.toJson()).toList(),
+          if (approval != null) 'approval': {'user_id': approval.userId, 'pin': approval.pin},
+        }));
     return res['data'] as OrderJson;
   }
 

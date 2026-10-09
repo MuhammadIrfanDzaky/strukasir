@@ -130,6 +130,8 @@ class ShiftResultDialog extends ConsumerWidget {
           AppSummaryRow('Tunai masuk', rp(summary['cash_in'] as int)),
           if ((summary['cash_refund'] as int) > 0)
             AppSummaryRow('Refund tunai', '-${rp(summary['cash_refund'] as int)}'),
+          if (((summary['credit_repaid_cash'] as int?) ?? 0) != 0)
+            AppSummaryRow('Pelunasan kasbon tunai', rp(summary['credit_repaid_cash'] as int)),
           AppSummaryRow('Kas seharusnya', rp(shift['expected_cash'] as int)),
           AppSummaryRow('Kas dihitung', rp(shift['counted_cash'] as int)),
           Container(
@@ -149,6 +151,7 @@ class ShiftResultDialog extends ConsumerWidget {
           AppSummaryRow('Order lunas', '${summary['paid_orders']}'),
           AppSummaryRow('Debit', rp(byMethod['debit'] as int)),
           AppSummaryRow('QRIS', rp(byMethod['qris'] as int)),
+          if (((byMethod['credit'] as int?) ?? 0) != 0) AppSummaryRow('Kasbon (belum dibayar)', rp(byMethod['credit'] as int)),
         ]),
       ),
       actions: [

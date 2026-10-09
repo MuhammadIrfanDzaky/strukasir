@@ -70,6 +70,7 @@ class OrderController extends Controller
             (int) $request->validated('expected_total'),
             $request->user(),
             $request->attributes->get('device'),
+            $request->validated('approval'),
         ));
     }
 

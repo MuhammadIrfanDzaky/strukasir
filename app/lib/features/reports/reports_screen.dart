@@ -251,6 +251,7 @@ class _Dashboard extends StatelessWidget {
         ('Tunai', (byMethod['cash'] as int?) ?? 0, ChartColors.cash),
         ('Debit', (byMethod['debit'] as int?) ?? 0, ChartColors.debit),
         ('QRIS', (byMethod['qris'] as int?) ?? 0, ChartColors.qris),
+        if (((byMethod['credit'] as int?) ?? 0) > 0) ('Kasbon', byMethod['credit'] as int, ChartColors.credit),
       ]),
     ]);
     final categoryCard = AppSectionCard(title: 'Penjualan per kategori', children: [
@@ -333,6 +334,22 @@ class _Dashboard extends StatelessWidget {
       if (customersOn) ...[
         const SizedBox(height: AppSpace.s3),
         _customerCards(r, pair),
+      ],
+      if (r['credit'] case {'outstanding': final int outstanding} when customersOn && (outstanding > 0 || ((r['credit'] as Map)['issued'] as int) > 0)) ...[
+        const SizedBox(height: AppSpace.s3),
+        AppSectionCard(title: 'Kasbon / piutang', children: [
+          Wrap(spacing: AppSpace.s3, runSpacing: AppSpace.s3, children: [
+            AppStatCard('Piutang sekarang', rp(outstanding), width: smallWidth),
+            AppStatCard('Kasbon baru', rp((r['credit'] as Map)['issued'] as int), width: smallWidth),
+            AppStatCard('Dilunasi', rp((r['credit'] as Map)['repaid'] as int), width: smallWidth),
+            AppStatCard('Member berkasbon', '${(r['credit'] as Map)['debtors']}', width: smallWidth),
+          ]),
+          const SizedBox(height: AppSpace.s3),
+          RankedBars(rows: [
+            for (final d in ((r['credit'] as Map)['top'] as List).cast<Map<String, dynamic>>())
+              ('${d['name']} · ${d['code']}', d['balance'] as int, rp(d['balance'] as int), 'sisa kasbon'),
+          ]),
+        ]),
       ],
       if (customersOn && _list('by_tier').isNotEmpty) ...[
         const SizedBox(height: AppSpace.s3),

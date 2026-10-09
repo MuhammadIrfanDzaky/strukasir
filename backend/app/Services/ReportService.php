@@ -101,6 +101,16 @@ class ReportService
             ->selectRaw('tier_name as name, count(*) as orders, sum(grand_total) as sales, count(distinct customer_id) as customers, sum(tier_discount) as discount')
             ->orderByDesc('sales')->get();
 
+        // Kasbon: pelunasan di periode (hari lokal kedai) & piutang yang masih terbuka sekarang.
+        $repaid = (int) DB::table('credit_repayments')
+            ->whereRaw("((created_at at time zone 'UTC') at time zone ?)::date between ? and ?", [$tz, $from, $to])
+            ->sum(DB::raw("case when kind = 'repayment' then amount else -amount end"));
+        $debtors = DB::query()->fromSub(CreditService::balanceQuery(), 'b')
+            ->join('customers', 'customers.id', '=', 'b.customer_id')
+            ->where('b.credit_balance', '>', 0)
+            ->orderByDesc('b.credit_balance')
+            ->get(['customers.id', 'customers.code', 'customers.name', 'b.credit_balance']);
+
         $orders = (int) $totals->orders;
         $sales = (int) $totals->sales;
 
@@ -119,7 +129,7 @@ class ReportService
             'gross_profit' => $sales - (int) $totals->tax - (int) $costs->cost,
             'cost_missing_items' => (int) $costs->missing,
             'voids' => ['orders' => (int) $voids->orders, 'refunded' => (int) $voids->refunded],
-            'by_method' => collect(['cash', 'debit', 'qris'])->mapWithKeys(fn ($m) => [
+            'by_method' => collect(['cash', 'debit', 'qris', 'credit'])->mapWithKeys(fn ($m) => [
                 $m => (int) ($byMethod->firstWhere('method', $m)->total ?? 0),
             ]),
             'top_products' => $topProducts->map(fn ($r) => [
@@ -152,6 +162,15 @@ class ReportService
                 'top' => $topCustomers->map(fn ($r) => [
                     'id' => $r->id, 'code' => $r->code, 'name' => $r->name, 'orders' => (int) $r->orders, 'sales' => (int) $r->sales,
                 ]),
+            ],
+            'credit' => [
+                'issued' => (int) ($byMethod->firstWhere('method', 'credit')->total ?? 0),
+                'repaid' => $repaid,
+                'outstanding' => (int) $debtors->sum('credit_balance'),
+                'debtors' => $debtors->count(),
+                'top' => $debtors->take(5)->map(fn ($d) => [
+                    'id' => $d->id, 'code' => $d->code, 'name' => $d->name, 'balance' => (int) $d->credit_balance,
+                ])->values(),
             ],
             'by_tier' => $byTier->map(fn ($r) => [
                 'name' => $r->name, 'orders' => (int) $r->orders, 'sales' => (int) $r->sales,

@@ -29,7 +29,7 @@ class CustomerService
     /** Minimal kunjungan untuk kelompok "setia". */
     public const LOYAL_VISITS = 5;
 
-    public const SEGMENTS = ['new', 'loyal', 'lost'];
+    public const SEGMENTS = ['new', 'loyal', 'lost', 'debt'];
 
     public const MAX_IMPORT_ROWS = 2000;
 
@@ -85,6 +85,12 @@ class CustomerService
         if ($customer->isAnonymized()) {
             return;
         }
+        $owed = app(CreditService::class)->balance($customer->id);
+        if ($owed > 0) {
+            throw ValidationException::withMessages([
+                'customer' => 'Pelanggan ini masih punya kasbon Rp'.number_format($owed, 0, ',', '.').'. Lunasi dulu sebelum datanya dihapus.',
+            ]);
+        }
         DB::transaction(function () use ($customer) {
             $name = $customer->name;
             Order::query()->where('customer_id', $customer->id)
@@ -126,8 +132,10 @@ class CustomerService
             ->leftJoinSub($stats, 's', 's.customer_id', '=', 'customers.id')
             ->leftJoinSub($loyalty, 'l', 'l.customer_id', '=', 'customers.id')
             ->leftJoinSub(app(TierService::class)->metricQuery(), 'tm', 'tm.customer_id', '=', 'customers.id')
+            ->leftJoinSub(CreditService::balanceQuery(), 'cb', 'cb.customer_id', '=', 'customers.id')
             ->select('customers.*')
             ->selectRaw('coalesce(tm.tier_metric, 0) as tier_metric')
+            ->selectRaw('coalesce(cb.credit_balance, 0) as credit_balance')
             ->selectRaw('coalesce(s.visits, 0) as visits, coalesce(s.total_spent, 0) as total_spent, s.last_visit_at, s.first_visit_at')
             ->selectRaw('coalesce(l.loyalty_raw, 0) as loyalty_raw, l.loyalty_last_at');
     }
@@ -163,6 +171,8 @@ class CustomerService
             'loyal' => $query->where('s.visits', '>=', self::LOYAL_VISITS)->where('s.last_visit_at', '>=', $since),
             // Menghilang: pernah belanja, tapi tidak datang 30 hari terakhir.
             'lost' => $query->where('s.last_visit_at', '<', $since),
+            // Berkasbon: masih punya piutang.
+            'debt' => $query->where('cb.credit_balance', '>', 0),
             default => null,
         };
 
@@ -170,6 +180,7 @@ class CustomerService
             'recent' => $query->orderByRaw('s.last_visit_at desc nulls last')->orderBy('customers.name'),
             'top' => $query->orderByRaw('coalesce(s.total_spent, 0) desc')->orderBy('customers.name'),
             'newest' => $query->orderByDesc('customers.created_at'),
+            'debt' => $query->orderByRaw('coalesce(cb.credit_balance, 0) desc')->orderBy('customers.name'),
             default => $query->orderByRaw('lower(customers.name)')->orderBy('customers.code'),
         };
     }

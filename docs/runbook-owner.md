@@ -38,6 +38,13 @@ otomatis masuk ke setiap item yang belum didiskon ("Diskon member"); item yang s
 atau hadiah gratis tidak ikut. Bila muncul "Tingkat member pelanggan ini berubah", lepas member lalu pilih
 lagi (tingkatnya baru saja naik/turun).
 
+**Kasbon** (bila fitur *Kasbon* aktif): pilih member dulu, lalu di dialog bayar pilih **Kasbon** (boleh
+dibagi: sebagian tunai, sisanya kasbon). Dialog menampilkan sisa kasbon sekarang, sesudahnya, dan batasnya;
+bila lewat batas, owner memasukkan PIN. Struk mencetak "Sisa kasbon". Kasbon tidak menambah uang di laci.
+- **Pelunasan**: pilih member → di keranjang ketuk **Bayar kasbon** (atau owner: Pelanggan → detail →
+  *Catat pelunasan*). Boleh dicicil. Tunai masuk laci dan ikut "kas seharusnya" saat tutup shift; bukti
+  pelunasan tercetak.
+
 **Bayar nanti (Open Bill)**: ketuk **Open Bill** di bawah keranjang. Order disimpan tanpa mencetak apa pun.
 Untuk menambah pesanan atau membayar, ketuk **Open Bill** di atas keranjang dan pilih order-nya:
 - pelanggan pesan lagi → tambah produk, lalu ketuk **Simpan Bill**;
@@ -124,6 +131,18 @@ Menu **Pengaturan → Program loyalitas** (fitur *Program loyalitas* harus aktif
   stempel kertas. Semua perubahan tercatat di riwayat stempel pelanggan.
 - **Dashboard**: stempel/poin keluar vs ditukar, nilai hadiah, hadiah terpopuler.
 
+## Kasbon (owner)
+
+- **Batas default** per member: Pengaturan → Fitur → *Kasbon* (kosong = tanpa batas). Batas khusus per
+  member: Pelanggan → detail → *Kasbon* → *Batas* (0 = tidak boleh kasbon).
+- **Daftar yang berkasbon**: Pelanggan → kelompok *Berkasbon*, atau urutkan *Kasbon terbesar*.
+- **Salah catat pelunasan**: Pelanggan → detail → riwayat kasbon → tombol batalkan (↶) + alasan. Bila tunai,
+  uangnya dianggap keluar dari laci shift yang sedang buka.
+- **Void order kasbon** otomatis mengurangi kasbon member (tidak ada uang keluar).
+- Data pelanggan yang masih berkasbon tidak bisa dihapus sebelum lunas.
+- **Dashboard**: piutang sekarang, kasbon baru & pelunasan di periode, member dengan kasbon terbesar.
+- **Tutup shift**: laporan menampilkan "Kasbon (belum dibayar)" dan "Pelunasan kasbon tunai".
+
 ## Tingkat member (owner)
 
 Menu **Pengaturan → Tingkat member** (fitur *Tingkat member* harus aktif, butuh *Pelanggan*).
@@ -150,6 +169,7 @@ ikut berubah. Mematikan fitur tidak menghapus data.
 - **Pelanggan / member**: data pelanggan, kode member, riwayat belanja. Saklar **No HP pelanggan wajib**:
   nyala = pelanggan baru harus punya no HP (tidak bisa dobel); mati = boleh nama saja.
 - **Program loyalitas**: stempel/poin & hadiah untuk member (butuh *Pelanggan / member*).
+- **Kasbon (bayar nanti)**: member boleh berutang dengan batas; pelunasan di kasir (butuh *Pelanggan*).
 - **Tingkat member**: Silver/Gold dst. dengan diskon & pengali stempel (butuh *Pelanggan / member*).
 - **Pajak & service**: isi persen (mis. PB1 10%, service 5%); 0 = tidak dipungut. Untuk tiap tarif yang
   diisi, pilih **Harga menu sudah termasuk pajak / service**: nyala = total sama dengan harga menu dan

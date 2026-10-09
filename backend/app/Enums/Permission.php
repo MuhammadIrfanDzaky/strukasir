@@ -17,6 +17,8 @@ enum Permission: string
     // Kasir: cari, tautkan & daftarkan pelanggan. Owner: ubah, hapus data (anonim), import, statistik.
     case CustomersView = 'customers.view';
     case CustomersManage = 'customers.manage';
+    // Kasbon melewati batas pelanggan (kasir butuh PIN owner).
+    case CreditOverLimit = 'credit.over_limit';
 
     /** Fitur paket yang wajib aktif agar izin ini berlaku (dimensi entitlement tenant). */
     public function requiredFeature(): ?string
@@ -25,6 +27,7 @@ enum Permission: string
             self::DiscountWithinLimit, self::DiscountOverLimit => Feature::Discounts->value,
             self::ReportsView => Feature::Reports->value,
             self::CustomersView, self::CustomersManage => Feature::Customers->value,
+            self::CreditOverLimit => Feature::CustomerCredit->value,
             default => null,
         };
     }

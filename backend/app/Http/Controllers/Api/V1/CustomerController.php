@@ -6,9 +6,11 @@ use App\Enums\Feature;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CustomerRequest;
+use App\Models\CreditRepayment;
 use App\Models\Customer;
 use App\Models\LoyaltyEntry;
 use App\Models\LoyaltyProgram;
+use App\Services\CreditService;
 use App\Services\CustomerService;
 use App\Services\LoyaltyService;
 use App\Services\TierService;
@@ -34,7 +36,7 @@ class CustomerController extends Controller
         $data = $request->validate([
             'q' => ['nullable', 'string', 'max:80'],
             'segment' => ['nullable', Rule::in(CustomerService::SEGMENTS)],
-            'sort' => ['nullable', Rule::in(['name', 'recent', 'top', 'newest'])],
+            'sort' => ['nullable', Rule::in(['name', 'recent', 'top', 'newest', 'debt'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
             'with_counts' => ['sometimes', 'boolean'],
             'tier_id' => ['nullable', 'uuid'],
@@ -73,6 +75,7 @@ class CustomerController extends Controller
             ...$this->customers->history($customer),
             'loyalty_entries' => $this->loyaltyEntries($customer),
             'tier_progress' => $this->tierProgress($customer),
+            'credit_history' => app(CreditService::class)->enabled() ? app(CreditService::class)->history($customer) : [],
         ]]);
     }
 
@@ -97,6 +100,55 @@ class CustomerController extends Controller
         $balance = $loyalty->adjust($customer, (int) $data['units'], trim($data['note']), $request->user());
 
         return response()->json(['data' => ['balance' => $balance]]);
+    }
+
+    /** Pelunasan kasbon (kasir & owner, shift terbuka). */
+    public function repayCredit(Request $request, Customer $customer, CreditService $credit): JsonResponse
+    {
+        abort_if($customer->isAnonymized(), 404);
+        abort_unless($credit->enabled(), 403, 'Fitur kasbon tidak aktif untuk kedai ini.');
+        $data = $request->validate([
+            'id' => ['required', 'uuid'],
+            'method' => ['required', Rule::in(['cash', 'debit', 'qris'])],
+            'amount' => ['required', 'integer', 'min:1', 'max:1000000000'],
+            'tendered' => ['nullable', 'integer', 'min:1'],
+            'note' => ['nullable', 'string', 'max:120'],
+        ]);
+        $repayment = $credit->repay($customer, $data, $request->user(), $request->attributes->get('device'));
+
+        return response()->json(['data' => [
+            'id' => $repayment->id,
+            'amount' => $repayment->amount,
+            'method' => $repayment->method,
+            'tendered' => $repayment->tendered,
+            'change' => $repayment->change,
+            'balance' => $credit->balance($customer->id),
+            'created_at' => $repayment->created_at->toIso8601String(),
+        ]], 201);
+    }
+
+    /** Owner membatalkan pelunasan yang salah catat. */
+    public function reverseRepayment(Request $request, Customer $customer, string $repayment, CreditService $credit): JsonResponse
+    {
+        abort_unless($credit->enabled(), 403, 'Fitur kasbon tidak aktif untuk kedai ini.');
+        $data = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:120']]);
+        $row = CreditRepayment::query()->where('customer_id', $customer->id)->whereKey($repayment)->firstOrFail();
+        $credit->reverse($row, $data['reason'], $request->user(), $request->attributes->get('device'));
+
+        return response()->json(['data' => ['balance' => $credit->balance($customer->id)]]);
+    }
+
+    /** Batas kasbon per pelanggan (owner); null = ikut default kedai. */
+    public function setCreditLimit(Request $request, Customer $customer, CreditService $credit): JsonResponse
+    {
+        abort_if($customer->isAnonymized(), 404);
+        abort_unless($credit->enabled(), 403, 'Fitur kasbon tidak aktif untuk kedai ini.');
+        $data = $request->validate(['credit_limit' => ['present', 'nullable', 'integer', 'min:0', 'max:1000000000']]);
+        $before = $customer->credit_limit;
+        $customer->forceFill(['credit_limit' => $data['credit_limit']])->save();
+        Audit::record('customer.credit_limit_set', $customer, ['credit_limit' => $before], ['code' => $customer->code, 'credit_limit' => $data['credit_limit']]);
+
+        return response()->json(['data' => $this->present($this->reload($customer), true)]);
     }
 
     /** Kunci tingkat manual (owner); null = kembali otomatis dari belanja. */
@@ -133,6 +185,16 @@ class CustomerController extends Controller
         }
 
         return $attributes->get('loyalty_program');
+    }
+
+    private function creditOn(): bool
+    {
+        $attributes = request()->attributes;
+        if (! $attributes->has('credit_on')) {
+            $attributes->set('credit_on', app(CreditService::class)->enabled());
+        }
+
+        return $attributes->get('credit_on');
     }
 
     private function full(Request $request): bool
@@ -204,6 +266,12 @@ class CustomerController extends Controller
             'loyalty_balance' => $loyalty['balance'] ?? null,
             // Tingkat member (null = fitur mati / belum ada tingkat yang tercapai).
             'tier' => $tier === null ? null : TierService::present($tier['tier'], $tier['manual']),
+            // Kasbon (null = fitur mati): sisa piutang & batas efektif (null = tanpa batas).
+            ...($this->creditOn() ? [
+                'credit_balance' => (int) $c->credit_balance,
+                'credit_limit' => app(CreditService::class)->limitFor($c),
+                'credit_limit_custom' => $c->credit_limit !== null,
+            ] : ['credit_balance' => null]),
             'loyalty_expires_at' => isset($loyalty['expires_at']) ? $loyalty['expires_at']->toIso8601String() : null,
             'id' => $c->id,
             'code' => $c->code,

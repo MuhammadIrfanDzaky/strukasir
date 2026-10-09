@@ -62,7 +62,7 @@ String _time(String iso) {
   return '${two(d.day)}/${two(d.month)}/${d.year} ${two(d.hour)}:${two(d.minute)}';
 }
 
-const _methodLabel = {'cash': 'cash', 'debit': 'debit', 'qris': 'qris'};
+const _methodLabel = {'cash': 'cash', 'debit': 'debit', 'qris': 'qris', 'credit': 'kasbon'};
 
 /// Satu baris cetak (sudah ≤ 32 karakter). `bold` = huruf tebal ESC/POS (lebar tetap sama).
 class PrintLine {
@@ -155,6 +155,9 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
   if (payments.any((p) => p['method'] == 'cash')) {
     out.addAll(_plain(leftRight('  Kembalian', rupiah(order['change_total'] as int))));
   }
+  if (order['credit'] case {'balance': final int balance}) {
+    out.addAll(_bold(leftRight('  Sisa kasbon', rupiah(balance))));
+  }
 
   out.add(PrintLine(divider()));
   // Stempel / poin member (order lunas): didapat, ditukar, saldo sekarang.
@@ -174,6 +177,27 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
     }
   }
   return out;
+}
+
+/// Bukti pelunasan kasbon (dari respons POST /customers/{id}/credit-repayments).
+List<PrintLine> creditRepaymentReceipt(Map<String, dynamic> r, {required String customerName, String? cashier, required String shopName}) {
+  final method = _methodLabel[r['method']] ?? '${r['method']}';
+  return [
+    ..._bold(wrap(shopName).map(center)),
+    PrintLine(center('BUKTI PELUNASAN KASBON'), bold: true),
+    PrintLine(divider()),
+    PrintLine('Date: ${_time(r['created_at'] as String)}'),
+    if (cashier != null) ..._plain(wrap('Cashier: $cashier')),
+    ..._plain(wrap('Customer: $customerName')),
+    PrintLine(divider()),
+    ..._plain(leftRight('  Dibayar ($method)', rupiah(r['amount'] as int))),
+    if (r['method'] == 'cash' && r['tendered'] != null) ...[
+      ..._plain(leftRight('  Uang diterima', rupiah(r['tendered'] as int))),
+      ..._plain(leftRight('  Kembalian', rupiah(r['change'] as int? ?? 0))),
+    ],
+    ..._bold(leftRight('  Sisa kasbon', rupiah(r['balance'] as int))),
+    PrintLine(divider()),
+  ];
 }
 
 /// Laporan tutup shift (dari respons POST /shifts/close).
@@ -198,6 +222,8 @@ List<String> shiftReport(Map<String, dynamic> shift) {
     divider(),
     ...leftRight('Debit', rupiah(byMethod['debit'] as int)),
     ...leftRight('QRIS', rupiah(byMethod['qris'] as int)),
+    if (((byMethod['credit'] as int?) ?? 0) != 0) ...leftRight('Kasbon (belum dibayar)', rupiah(byMethod['credit'] as int)),
+    if (((s['credit_repaid_cash'] as int?) ?? 0) != 0) ...leftRight('Pelunasan tunai', rupiah(s['credit_repaid_cash'] as int)),
     ...leftRight('Order lunas', '${s['paid_orders']}'),
     if ((s['refunds'] as int) > 0) ...leftRight('Order di-refund', '${s['refunds']}'),
     if ((shift['note'] as String?)?.isNotEmpty ?? false) ...wrap('Catatan: ${shift['note']}'),

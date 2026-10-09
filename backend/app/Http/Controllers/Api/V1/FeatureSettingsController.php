@@ -38,6 +38,7 @@ class FeatureSettingsController extends Controller
             'tax_inclusive' => ['sometimes', 'boolean'],
             'service_inclusive' => ['sometimes', 'boolean'],
             'customer_phone_required' => ['sometimes', 'boolean'],
+            'credit_default_limit' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000000'],
         ]);
 
         $tenantId = $context->id();
@@ -72,7 +73,7 @@ class FeatureSettingsController extends Controller
         $settings = TenantSetting::query()->firstOrFail();
         $before = ['features' => $current, 'tax_bp' => $settings->tax_rate_bp, 'service_bp' => $settings->service_rate_bp,
             'tax_inclusive' => $settings->tax_inclusive, 'service_inclusive' => $settings->service_inclusive,
-            'customer_phone_required' => $settings->customer_phone_required];
+            'customer_phone_required' => $settings->customer_phone_required, 'credit_default_limit' => $settings->credit_default_limit];
 
         DB::transaction(function () use ($data, $tenantId, $settings) {
             foreach ($data['features'] ?? [] as $key => $enabled) {
@@ -91,6 +92,9 @@ class FeatureSettingsController extends Controller
                     $settings->{"{$prefix}_enabled"} = $bp > 0;
                 }
             }
+            if (array_key_exists('credit_default_limit', $data)) {
+                $settings->credit_default_limit = $data['credit_default_limit'];
+            }
             foreach (['tax_inclusive', 'service_inclusive', 'customer_phone_required'] as $flag) {
                 if (array_key_exists($flag, $data)) {
                     $settings->{$flag} = (bool) $data[$flag];
@@ -105,6 +109,7 @@ class FeatureSettingsController extends Controller
             'features' => $gate->forTenant($tenantId), 'tax_bp' => $settings->tax_rate_bp, 'service_bp' => $settings->service_rate_bp,
             'tax_inclusive' => $settings->tax_inclusive, 'service_inclusive' => $settings->service_inclusive,
             'customer_phone_required' => $settings->customer_phone_required,
+            'credit_default_limit' => $settings->credit_default_limit,
         ]);
 
         return response()->json(['data' => $after]);
@@ -140,6 +145,7 @@ class FeatureSettingsController extends Controller
             'tax_inclusive' => (bool) $settings->tax_inclusive,
             'service_inclusive' => (bool) $settings->service_inclusive,
             'customer_phone_required' => (bool) $settings->customer_phone_required,
+            'credit_default_limit' => $settings->credit_default_limit === null ? null : (int) $settings->credit_default_limit,
         ];
     }
 }

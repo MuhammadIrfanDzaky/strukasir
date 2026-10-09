@@ -15,6 +15,7 @@ abstract final class ChartColors {
   static const cash = Color(0xFF2A78D6);
   static const debit = Color(0xFFEB6834);
   static const qris = Color(0xFF1BAF7A); // kontras < 3:1 → selalu ada label & nilai di legenda
+  static const credit = Color(0xFF94A3B8); // kasbon: uang belum diterima → netral (abu-abu)
 }
 
 /// Rupiah ringkas untuk sumbu & label: 950 → "950", 15.000 → "15rb", 1.250.000 → "1,25jt".

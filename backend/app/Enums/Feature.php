@@ -18,6 +18,7 @@ enum Feature: string
     case Customers = 'customers';
     case Loyalty = 'loyalty';
     case MemberTiers = 'member_tiers';
+    case CustomerCredit = 'customer_credit';
 
     public function description(): string
     {
@@ -32,6 +33,7 @@ enum Feature: string
             self::Customers => 'Data pelanggan / member: cari & tautkan ke order, riwayat belanja, kelompok pelanggan',
             self::Loyalty => 'Program loyalitas: stempel / poin dari belanja member, tukar hadiah',
             self::MemberTiers => 'Tingkat member (mis. Silver/Gold): naik otomatis dari belanja, diskon & pengali stempel',
+            self::CustomerCredit => 'Kasbon / piutang member: bayar nanti dengan batas, pelunasan di kasir, laporan piutang',
         };
     }
 
@@ -49,6 +51,7 @@ enum Feature: string
             self::Customers => 'Pelanggan / member',
             self::Loyalty => 'Program loyalitas',
             self::MemberTiers => 'Tingkat member',
+            self::CustomerCredit => 'Kasbon (bayar nanti)',
         };
     }
 
@@ -67,6 +70,7 @@ enum Feature: string
             // Stempel / poin dicatat per member.
             self::Loyalty => self::Customers,
             self::MemberTiers => self::Customers,
+            self::CustomerCredit => self::Customers,
             default => null,
         };
     }
