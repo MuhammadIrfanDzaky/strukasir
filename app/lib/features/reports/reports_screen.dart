@@ -334,6 +334,20 @@ class _Dashboard extends StatelessWidget {
         const SizedBox(height: AppSpace.s3),
         _customerCards(r, pair),
       ],
+      if (customersOn && _list('by_tier').isNotEmpty) ...[
+        const SizedBox(height: AppSpace.s3),
+        AppSectionCard(title: 'Penjualan per tingkat member', children: [
+          RankedBars(rows: [
+            for (final t in _list('by_tier'))
+              (
+                t['name'] as String,
+                t['sales'] as int,
+                rp(t['sales'] as int),
+                '${t['customers']} member · ${t['orders']} transaksi · diskon ${rp(t['discount'] as int)}',
+              ),
+          ]),
+        ]),
+      ],
       if (customersOn && loyaltyUnit != null) ...[
         const SizedBox(height: AppSpace.s3),
         _loyaltyCard(r, loyaltyUnit!, smallWidth),

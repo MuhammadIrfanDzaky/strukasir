@@ -14,6 +14,8 @@ import 'package:berrybrew_pos/features/cart/payment_dialog.dart';
 import 'package:berrybrew_pos/features/customers/customer_api.dart';
 import 'package:berrybrew_pos/features/customers/customer_form.dart';
 import 'package:berrybrew_pos/features/customers/customers_screen.dart';
+import 'package:berrybrew_pos/features/customers/member_tier.dart';
+import 'package:berrybrew_pos/features/customers/tier_settings_screen.dart';
 import 'package:berrybrew_pos/features/history/history_screen.dart';
 import 'package:berrybrew_pos/features/loyalty/loyalty_models.dart';
 import 'package:berrybrew_pos/features/loyalty/loyalty_settings_screen.dart';
@@ -71,7 +73,8 @@ const owner = SessionUser(id: 'u1', name: 'Rina Amelia', role: 'owner', permissi
 /// Menu contoh + beberapa produk tambahan (nama panjang, habis) supaya grid terisi.
 final bigMenu = Menu.fromJson({
   ...menuJson,
-  'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true},
+  'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true, 'member_tiers': true},
+  'member_tiers': tiersJson,
   'loyalty': loyaltyJson,
   'categories': [
     ...menuJson['categories'] as List,
@@ -91,6 +94,12 @@ final bigMenu = Menu.fromJson({
       },
   ],
 });
+
+final tiersJson = [
+  {'id': 't1', 'name': 'Silver', 'threshold': 500000, 'discount_bp': 500, 'earn_multiplier': 1, 'color': 'silver'},
+  {'id': 't2', 'name': 'Gold', 'threshold': 2000000, 'discount_bp': 1000, 'earn_multiplier': 2, 'color': 'gold'},
+  {'id': 't3', 'name': 'Platinum Prioritas', 'threshold': 5000000, 'discount_bp': 1500, 'earn_multiplier': 3, 'color': 'platinum'},
+];
 
 final loyaltyJson = <String, dynamic>{
   'active': true, 'name': 'BerryCard', 'unit': 'stempel', 'earn_mode': 'per_item', 'category_ids': ['c1'],
@@ -132,6 +141,10 @@ final reportJson = {
     {'name': 'Snacks', 'qty': 95, 'revenue': 1650000},
     {'name': 'Manual Brew', 'qty': 25, 'revenue': 695000},
   ],
+  'by_tier': [
+    {'name': 'Gold', 'orders': 64, 'sales': 2480000, 'customers': 12, 'discount': 248000},
+    {'name': 'Silver', 'orders': 41, 'sales': 1210000, 'customers': 19, 'discount': 60500},
+  ],
   'loyalty': {
     'earned': 386, 'redeemed': 140,
     'rewards': [
@@ -162,6 +175,7 @@ final featureSettingsJson = {
     _f('split_payment', 'Bayar dengan beberapa metode', 'Satu order dibayar dengan beberapa metode', on: false, available: false),
     _f('customers', 'Pelanggan / member', 'Data pelanggan / member: cari & tautkan ke order, riwayat belanja, kelompok pelanggan'),
     _f('loyalty', 'Program loyalitas', 'Program loyalitas: stempel / poin dari belanja member, tukar hadiah', requires: 'customers'),
+    _f('member_tiers', 'Tingkat member', 'Tingkat member (mis. Silver/Gold): naik otomatis dari belanja, diskon & pengali stempel', requires: 'customers'),
   ],
   'customer_phone_required': true,
   'tax_percent': 10,
@@ -243,6 +257,7 @@ Map<String, dynamic> customerJson(int i, {bool full = true}) => {
       'note': i == 1 ? 'Alergi susu sapi, ganti oat milk. Suka less sugar dan es dipisah.' : null,
       'visits': i == 3 ? 0 : 12 - i,
       'loyalty_balance': i == 3 ? 0 : 14 - i * 3,
+      'tier': i == 3 ? null : {...tiersJson[i % 3], 'manual': i == 2},
       'loyalty_expires_at': i == 3 ? null : '2027-04-0${i + 1}T10:00:00Z',
       'last_visit_at': i == 3 ? null : '2026-10-0${i + 1}T10:00:00Z',
       if (full) ...{
@@ -259,6 +274,8 @@ final customerDetailJson = {
     {'name': 'Kopi Susu Gula Aren', 'qty': 14},
     {'name': 'Es Kopi Susu Berry Spesial Ukuran Jumbo', 'qty': 6},
   ],
+  'tier_progress': {'basis': 'spend', 'window_months': 12, 'metric': 1250000,
+    'next': {'name': 'Gold', 'threshold': 2000000, 'remaining': 750000}},
   'loyalty_entries': [
     {'kind': 'earn', 'units': 2, 'note': null, 'order_number': 'T1-0042', 'created_at': '2026-10-06T08:00:00Z'},
     {'kind': 'redeem', 'units': -10, 'note': 'Gratis Kopi Susu Gula Aren', 'order_number': 'T1-0031', 'created_at': '2026-10-01T08:00:00Z'},
@@ -276,6 +293,8 @@ Dio fakeDio() => Dio()
     final path = o.path;
     final data = path.startsWith('/settings/features')
         ? {'data': featureSettingsJson}
+        : path.startsWith('/settings/tiers')
+        ? {'data': {'basis': 'spend', 'window_months': 12, 'tiers': tiersJson}}
         : path.startsWith('/settings/loyalty')
         ? {'data': {'program': loyaltyJson, 'rewards': loyaltyJson['rewards']}}
         : path.startsWith('/customers/')
@@ -594,6 +613,38 @@ final scenarios = <Scenario>[
   ),
   (name: 'pelanggan', session: loggedIn, home: (s) => home(s, 4), fillCart: false, act: null),
   (name: 'loyalitas-pengaturan', session: loggedIn, home: (_) => const LoyaltySettingsScreen(), fillCart: false, act: null),
+  (name: 'tingkat-pengaturan', session: loggedIn, home: (_) => const TierSettingsScreen(), fillCart: false, act: null),
+  (
+    name: 'tingkat-form',
+    session: loggedIn,
+    home: (_) => const TierSettingsScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.ensureVisible(find.text('Platinum Prioritas'));
+      await settle(t);
+      await t.tap(find.text('Platinum Prioritas'));
+      await settle(t);
+      expect(find.text('Ubah tingkat'), findsOneWidget);
+    },
+  ),
+  (
+    name: 'kasir-member-gold',
+    session: loggedIn,
+    home: home,
+    fillCart: true,
+    act: (t) async {
+      final container = ProviderScope.containerOf(t.element(find.byType(HomeShell)));
+      container.read(cartProvider.notifier).setCustomer(CartCustomer(
+          id: 'cu1', code: 'M0002', name: 'Siti Nurhaliza Putri Ramadhani', visits: 11, balance: 12,
+          tier: MemberTier.fromJson(tiersJson[2])));
+      await settle(t);
+      final open = find.text('Lihat pesanan');
+      if (open.evaluate().isNotEmpty) {
+        await t.tap(open);
+        await settle(t);
+      }
+    },
+  ),
   (
     name: 'loyalitas-form-hadiah',
     session: loggedIn,

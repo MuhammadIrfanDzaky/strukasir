@@ -11,6 +11,8 @@ use App\Models\LoyaltyEntry;
 use App\Models\LoyaltyProgram;
 use App\Services\CustomerService;
 use App\Services\LoyaltyService;
+use App\Services\TierService;
+use App\Support\Audit;
 use App\Support\PhoneNumber;
 use App\Support\Tenancy\FeatureGate;
 use Illuminate\Http\JsonResponse;
@@ -35,11 +37,12 @@ class CustomerController extends Controller
             'sort' => ['nullable', Rule::in(['name', 'recent', 'top', 'newest'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
             'with_counts' => ['sometimes', 'boolean'],
+            'tier_id' => ['nullable', 'uuid'],
         ]);
         $full = $this->full($request);
 
         $page = $this->customers
-            ->search($this->customers->withStats(), $data['q'] ?? null, $data['segment'] ?? null, $data['sort'] ?? 'name')
+            ->search($this->customers->withStats(), $data['q'] ?? null, $data['segment'] ?? null, $data['sort'] ?? 'name', $data['tier_id'] ?? null)
             ->paginate($data['per_page'] ?? 20);
 
         return response()->json([
@@ -69,6 +72,7 @@ class CustomerController extends Controller
             ...$this->present($this->reload($customer), true),
             ...$this->customers->history($customer),
             'loyalty_entries' => $this->loyaltyEntries($customer),
+            'tier_progress' => $this->tierProgress($customer),
         ]]);
     }
 
@@ -93,6 +97,20 @@ class CustomerController extends Controller
         $balance = $loyalty->adjust($customer, (int) $data['units'], trim($data['note']), $request->user());
 
         return response()->json(['data' => ['balance' => $balance]]);
+    }
+
+    /** Kunci tingkat manual (owner); null = kembali otomatis dari belanja. */
+    public function setTier(Request $request, Customer $customer, FeatureGate $features): JsonResponse
+    {
+        abort_if($customer->isAnonymized(), 404);
+        abort_unless($features->enabled(Feature::MemberTiers), 403, 'Fitur tingkat member tidak aktif untuk kedai ini.');
+        $data = $request->validate(['tier_id' => ['present', 'nullable', 'uuid']]);
+        $tier = TierController::assertTier($data['tier_id']);
+        $before = $customer->tier_id;
+        $customer->forceFill(['tier_id' => $tier?->id])->save();
+        Audit::record('customer.tier_set', $customer, ['tier_id' => $before], ['code' => $customer->code, 'tier_id' => $tier?->id]);
+
+        return response()->json(['data' => $this->present($this->reload($customer), true)]);
     }
 
     public function anonymize(Customer $customer): JsonResponse
@@ -152,15 +170,40 @@ class CustomerController extends Controller
             ->all();
     }
 
+    /** @return array<string, mixed>|null kemajuan menuju tingkat berikutnya (owner) */
+    private function tierProgress(Customer $customer): ?array
+    {
+        $tiers = app(TierService::class);
+        if (! $tiers->enabled()) {
+            return null;
+        }
+        $e = $tiers->evaluate($customer);
+
+        return [
+            ...$tiers->settings(),
+            'metric' => $e['metric'],
+            'next' => $e['next'] === null ? null : [
+                'name' => $e['next']->name,
+                'threshold' => $e['next']->threshold,
+                'remaining' => max(0, $e['next']->threshold - $e['metric']),
+            ],
+        ];
+    }
+
     /** @return array<string, mixed> */
     private function present(Customer $c, bool $full): array
     {
+        $tiers = app(TierService::class);
+        $tier = $tiers->enabled() ? $tiers->evaluate($c, (int) $c->tier_metric) : null;
+
         $program = $this->loyaltyProgram();
         $loyalty = $program === null ? null : LoyaltyService::effective((int) $c->loyalty_raw, $c->loyalty_last_at, $program);
 
         return [
             // Saldo stempel/poin (null bila program tidak berjalan): kasir perlu melihatnya untuk tukar hadiah.
             'loyalty_balance' => $loyalty['balance'] ?? null,
+            // Tingkat member (null = fitur mati / belum ada tingkat yang tercapai).
+            'tier' => $tier === null ? null : TierService::present($tier['tier'], $tier['manual']),
             'loyalty_expires_at' => isset($loyalty['expires_at']) ? $loyalty['expires_at']->toIso8601String() : null,
             'id' => $c->id,
             'code' => $c->code,

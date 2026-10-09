@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
 import '../session/session_controller.dart';
+import 'member_tier.dart';
 
 /// Pelanggan / member dari GET /customers. Untuk kasir: no HP tersamar (0812****7890) dan tanpa
 /// total belanja / tanggal lahir; untuk owner semua kolom terisi.
@@ -20,6 +21,7 @@ class Customer {
     this.createdAt,
     this.loyaltyBalance,
     this.loyaltyExpiresAt,
+    this.tier,
   });
 
   factory Customer.fromJson(Map<String, dynamic> j) => Customer(
@@ -36,6 +38,7 @@ class Customer {
         createdAt: _date(j['created_at']),
         loyaltyBalance: j['loyalty_balance'] as int?,
         loyaltyExpiresAt: _date(j['loyalty_expires_at']),
+        tier: j['tier'] == null ? null : MemberTier.fromJson(j['tier'] as Map<String, dynamic>),
       );
 
   static DateTime? _date(Object? v) => v is String ? DateTime.tryParse(v)?.toLocal() : null;
@@ -59,6 +62,9 @@ class Customer {
 
   /// Saldo hangus bila tidak ada transaksi sampai tanggal ini.
   final DateTime? loyaltyExpiresAt;
+
+  /// Tingkat member sekarang (null = belum mencapai tingkat / fitur mati).
+  final MemberTier? tier;
 
   /// Rata-rata belanja per kunjungan (owner).
   int? get average => totalSpent == null || visits == 0 ? null : totalSpent! ~/ visits;
@@ -120,6 +126,7 @@ class CustomerApi {
     int page = 1,
     int perPage = 20,
     bool withCounts = false,
+    String? tierId,
   }) async {
     final params = {
       if (query.trim().isNotEmpty) 'q': query.trim(),
@@ -128,6 +135,7 @@ class CustomerApi {
       'page': '$page',
       'per_page': '$perPage',
       if (withCounts) 'with_counts': '1',
+      'tier_id': ?tierId,
     };
     final res = await _authed((api, token) => api.get('/customers?${Uri(queryParameters: params).query}', token: token));
     final meta = res['meta'] as Map<String, dynamic>;
@@ -165,6 +173,12 @@ class CustomerApi {
     final res = await _authed((api, token) =>
         api.post('/customers/$id/loyalty-adjust', token: token, data: {'units': units, 'note': note.trim()}));
     return (res['data'] as Map<String, dynamic>)['balance'] as int;
+  }
+
+  /// Kunci tingkat manual (owner); null = kembali otomatis dari belanja.
+  Future<Customer> setTier(String id, String? tierId) async {
+    final res = await _authed((api, token) => api.put('/customers/$id/tier', token: token, data: {'tier_id': tierId}));
+    return Customer.fromJson(res['data'] as Map<String, dynamic>);
   }
 
   Future<void> anonymize(String id) => _authed((api, token) => api.post('/customers/$id/anonymize', token: token));

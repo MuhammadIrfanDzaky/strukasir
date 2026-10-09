@@ -33,6 +33,11 @@ kurang tidak bisa dipilih). Hadiah *gratis produk* butuh produknya sudah ada di 
 dengan diskon order. Stempel baru tercatat & hadiah baru terpotong saat **Bayar**; struk mencetak dapat,
 ditukar, dan saldo. Order di-void → stempelnya ditarik dan hadiahnya kembali ke saldo member.
 
+**Tingkat member** (Silver, Gold, …): lencana tingkat tampil di samping nama member. Diskon tingkat
+otomatis masuk ke setiap item yang belum didiskon ("Diskon member"); item yang sudah diberi diskon manual
+atau hadiah gratis tidak ikut. Bila muncul "Tingkat member pelanggan ini berubah", lepas member lalu pilih
+lagi (tingkatnya baru saja naik/turun).
+
 **Bayar nanti (Open Bill)**: ketuk **Open Bill** di bawah keranjang. Order disimpan tanpa mencetak apa pun.
 Untuk menambah pesanan atau membayar, ketuk **Open Bill** di atas keranjang dan pilih order-nya:
 - pelanggan pesan lagi → tambah produk, lalu ketuk **Simpan Bill**;
@@ -119,6 +124,19 @@ Menu **Pengaturan → Program loyalitas** (fitur *Program loyalitas* harus aktif
   stempel kertas. Semua perubahan tercatat di riwayat stempel pelanggan.
 - **Dashboard**: stempel/poin keluar vs ditukar, nilai hadiah, hadiah terpopuler.
 
+## Tingkat member (owner)
+
+Menu **Pengaturan → Tingkat member** (fitur *Tingkat member* harus aktif, butuh *Pelanggan*).
+
+- **Cara naik tingkat**: total belanja atau jumlah kunjungan, dihitung dari 3/6/12/24 bulan terakhir atau
+  sepanjang waktu. Tingkat naik otomatis, dan turun lagi bila belanjanya keluar dari jendela waktu.
+- **Tiap tingkat**: nama, ambang (mis. mulai Rp500.000), diskon otomatis (0–50%), pengali stempel/poin
+  (1×/2×/3×), dan warna lencana. Maksimal 6 tingkat.
+- **Kunci manual**: Pelanggan → detail → *Tingkat member* → *Ubah* → pilih tingkat (mis. VIP keluarga)
+  atau *Otomatis dari belanja*. Halaman yang sama menampilkan kemajuan menuju tingkat berikutnya.
+- Diskon tingkat tidak butuh PIN owner walau melebihi batas diskon kasir.
+- Daftar pelanggan bisa difilter per tingkat; dashboard menampilkan penjualan per tingkat.
+
 ## Fitur (owner)
 
 Menu **Pengaturan → Atur fitur**: nyalakan hanya yang dipakai supaya layar kasir ringkas. Semua tablet
@@ -132,6 +150,7 @@ ikut berubah. Mematikan fitur tidak menghapus data.
 - **Pelanggan / member**: data pelanggan, kode member, riwayat belanja. Saklar **No HP pelanggan wajib**:
   nyala = pelanggan baru harus punya no HP (tidak bisa dobel); mati = boleh nama saja.
 - **Program loyalitas**: stempel/poin & hadiah untuk member (butuh *Pelanggan / member*).
+- **Tingkat member**: Silver/Gold dst. dengan diskon & pengali stempel (butuh *Pelanggan / member*).
 - **Pajak & service**: isi persen (mis. PB1 10%, service 5%); 0 = tidak dipungut. Untuk tiap tarif yang
   diisi, pilih **Harga menu sudah termasuk pajak / service**: nyala = total sama dengan harga menu dan
   struk menulis "Termasuk pajak 10%"; mati = ditambahkan di atas harga. Persen ikut tercetak di struk.

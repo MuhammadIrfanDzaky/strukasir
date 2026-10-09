@@ -5,6 +5,7 @@ import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../customers/customer_picker.dart';
+import '../customers/member_tier.dart';
 import '../loyalty/reward_dialog.dart';
 import '../menu/menu_controller.dart';
 import '../menu/modifier_selection.dart';
@@ -70,7 +71,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
     if (c == null || !mounted) return;
     ref.read(cartProvider.notifier).setCustomer(
           CartCustomer(
-              id: c.id, code: c.code, name: c.name, phone: c.phone, visits: c.visits, note: c.note, balance: c.loyaltyBalance),
+              id: c.id, code: c.code, name: c.name, phone: c.phone, visits: c.visits, note: c.note, balance: c.loyaltyBalance, tier: c.tier),
         );
     if (_labelError != null) setState(() => _labelError = null);
   }
@@ -141,7 +142,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                               Text('Catatan: ${l.note}', style: AppType.caption.copyWith(color: AppColors.warning)),
                             if (totals.lineDiscounts.length > i && totals.lineDiscounts[i] > 0)
                               Text(
-                                '${l.id == cart.rewardItemId ? 'Hadiah' : 'Diskon'} -${rupiah(totals.lineDiscounts[i])}',
+                                '${l.id == cart.rewardItemId ? 'Hadiah' : isTierLine(cart, l) ? 'Diskon member' : 'Diskon'} -${rupiah(totals.lineDiscounts[i])}',
                                 style: AppType.caption.copyWith(color: AppColors.success),
                               ),
                           ],
@@ -333,12 +334,24 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  customer.name,
-                                  style: AppType.caption.copyWith(color: AppColors.primaryStrong, fontWeight: FontWeight.w700),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                Row(children: [
+                                  Flexible(
+                                    child: Text(
+                                      customer.name,
+                                      style: AppType.caption.copyWith(color: AppColors.primaryStrong, fontWeight: FontWeight.w700),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (customer.tier != null) ...[const SizedBox(width: AppSpace.s1), TierBadge(customer.tier!, dense: true)],
+                                ]),
+                                if (customer.tier != null && customer.tier!.benefits.isNotEmpty)
+                                  Text(
+                                    '${customer.tier!.name}: ${customer.tier!.benefits}',
+                                    style: AppType.caption.copyWith(color: AppColors.primaryStrong),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 Text(
                                   [
                                     'Member ${customer.code}',
@@ -391,6 +404,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           final l = cart.lines[i];
           final discount = totals.lineDiscounts.length > i ? totals.lineDiscounts[i] : 0;
           final isReward = l.id == cart.rewardItemId;
+          final tierLine = isTierLine(cart, l);
           final meta = [
             if (l.modifiers.isNotEmpty) modifierSummary(l.modifiers),
             if (l.note != null && l.note!.isNotEmpty) '“${l.note}”',
@@ -409,7 +423,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                         if (meta.isNotEmpty) Text(meta, style: AppType.caption.copyWith(color: AppColors.inkMuted)),
                         if (discount > 0)
                           Text(
-                            '${isReward ? 'Hadiah' : 'Diskon'} -${rupiah(discount)}',
+                            '${isReward ? 'Hadiah' : tierLine ? 'Diskon member' : 'Diskon'} -${rupiah(discount)}',
                             style: AppType.caption.copyWith(color: AppColors.success, fontWeight: FontWeight.w600),
                           ),
                       ],

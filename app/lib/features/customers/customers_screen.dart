@@ -13,6 +13,7 @@ import '../menu/menu_controller.dart';
 import 'customer_api.dart';
 import 'customer_form.dart';
 import 'customer_picker.dart';
+import 'member_tier.dart';
 
 /// Kelompok pelanggan (sama dengan server: CustomerService::SEGMENTS).
 const _segments = [
@@ -43,6 +44,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   Timer? _debounce;
   String? _segment;
   String _sort = 'name';
+
+  /// Filter tingkat member (null = semua).
+  String? _tierId;
   final List<Customer> _items = [];
   Map<String, int>? _counts;
   int _page = 1;
@@ -86,6 +90,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             page: more ? _page + 1 : 1,
             perPage: 30,
             withCounts: !more,
+            tierId: _tierId,
           );
       if (!mounted || seq != _seq) return;
       setState(() {
@@ -219,11 +224,32 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             FilledButton.icon(onPressed: _add, icon: const Icon(Icons.person_add_alt_1_rounded), label: const Text('Tambah')),
           ];
 
+    final tiers = ref.watch(menuProvider).value?.menu.memberTiers ?? const <MemberTier>[];
     final chips = SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: EdgeInsets.symmetric(horizontal: pad),
       child: Row(
         children: [
+          if (tiers.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpace.s2),
+              child: PopupMenuButton<String>(
+                tooltip: 'Filter tingkat',
+                onSelected: (v) {
+                  setState(() => _tierId = v.isEmpty ? null : v);
+                  _load();
+                },
+                itemBuilder: (_) => [
+                  CheckedPopupMenuItem(value: '', checked: _tierId == null, child: const Text('Semua tingkat')),
+                  for (final t in tiers) CheckedPopupMenuItem(value: t.id, checked: _tierId == t.id, child: Text(t.name)),
+                ],
+                child: Chip(
+                  avatar: const Icon(Icons.workspace_premium_rounded, size: 18),
+                  label: Text(tiers.where((t) => t.id == _tierId).firstOrNull?.name ?? 'Tingkat'),
+                  backgroundColor: _tierId == null ? null : AppColors.primarySoft,
+                ),
+              ),
+            ),
           for (final s in _segments)
             Padding(
               padding: const EdgeInsets.only(right: AppSpace.s2),
@@ -359,6 +385,39 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     }
   }
 
+  /// Kunci tingkat manual, atau kembali otomatis (null).
+  Future<void> _lockTier(Customer c, List<MemberTier> tiers) async {
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Tingkat member'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, ''),
+            child: const ListTile(
+              leading: Icon(Icons.autorenew_rounded),
+              title: Text('Otomatis dari belanja'),
+              subtitle: Text('Naik / turun sendiri'),
+            ),
+          ),
+          for (final t in tiers)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, t.id),
+              child: ListTile(leading: TierBadge(t), title: Text('Kunci di ${t.name}'), subtitle: t.benefits.isEmpty ? null : Text(t.benefits)),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || !mounted) return;
+    try {
+      await ref.read(customerApiProvider).setTier(c.id, picked.isEmpty ? null : picked);
+      _changed = true;
+      _load();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
   /// Tambah / kurangi saldo dengan alasan (mis. pindahan kartu stempel kertas).
   Future<void> _adjust(Customer c, String unit) async {
     final result = await showDialog<(int, String)>(context: context, builder: (_) => _AdjustDialog(unit: unit, balance: c.loyaltyBalance ?? 0));
@@ -454,6 +513,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     final entries = ((data['loyalty_entries'] as List?) ?? const []).cast<Map<String, dynamic>>();
     final compact = context.isCompact;
     final program = ref.watch(menuProvider).value?.menu.loyalty;
+    final tiers = ref.watch(menuProvider).value?.menu.memberTiers ?? const <MemberTier>[];
+    final progress = data['tier_progress'] as Map<String, dynamic>?;
 
     final info = AppSectionCard(
       title: 'Data pelanggan',
@@ -509,6 +570,54 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
           AppSummaryRow('${i + 1}. ${f['name']}', '${f['qty']}×'),
       ],
     );
+
+    String measure(int v) => progress?['basis'] == 'visits' ? '$v kunjungan' : rp(v);
+    final next = progress?['next'] as Map<String, dynamic>?;
+    final tierCard = tiers.isEmpty
+        ? null
+        : AppSectionCard(
+            title: 'Tingkat member',
+            trailing: TextButton.icon(
+              onPressed: () => _lockTier(c, tiers),
+              icon: const Icon(Icons.edit_rounded, size: 18),
+              label: const Text('Ubah'),
+            ),
+            children: [
+              Row(children: [
+                if (c.tier != null) TierBadge(c.tier!) else const AppBadge('Belum bertingkat'),
+                const SizedBox(width: AppSpace.s2),
+                Expanded(
+                  child: Text(
+                    c.tier == null ? '' : (c.tier!.manual ? 'Dikunci owner' : (c.tier!.benefits.isEmpty ? 'Otomatis' : c.tier!.benefits)),
+                    style: AppType.caption.copyWith(color: AppColors.inkMuted),
+                  ),
+                ),
+              ]),
+              if (progress != null) ...[
+                const SizedBox(height: AppSpace.s3),
+                Text(
+                  '${progress['basis'] == 'visits' ? 'Kunjungan' : 'Belanja'} '
+                  '${progress['window_months'] == null ? 'sepanjang waktu' : '${progress['window_months']} bulan terakhir'}: '
+                  '${measure(progress['metric'] as int)}',
+                  style: AppType.body,
+                ),
+                if (next != null) ...[
+                  const SizedBox(height: AppSpace.s2),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      minHeight: 8,
+                      value: (next['threshold'] as int) == 0 ? 1 : ((progress['metric'] as int) / (next['threshold'] as int)).clamp(0, 1).toDouble(),
+                      backgroundColor: AppColors.surfaceSunken,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpace.s1),
+                  Text('Kurang ${measure(next['remaining'] as int)} lagi untuk ${next['name']}',
+                      style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+                ],
+              ],
+            ],
+          );
 
     final loyaltyCard = program == null
         ? null
@@ -609,6 +718,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                   if (compact) ...[
                     info,
                     const SizedBox(height: AppSpace.s3),
+                    if (tierCard != null) ...[tierCard, const SizedBox(height: AppSpace.s3)],
                     if (loyaltyCard != null) ...[loyaltyCard, const SizedBox(height: AppSpace.s3)],
                     favCard,
                     const SizedBox(height: AppSpace.s3),
@@ -617,7 +727,14 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: Column(children: [info, const SizedBox(height: AppSpace.s3), favCard])),
+                        Expanded(
+                          child: Column(children: [
+                            info,
+                            if (tierCard != null) ...[const SizedBox(height: AppSpace.s3), tierCard],
+                            const SizedBox(height: AppSpace.s3),
+                            favCard,
+                          ]),
+                        ),
                         const SizedBox(width: AppSpace.s3),
                         Expanded(
                           child: Column(children: [

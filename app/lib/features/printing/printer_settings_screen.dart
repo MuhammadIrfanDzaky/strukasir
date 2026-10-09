@@ -6,6 +6,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import 'printer_service.dart';
+import '../customers/tier_settings_screen.dart';
 import '../loyalty/loyalty_settings_screen.dart';
 import '../menu/menu_controller.dart';
 import '../settings/feature_settings_screen.dart';
@@ -75,6 +76,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     final canEditReceipt = user?.can('settings.manage') ?? false;
     final receipt = ref.watch(menuProvider).value?.menu.receipt;
     final loyaltyOn = ref.watch(menuProvider).value?.menu.feature('loyalty') ?? false;
+    final tiersOn = ref.watch(menuProvider).value?.menu.feature('member_tiers') ?? false;
     final device = (ref.watch(sessionProvider).value as LoggedIn?)?.device;
     final testButton = OutlinedButton(
       onPressed: saved == null || _busy
@@ -200,6 +202,29 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                           )),
                           icon: const Icon(Icons.loyalty_rounded),
                           label: const Text('Atur program loyalitas'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (tiersOn) ...[
+                  const SizedBox(height: AppSpace.s4),
+                  AppSectionCard(
+                    title: 'Tingkat member',
+                    children: [
+                      Text(
+                        'Silver, Gold, dst.: naik otomatis dari belanja, dengan diskon & pengali stempel/poin.',
+                        style: AppType.body.copyWith(color: AppColors.inkMuted),
+                      ),
+                      const SizedBox(height: AppSpace.s3),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                            builder: (_) => const TierSettingsScreen(),
+                          )),
+                          icon: const Icon(Icons.workspace_premium_rounded),
+                          label: const Text('Atur tingkat member'),
                         ),
                       ),
                     ],

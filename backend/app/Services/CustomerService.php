@@ -125,7 +125,9 @@ class CustomerService
             ->active()
             ->leftJoinSub($stats, 's', 's.customer_id', '=', 'customers.id')
             ->leftJoinSub($loyalty, 'l', 'l.customer_id', '=', 'customers.id')
+            ->leftJoinSub(app(TierService::class)->metricQuery(), 'tm', 'tm.customer_id', '=', 'customers.id')
             ->select('customers.*')
+            ->selectRaw('coalesce(tm.tier_metric, 0) as tier_metric')
             ->selectRaw('coalesce(s.visits, 0) as visits, coalesce(s.total_spent, 0) as total_spent, s.last_visit_at, s.first_visit_at')
             ->selectRaw('coalesce(l.loyalty_raw, 0) as loyalty_raw, l.loyalty_last_at');
     }
@@ -134,8 +136,12 @@ class CustomerService
      * @param  Builder<Customer>  $query  hasil withStats()
      * @return Builder<Customer>
      */
-    public function search(Builder $query, ?string $q, ?string $segment, string $sort): Builder
+    public function search(Builder $query, ?string $q, ?string $segment, string $sort, ?string $tierId = null): Builder
     {
+        if ($tierId !== null) {
+            $query->whereRaw(TierService::effectiveTierSql().' = ?', [$tierId]);
+        }
+
         $q = trim((string) $q);
         if ($q !== '') {
             $digits = PhoneNumber::searchDigits($q);

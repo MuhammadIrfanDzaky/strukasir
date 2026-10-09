@@ -43,6 +43,13 @@ class OrderResource extends JsonResource
                 'discount' => $this->reward_discount,
             ],
             'loyalty' => $this->loyalty(),
+            'tier' => $this->tier_name === null ? null : [
+                'id' => $this->tier_id,
+                'name' => $this->tier_name,
+                'discount_bp' => $this->tier_discount_bp,
+                'earn_multiplier' => $this->tier_multiplier,
+                'discount' => $this->tier_discount,
+            ],
             'cashier' => $this->cashier?->name,
             'currency' => $this->currency,
             'items' => $this->items->map(fn (OrderItem $i) => [

@@ -20,6 +20,8 @@ class UpsertOrderRequest extends FormRequest
             'reward' => ['nullable', 'array:id,item_id'],
             'reward.id' => ['required_with:reward', 'uuid'],
             'reward.item_id' => ['nullable', 'uuid'],
+            // Tingkat member yang dipakai tablet untuk menghitung harga (deteksi tingkat yang berubah).
+            'tier_id' => ['nullable', 'uuid'],
             'client_created_at' => ['nullable', 'date'],
             'expected_total' => ['required', 'integer', 'min:0'],
             'items' => ['required', 'array', 'min:1', 'max:100'],

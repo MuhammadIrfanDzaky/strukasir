@@ -96,6 +96,11 @@ class ReportService
             ->selectRaw('reward_name as name, count(*) as count, sum(reward_discount) as discount')
             ->orderByDesc('count')->limit(5)->get();
 
+        // Penjualan per tingkat member (salinan tingkat di order).
+        $byTier = $paid()->whereNotNull('tier_name')->groupBy('tier_name')
+            ->selectRaw('tier_name as name, count(*) as orders, sum(grand_total) as sales, count(distinct customer_id) as customers, sum(tier_discount) as discount')
+            ->orderByDesc('sales')->get();
+
         $orders = (int) $totals->orders;
         $sales = (int) $totals->sales;
 
@@ -148,6 +153,10 @@ class ReportService
                     'id' => $r->id, 'code' => $r->code, 'name' => $r->name, 'orders' => (int) $r->orders, 'sales' => (int) $r->sales,
                 ]),
             ],
+            'by_tier' => $byTier->map(fn ($r) => [
+                'name' => $r->name, 'orders' => (int) $r->orders, 'sales' => (int) $r->sales,
+                'customers' => (int) $r->customers, 'discount' => (int) $r->discount,
+            ]),
             'loyalty' => [
                 'earned' => (int) $loyaltyUnits->earned,
                 'redeemed' => (int) $loyaltyUnits->redeemed,

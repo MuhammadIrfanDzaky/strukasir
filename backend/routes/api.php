@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\V1\ShiftController;
 use App\Http\Controllers\Api\V1\SignupController;
 use App\Http\Controllers\Api\V1\SignupEmailCodeController;
 use App\Http\Controllers\Api\V1\SignupOptionsController;
+use App\Http\Controllers\Api\V1\TierController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -73,6 +74,7 @@ Route::prefix('v1')->group(function () {
             Route::put('customers/{customer}', [CustomerController::class, 'update']);
             Route::post('customers/{customer}/anonymize', [CustomerController::class, 'anonymize']);
             Route::post('customers/{customer}/loyalty-adjust', [CustomerController::class, 'adjustLoyalty']);
+            Route::put('customers/{customer}/tier', [CustomerController::class, 'setTier']);
         });
 
         Route::middleware('can:'.Permission::ShiftOperate->value)->group(function () {
@@ -91,6 +93,8 @@ Route::prefix('v1')->group(function () {
             Route::put('settings/features', [FeatureSettingsController::class, 'update']);
             Route::get('settings/loyalty', [LoyaltyController::class, 'show']);
             Route::put('settings/loyalty', [LoyaltyController::class, 'update']);
+            Route::get('settings/tiers', [TierController::class, 'show']);
+            Route::put('settings/tiers', [TierController::class, 'update']);
             Route::post('devices/current/unregister', DeviceUnregisterController::class);
         });
 

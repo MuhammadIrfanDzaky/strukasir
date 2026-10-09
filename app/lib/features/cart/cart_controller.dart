@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../menu/menu_controller.dart';
 import '../menu/menu_models.dart';
+import '../customers/member_tier.dart';
 import '../loyalty/loyalty_models.dart';
 import '../menu/modifier_selection.dart';
 import 'pricing.dart';
@@ -50,7 +51,7 @@ class CartLine {
 
 /// Member yang ditautkan ke order (cukup untuk tampilan kasir & struk).
 class CartCustomer {
-  const CartCustomer({required this.id, required this.code, required this.name, this.phone, this.visits, this.note, this.balance});
+  const CartCustomer({required this.id, required this.code, required this.name, this.phone, this.visits, this.note, this.balance, this.tier});
 
   final String id;
   final String code;
@@ -65,6 +66,9 @@ class CartCustomer {
 
   /// Saldo stempel / poin saat dipilih (null = program tidak berjalan / tidak diketahui).
   final int? balance;
+
+  /// Tingkat member (diskon otomatis & pengali stempel); dikirim ke server sebagai `tier_id`.
+  final MemberTier? tier;
 }
 
 class CartState {
@@ -125,6 +129,7 @@ class CartState {
   Map<String, dynamic> toJson(int expectedTotal) => {
         'customer_label': customerLabel.trim().isEmpty ? null : customerLabel.trim(),
         'customer_id': customer?.id,
+        if (customer != null) 'tier_id': customer!.tier?.id,
         if (reward != null) 'reward': {'id': reward!.id, 'item_id': rewardItemId},
         'client_created_at': DateTime.now().toUtc().toIso8601String(),
         'expected_total': expectedTotal,
@@ -147,10 +152,12 @@ final cartTotalsProvider = Provider<PricingResult>((ref) {
   }
 });
 
-/// Harga keranjang termasuk hadiah loyalitas, sama dengan OrderService::applyReward di server:
-/// gratis produk = potongan harga dasar 1 porsi di barisnya; potongan Rp (maks. subtotal) / % = diskon order.
+/// Harga keranjang termasuk hadiah loyalitas & tingkat member, sama dengan OrderService di server:
+/// gratis produk = potongan harga dasar 1 porsi di barisnya; potongan Rp (maks. subtotal) / % = diskon order;
+/// tingkat member = diskon % di setiap baris yang belum punya diskon (manual / hadiah).
 PricingResult priceCart(CartState cart, Menu menu) {
   final reward = cart.reward;
+  final tierBp = cart.customer?.tier?.discountBp ?? 0;
   final lines = [
     for (final l in cart.lines)
       PricingLine(
@@ -158,7 +165,7 @@ PricingResult priceCart(CartState cart, Menu menu) {
         qty: l.qty,
         discount: reward != null && reward.isFreeProduct && l.id == cart.rewardItemId
             ? Discount.amount(l.product.price)
-            : l.discount,
+            : l.discount ?? (tierBp > 0 ? Discount.percent(tierBp) : null),
       ),
   ];
   var orderDiscount = cart.orderDiscount;
@@ -182,8 +189,15 @@ int rewardDiscount(CartState cart, PricingResult totals) {
   return i >= 0 && i < totals.lineDiscounts.length ? totals.lineDiscounts[i] : 0;
 }
 
+/// Baris yang mendapat diskon tingkat member (tanpa diskon manual & bukan baris hadiah).
+bool isTierLine(CartState cart, CartLine l) =>
+    (cart.customer?.tier?.discountBp ?? 0) > 0 && l.discount == null && !(cart.reward?.isFreeProduct == true && l.id == cart.rewardItemId);
+
 /// Perkiraan stempel/poin yang didapat member dari order ini (server menghitung ulang saat bayar).
-int loyaltyEarnPreview(CartState cart, Menu menu, PricingResult totals) {
+int loyaltyEarnPreview(CartState cart, Menu menu, PricingResult totals) =>
+    _baseEarn(cart, menu, totals) * (cart.customer?.tier?.earnMultiplier ?? 1);
+
+int _baseEarn(CartState cart, Menu menu, PricingResult totals) {
   final p = menu.loyalty;
   if (p == null || cart.customer == null || cart.isEmpty) return 0;
   switch (p.earnMode) {
@@ -342,7 +356,18 @@ class CartController extends Notifier<CartState> {
       customerLabel: order['customer_label'] as String? ?? '',
       customer: customer == null
           ? null
-          : CartCustomer(id: customer['id'] as String, code: customer['code'] as String, name: customer['name'] as String),
+          : CartCustomer(
+              id: customer['id'] as String,
+              code: customer['code'] as String,
+              name: customer['name'] as String,
+              // Salinan tingkat saat order disimpan; server memeriksa ulang saat disimpan lagi.
+              tier: order['tier'] == null
+                  ? null
+                  : MemberTier.fromJson({
+                      ...order['tier'] as Map<String, dynamic>,
+                      ...?menu.memberTiers.where((t) => t.id == (order['tier'] as Map)['id']).map((t) => {'color': t.color}).firstOrNull,
+                    }),
+            ),
       reward: reward,
       rewardItemId: savedReward?['item_id'] as String?,
       orderDiscount: order['order_discount'] == null

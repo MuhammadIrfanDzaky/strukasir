@@ -97,7 +97,8 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
     if (order['cashier'] != null) ..._plain(wrap('Cashier: ${order['cashier']}')),
     if ((order['customer_label'] as String?)?.isNotEmpty ?? false) ..._plain(wrap('Customer: ${order['customer_label']}')),
     // Kode member saja (bukan no HP): struk bisa terbawa / dibuang pelanggan.
-    if (order['customer'] case {'code': final String code, 'anonymized': false}) PrintLine('Member: $code'),
+    if (order['customer'] case {'code': final String code, 'anonymized': false})
+      PrintLine(order['tier'] is Map ? 'Member: $code (${(order['tier'] as Map)['name']})' : 'Member: $code'),
     ..._plain(wrap('Transaction No: ${order['number']}')),
     PrintLine(divider()),
   ];
@@ -116,7 +117,11 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
     out.addAll(_plain(leftRight('  $qty x ${rupiah(unit)}', rupiah(qty * unit))));
     final disc = item['discount_total'] as int;
     // Porsi gratis dari hadiah loyalitas ditulis "Hadiah", bukan diskon.
-    if (disc > 0) out.addAll(_plain(leftRight(reward?['item_id'] == item['id'] ? '  Hadiah' : '  Diskon', '-${rupiah(disc)}')));
+    // Diskon tingkat member: baris tanpa diskon manual (discount null) di order bertingkat.
+    final label = reward?['item_id'] == item['id']
+        ? '  Hadiah'
+        : (order['tier'] != null && item['discount'] == null ? '  Diskon ${(order['tier'] as Map)['name']}' : '  Diskon');
+    if (disc > 0) out.addAll(_plain(leftRight(label, '-${rupiah(disc)}')));
   }
 
   final itemDiscounts = items.fold<int>(0, (s, i) => s + (i['discount_total'] as int));

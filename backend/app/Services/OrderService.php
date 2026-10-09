@@ -7,6 +7,7 @@ use App\Enums\Permission;
 use App\Models\Customer;
 use App\Models\Device;
 use App\Models\LoyaltyReward;
+use App\Models\MemberTier;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderItemModifier;
@@ -39,6 +40,7 @@ class OrderService
         private readonly PricingService $pricing,
         private readonly FeatureGate $features,
         private readonly LoyaltyService $loyalty,
+        private readonly TierService $tiers,
     ) {}
 
     /**
@@ -60,16 +62,18 @@ class OrderService
         $this->guardDiscountFeature($data);
         $customer = $this->resolveCustomer($data['customer_id'] ?? null, $existing);
         [$lines, $orderDiscount, $reward] = $this->applyReward($data, $customer, $lines, $existing);
+        [$lines, $tier] = $this->applyTier($data, $customer, $lines);
         $result = $this->price($lines, $orderDiscount);
         $this->guardExpectedTotal($result, (int) $data['expected_total']);
         $rewardDiscount = $reward === null ? 0
             : ($reward['line_index'] !== null ? $result->lineDiscounts[$reward['line_index']] : $result->orderDiscount);
+        $tierDiscount = array_sum(array_map(fn ($i) => ($lines[$i]['tier'] ?? false) ? $result->lineDiscounts[$i] : 0, array_keys($lines)));
 
         // Persetujuan diverifikasi SEBELUM transaksi: percobaan PIN gagal harus tetap tercatat.
         // Potongan hadiah sudah "dibayar" dengan stempel/poin, jadi tidak ikut batas diskon kasir.
-        $approver = $this->authorizeDiscount($result, $lines, $cashier, $data['approval'] ?? null, $rewardDiscount);
+        $approver = $this->authorizeDiscount($result, $lines, $cashier, $data['approval'] ?? null, $rewardDiscount + $tierDiscount);
 
-        $order = DB::transaction(function () use ($orderId, $data, $cashier, $device, $tenant, $lines, $result, $customer, $reward, $rewardDiscount) {
+        $order = DB::transaction(function () use ($orderId, $data, $cashier, $device, $tenant, $lines, $result, $customer, $reward, $rewardDiscount, $tier, $tierDiscount) {
             $order = Order::query()->lockForUpdate()->find($orderId);
 
             if ($order === null) {
@@ -97,6 +101,12 @@ class OrderService
                 'reward_cost' => $reward['reward']->cost ?? null,
                 'reward_item_id' => $reward === null || $reward['line_index'] === null ? null : $lines[$reward['line_index']]['id'],
                 'reward_discount' => $rewardDiscount,
+                // Salinan tingkat member saat order disimpan (diskon & pengali stempel saat bayar).
+                'tier_id' => $tier?->id,
+                'tier_name' => $tier?->name,
+                'tier_discount_bp' => $tier->discount_bp ?? 0,
+                'tier_multiplier' => $tier->earn_multiplier ?? 1,
+                'tier_discount' => $tierDiscount,
                 'order_discount_type' => $data['order_discount']['type'] ?? null,
                 'order_discount_value' => $data['order_discount']['value'] ?? 0,
                 'subtotal' => $result->subtotal,
@@ -438,6 +448,35 @@ class OrderService
         return [$lines, $orderDiscount, $reward];
     }
 
+    /**
+     * Diskon tingkat member: persen tingkat di setiap baris yang belum punya diskon (manual / hadiah).
+     * Tablet mengirim tingkat yang dipakainya; bila berbeda dari tingkat sekarang, minta pilih ulang member.
+     *
+     * @return array{0: list<array<string, mixed>>, 1: ?MemberTier}
+     */
+    private function applyTier(array $data, ?Customer $customer, array $lines): array
+    {
+        $tier = $customer !== null && ! $customer->isAnonymized() && $this->tiers->enabled()
+            ? $this->tiers->evaluate($customer)['tier'] : null;
+
+        if (array_key_exists('tier_id', $data) && ($data['tier_id'] ?? null) !== $tier?->id) {
+            throw ValidationException::withMessages([
+                'customer_id' => 'Tingkat member pelanggan ini berubah'.($tier ? " (sekarang {$tier->name})" : '').'. Pilih ulang membernya.',
+            ]);
+        }
+        if ($tier === null || $tier->discount_bp === 0) {
+            return [$lines, $tier];
+        }
+        foreach ($lines as $i => $line) {
+            if (empty($line['discount']) && ! ($line['reward'] ?? false)) {
+                $lines[$i]['discount'] = ['type' => 'percent', 'value' => $tier->discount_bp];
+                $lines[$i]['tier'] = true;
+            }
+        }
+
+        return [$lines, $tier];
+    }
+
     private function guardDiscountFeature(array $data): void
     {
         $hasDiscount = ! empty($data['order_discount']['value'])
@@ -495,8 +534,8 @@ class OrderService
             'qty' => $line['qty'],
             'modifiers_total' => $line['modifiers_total'],
             // Baris hadiah: potongan tercatat di discount_total, bukan sebagai diskon manual.
-            'discount_type' => ($line['reward'] ?? false) ? null : ($line['discount']['type'] ?? null),
-            'discount_value' => ($line['reward'] ?? false) ? 0 : ($line['discount']['value'] ?? 0),
+            'discount_type' => ($line['reward'] ?? false) || ($line['tier'] ?? false) ? null : ($line['discount']['type'] ?? null),
+            'discount_value' => ($line['reward'] ?? false) || ($line['tier'] ?? false) ? 0 : ($line['discount']['value'] ?? 0),
             'discount_total' => $result->lineDiscounts[$i],
             'line_total' => $result->lines[$i],
             'note' => $line['note'],

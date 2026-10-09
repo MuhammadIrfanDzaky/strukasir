@@ -76,6 +76,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
     'split_payment': Icons.call_split_rounded,
     'customers': Icons.groups_rounded,
     'loyalty': Icons.loyalty_rounded,
+    'member_tiers': Icons.workspace_premium_rounded,
   };
 
   @override

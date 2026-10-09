@@ -9,6 +9,7 @@ import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import '../menu/menu_controller.dart';
 import 'customer_api.dart';
+import 'member_tier.dart';
 import 'customer_form.dart';
 
 /// Pilih member untuk order: cari nama / kode / no HP (cukup beberapa angka terakhir), atau
@@ -193,7 +194,10 @@ class CustomerTile extends StatelessWidget {
     return ListTile(
       onTap: onTap,
       leading: AppAvatar(c.name, size: 40),
-      title: Text(c.name, style: AppType.bodyStrong, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Row(children: [
+        Flexible(child: Text(c.name, style: AppType.bodyStrong, maxLines: 1, overflow: TextOverflow.ellipsis)),
+        if (c.tier != null) ...[const SizedBox(width: AppSpace.s2), TierBadge(c.tier!, dense: true)],
+      ]),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

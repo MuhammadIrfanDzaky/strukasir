@@ -148,7 +148,8 @@ class LoyaltyService
         $earned = 0;
         $active = $this->activeProgram();
         if ($active !== null) {
-            $earned = $this->earnFor($order, $active);
+            // Pengali tingkat member (mis. Gold 2×) dari salinan di order.
+            $earned = $this->earnFor($order, $active) * max(1, (int) $order->tier_multiplier);
             if ($earned > 0) {
                 $this->entry($customer, 'earn', $earned, $cashier, $order);
             }
