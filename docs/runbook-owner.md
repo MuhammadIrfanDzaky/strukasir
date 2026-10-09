@@ -182,6 +182,23 @@ Menu **Pengaturan → Atur promo & voucher** (fitur *Promo & voucher*).
   pemakaian, tanggal berakhir. Kuota dihitung dari transaksi lunas; transaksi yang di-void mengembalikan kuota.
 - Dashboard: promo & voucher yang terpakai beserta total potongannya; struk menulis nama promo / kode voucher.
 
+## Stok & resep (owner)
+
+Menu **Pengaturan → Atur stok & resep** (fitur *Stok & resep*).
+
+1. **Bahan**: tambah bahan dengan satuan dasar *gram / ml / pcs* dan batas *stok menipis* (opsional).
+2. **Pembelian**: isi jumlah & total harga per bahan (ketuk satuan untuk ganti ke kg / L). Modal rata-rata
+   dihitung ulang otomatis. Aktifkan *Dibayar dari laci kas* bila uangnya diambil dari laci: tercatat sebagai
+   kas keluar "Beli stok" di shift tablet itu (bukan biaya, karena modalnya masuk HPP saat produk terjual).
+3. **Resep** (tab Resep): pemakaian bahan per 1 porsi; HPP & margin langsung terlihat. Pilihan varian bisa
+   menambah bahan (Extra shot +18 g kopi) atau mengganti (Oat milk: +150 ml oat, **−150** ml susu).
+4. Stok **terpotong otomatis saat order lunas** dan **kembali saat order di-void**. Stok boleh minus (penjualan
+   tidak pernah ditolak); bahan minus / di bawah batas ditandai **Menipis** dan disebut di laporan tutup shift.
+5. **Terbuang** (wajib alasan) dan **Stok opname** (isi hasil hitung fisik; bahan yang dikosongkan tidak diubah).
+   Keduanya jadi *kerugian stok* yang mengurangi laba bersih di dashboard.
+- Produk dengan resep memakai **HPP dari resep** di laporan laba (modal manual di form produk diabaikan).
+- Ketuk satu bahan untuk melihat riwayatnya: pembelian, terjual (nomor order), void, terbuang, opname.
+
 ## Kasbon (owner)
 
 - **Batas default** per member: Pengaturan → Fitur → *Kasbon* (kosong = tanpa batas). Batas khusus per

@@ -89,6 +89,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
     'customer_credit': Icons.menu_book_rounded,
     'customer_messaging': Icons.chat_rounded,
     'promotions': Icons.local_offer_rounded,
+    'inventory': Icons.inventory_2_rounded,
   };
 
   @override

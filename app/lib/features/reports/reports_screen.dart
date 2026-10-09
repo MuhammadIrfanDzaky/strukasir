@@ -9,6 +9,8 @@ import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
+import '../inventory/inventory_models.dart';
+import '../inventory/inventory_screen.dart';
 import '../menu/menu_controller.dart';
 import '../session/session_controller.dart';
 import 'dashboard_charts.dart';
@@ -339,10 +341,12 @@ class _Dashboard extends StatelessWidget {
         if ((r['service'] as int) > 0) AppStatCard('Service', rp(r['service'] as int), width: smallWidth),
         if (tax > 0) AppStatCard('Pajak', rp(tax), width: smallWidth),
         AppStatCard('Void', '${voids['orders']} · ${rp(voids['refunded'] as int)}', width: smallWidth),
-        if (((r['expenses'] as Map?)?['total'] as int? ?? 0) > 0) ...[
+        if (((r['expenses'] as Map?)?['total'] as int? ?? 0) > 0)
           AppStatCard('Pengeluaran', rp((r['expenses'] as Map)['total'] as int), width: smallWidth),
+        if (((r['stock'] as Map?)?['loss'] as int? ?? 0) != 0)
+          AppStatCard('Kerugian stok', rp((r['stock'] as Map)['loss'] as int), width: smallWidth),
+        if (((r['expenses'] as Map?)?['total'] as int? ?? 0) > 0 || ((r['stock'] as Map?)?['loss'] as int? ?? 0) != 0)
           AppStatCard('Laba bersih', rp(r['net_profit'] as int), width: smallWidth),
-        ],
       ]),
       if (((r['expenses'] as Map?)?['by_category'] as List?)?.isNotEmpty ?? false) ...[
         const SizedBox(height: AppSpace.s3),
@@ -355,6 +359,10 @@ class _Dashboard extends StatelessWidget {
               (e['label'] as String, e['total'] as int, rp(e['total'] as int), ''),
           ]),
         ]),
+      ],
+      if (r['stock'] is Map) ...[
+        const SizedBox(height: AppSpace.s3),
+        _StockCard(stock: (r['stock'] as Map).cast<String, dynamic>()),
       ],
       if (((r['cost_missing_items'] as int?) ?? 0) > 0) _MissingCostNote(count: r['cost_missing_items'] as int),
       if (trend.length > 1) ...[
@@ -547,4 +555,46 @@ class _MissingCostNote extends StatelessWidget {
           ),
         ]),
       );
+}
+
+/// Stok bahan (fitur `inventory`): pembelian & kerugian di periode, nilai stok & bahan menipis sekarang.
+class _StockCard extends ConsumerWidget {
+  const _StockCard({required this.stock});
+
+  final Map<String, dynamic> stock;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final low = (stock['low'] as List? ?? const []).cast<Map<String, dynamic>>();
+    final canManage = ((ref.watch(sessionProvider).value as LoggedIn?)?.user.can('inventory.manage')) ?? false;
+    final countDiff = stock['count_diff'] as int? ?? 0;
+    return AppSectionCard(
+      title: 'Stok bahan',
+      trailing: canManage
+          ? TextButton(
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const InventoryScreen())),
+              child: const Text('Buka stok'),
+            )
+          : null,
+      children: [
+        AppSummaryRow('Pembelian', rp(stock['purchases'] as int? ?? 0)),
+        AppSummaryRow('Terbuang / rusak', rp(stock['waste'] as int? ?? 0)),
+        AppSummaryRow('Selisih stok opname', '${countDiff > 0 ? '+' : ''}${rp(countDiff)}',
+            valueColor: countDiff < 0 ? AppColors.danger : null),
+        AppSummaryRow('Nilai stok sekarang', rp(stock['value'] as int? ?? 0)),
+        const SizedBox(height: AppSpace.s2),
+        _Caption('Kerugian stok (terbuang + susut opname) mengurangi laba bersih. Pembelian tidak dihitung biaya: '
+            'modalnya masuk HPP saat produk terjual.'),
+        if (low.isNotEmpty) ...[
+          const SizedBox(height: AppSpace.s3),
+          Text('Stok menipis', style: AppType.bodyStrong.copyWith(color: AppColors.danger)),
+          const SizedBox(height: AppSpace.s1),
+          Wrap(spacing: AppSpace.s2, runSpacing: AppSpace.s2, children: [
+            for (final i in low)
+              AppBadge('${i['name']} ${qtyText((i['stock'] as num).toDouble())} ${i['unit']}', tone: AppTone.danger),
+          ]),
+        ],
+      ],
+    );
+  }
 }

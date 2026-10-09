@@ -274,7 +274,12 @@ class _ProductRow extends StatelessWidget {
                       runSpacing: AppSpace.s1,
                       children: [
                         Text(rp(p.price), style: AppType.bodyStrong.copyWith(color: AppColors.primary)),
-                        Text(p.cost == null ? 'Modal belum diisi' : 'Modal ${rp(p.cost!)}', style: muted),
+                        Text(
+                          p.recipeCost != null
+                              ? 'HPP resep ${rp(p.recipeCost!)}'
+                              : p.cost == null ? 'Modal belum diisi' : 'Modal ${rp(p.cost!)}',
+                          style: muted,
+                        ),
                         if (margin != null)
                           Text(
                             'Margin ${margin.toStringAsFixed(0)}%',
@@ -333,7 +338,7 @@ class _ProductFormState extends ConsumerState<ProductForm> {
   /// Margin dari isian saat ini, mis. "Margin 50% · laba Rp 3.000 per porsi".
   String? get _marginText {
     final price = parseRupiah(_price.text);
-    final cost = parseRupiah(_cost.text);
+    final cost = widget.product?.recipeCost ?? parseRupiah(_cost.text);
     if (price == null || cost == null || price == 0) return null;
     final margin = (price - cost) * 100 / price;
     return 'Margin ${margin.toStringAsFixed(margin.abs() < 10 ? 1 : 0)}% · laba ${rp(price - cost)} per porsi';
@@ -416,7 +421,11 @@ class _ProductFormState extends ConsumerState<ProductForm> {
               Padding(
                 padding: const EdgeInsets.only(top: AppSpace.s1),
                 child: Text(
-                  _marginText ?? 'Isi modal untuk melihat margin & laba kotor di laporan.',
+                  [
+                    if (widget.product?.recipeCost != null)
+                      'HPP dari resep ${rp(widget.product!.recipeCost!)} (dipakai di laporan; modal manual diabaikan).',
+                    _marginText ?? 'Isi modal untuk melihat margin & laba kotor di laporan.',
+                  ].join(' '),
                   style: AppType.caption.copyWith(
                     color: (parseRupiah(_cost.text) ?? 0) > (parseRupiah(_price.text) ?? 0)
                         ? AppColors.danger

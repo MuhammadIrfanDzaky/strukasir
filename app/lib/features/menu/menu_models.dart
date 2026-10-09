@@ -104,6 +104,7 @@ class MenuProduct {
     required this.modifierGroupIds,
     this.code,
     this.cost,
+    this.recipeCost,
     this.favorite = false,
   });
 
@@ -118,6 +119,7 @@ class MenuProduct {
         modifierGroupIds: (j['modifier_group_ids'] as List).cast<String>(),
         code: j['code'] as String?,
         cost: j['cost'] as int?,
+        recipeCost: j['recipe_cost'] as int?,
         favorite: j['favorite'] as bool? ?? false,
       );
 
@@ -136,13 +138,19 @@ class MenuProduct {
   /// Harga modal (HPP). Hanya dikirim server ke user yang boleh mengelola menu; null = belum diisi.
   final int? cost;
 
+  /// HPP dari resep (fitur stok, hanya untuk owner); bila ada, menggantikan [cost] di laporan.
+  final int? recipeCost;
+
+  /// Modal yang dipakai server untuk laba: HPP resep, atau modal manual.
+  int? get effectiveCost => recipeCost ?? cost;
+
   /// Tampil di filter "Favorit" layar kasir.
   final bool favorite;
 
   bool get sellable => active && !soldOut;
 
   /// Margin terhadap harga jual (%), null bila modal belum diisi atau harga 0.
-  double? get marginPercent => cost == null || price == 0 ? null : (price - cost!) * 100 / price;
+  double? get marginPercent => effectiveCost == null || price == 0 ? null : (price - effectiveCost!) * 100 / price;
 
   /// Cocok dengan kata kunci pencarian (nama atau kode, tanpa beda huruf besar/kecil).
   bool matches(String query) {

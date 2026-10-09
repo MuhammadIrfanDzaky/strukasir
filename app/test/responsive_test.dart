@@ -30,6 +30,8 @@ import 'package:berrybrew_pos/features/printing/printer_settings_screen.dart';
 import 'package:berrybrew_pos/features/printing/receipt_logo.dart';
 import 'package:berrybrew_pos/features/printing/receipt_settings_screen.dart';
 import 'package:berrybrew_pos/features/printing/stations.dart';
+import 'package:berrybrew_pos/features/inventory/inventory_models.dart';
+import 'package:berrybrew_pos/features/inventory/inventory_screen.dart';
 import 'package:berrybrew_pos/features/promotions/promotion_models.dart';
 import 'package:berrybrew_pos/features/promotions/promotions_screen.dart';
 import 'package:berrybrew_pos/features/promotions/voucher_dialog.dart';
@@ -76,13 +78,13 @@ const sizes = <String, Size>{
 final device = DeviceInfo.fromJson({'id': 'd1', 'code': 'T1', 'name': 'Tablet Kasir', 'tenant_name': 'BerryBrew'});
 const owner = SessionUser(id: 'u1', name: 'Rina Amelia', role: 'owner', permissions: {
   'reports.view', 'menu.manage', 'settings.manage', 'discount.within_limit', 'discount.over_limit', 'order.void',
-  'customers.view', 'customers.manage',
+  'customers.view', 'customers.manage', 'inventory.manage',
 });
 
 /// Menu contoh + beberapa produk tambahan (nama panjang, habis) supaya grid terisi.
 final bigMenu = Menu.fromJson({
   ...menuJson,
-  'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true, 'member_tiers': true, 'customer_credit': true, 'customer_messaging': true, 'promotions': true},
+  'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true, 'member_tiers': true, 'customer_credit': true, 'customer_messaging': true, 'promotions': true, 'inventory': true},
   'promotions': promotionsJson,
   'member_tiers': tiersJson,
   'loyalty': loyaltyJson,
@@ -104,6 +106,23 @@ final bigMenu = Menu.fromJson({
       },
   ],
 });
+
+/// Stok: satu bahan minus, satu menipis, nama panjang; resep Americano + varian pengganti.
+final inventoryJson = {
+  'ingredients': [
+    {'id': 'i1', 'name': 'Biji kopi Arabika Gayo Wine Process Premium', 'unit': 'g', 'stock': 1250.5, 'min_stock': 500, 'avg_cost': 210.5, 'value': 263230, 'low': false, 'active': true, 'used_in': 3},
+    {'id': 'i2', 'name': 'Susu UHT', 'unit': 'ml', 'stock': 750, 'min_stock': 1000, 'avg_cost': 19.75, 'value': 14813, 'low': true, 'active': true, 'used_in': 2},
+    {'id': 'i3', 'name': 'Cup 12oz', 'unit': 'pcs', 'stock': -4, 'min_stock': 50, 'avg_cost': 850, 'value': 0, 'low': true, 'active': true, 'used_in': 1},
+    {'id': 'i4', 'name': 'Oat milk', 'unit': 'ml', 'stock': 2000, 'min_stock': null, 'avg_cost': 0.25, 'value': 500, 'low': false, 'active': true, 'used_in': 0},
+    {'id': 'i5', 'name': 'Sirup lama', 'unit': 'ml', 'stock': 0, 'min_stock': null, 'avg_cost': 0, 'value': 0, 'low': false, 'active': false, 'used_in': 0},
+  ],
+  'recipes': {
+    'products': {'p1': [{'ingredient_id': 'i1', 'qty': 18}, {'ingredient_id': 'i3', 'qty': 1}]},
+    'modifiers': {'oat': [{'ingredient_id': 'i4', 'qty': 150}, {'ingredient_id': 'i2', 'qty': -150}]},
+  },
+  'product_costs': {'p1': 4639},
+  'summary': {'value': 278543, 'low': 2},
+};
 
 /// Promo tanpa jadwal (selalu berjalan) + happy hour berjadwal.
 final promotionsJson = [
@@ -379,6 +398,20 @@ Dio fakeDio() => Dio()
                 {'key': k, 'title': t, 'body': b, 'default': b},
             ],
             'placeholders': ['{nama}', '{kedai}', '{kode}', '{tingkat}', '{stempel}', '{sisa_kasbon}', '{struk}', '{total}', '{nomor}'],
+          }}
+        : path == '/inventory'
+        ? {'data': inventoryJson}
+        : path.contains('/movements')
+        ? {'data': {
+            'ingredient': (inventoryJson['ingredients'] as List).first,
+            'movements': [
+              {'id': 'm1', 'kind': 'sale', 'kind_label': 'Terjual', 'qty': -36, 'balance_after': 1250.5, 'unit_cost': 210.5,
+                'supplier': null, 'note': null, 'order_number': 'T1-0042', 'user': 'Andi', 'created_at': '2026-10-10T08:15:00Z'},
+              {'id': 'm2', 'kind': 'purchase', 'kind_label': 'Pembelian', 'qty': 1000, 'balance_after': 1286.5, 'unit_cost': 215,
+                'supplier': 'Toko Kopi Nusantara Sejahtera Abadi', 'note': 'nota 12', 'order_number': null, 'user': 'Rina Amelia', 'created_at': '2026-10-09T03:00:00Z'},
+              {'id': 'm3', 'kind': 'count', 'kind_label': 'Stok opname', 'qty': -13.5, 'balance_after': 286.5, 'unit_cost': 205,
+                'supplier': null, 'note': null, 'order_number': null, 'user': 'Rina Amelia', 'created_at': '2026-10-08T15:00:00Z'},
+            ],
           }}
         : path.startsWith('/settings/promotions')
         ? {'data': {
@@ -792,6 +825,50 @@ final scenarios = <Scenario>[
       await settle(t);
       expect(find.text('Ubah voucher'), findsOneWidget);
     },
+  ),
+  (name: 'stok-bahan', session: loggedIn, home: (_) => const InventoryScreen(), fillCart: false, act: null),
+  (name: 'stok-resep', session: loggedIn, home: (_) => const InventoryScreen(initialTab: 1), fillCart: false, act: null),
+  (
+    name: 'stok-pembelian',
+    session: loggedIn,
+    home: (_) => const InventoryScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Pembelian'));
+      await settle(t);
+      expect(find.text('Pembelian stok'), findsOneWidget);
+    },
+  ),
+  (
+    name: 'stok-opname',
+    session: loggedIn,
+    home: (_) => const InventoryScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Stok opname'));
+      await settle(t);
+      await t.enterText(find.byType(TextField).first, '1200');
+      await settle(t);
+      expect(find.textContaining('selisih -50,5'), findsOneWidget);
+    },
+  ),
+  (
+    name: 'stok-resep-form',
+    session: loggedIn,
+    home: (_) => const InventoryScreen(initialTab: 1),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Americano'));
+      await settle(t);
+      expect(find.text('Resep Americano'), findsOneWidget);
+    },
+  ),
+  (
+    name: 'stok-riwayat',
+    session: loggedIn,
+    home: (_) => const IngredientScreen(ingredient: Ingredient(id: 'i1', name: 'Biji kopi Arabika Gayo Wine Process Premium', unit: 'g')),
+    fillCart: false,
+    act: null,
   ),
   (
     name: 'voucher-dialog',

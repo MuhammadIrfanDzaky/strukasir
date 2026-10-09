@@ -9,6 +9,7 @@ import 'printer_service.dart';
 import '../customers/messaging.dart';
 import '../customers/tier_settings_screen.dart';
 import '../loyalty/loyalty_settings_screen.dart';
+import '../inventory/inventory_screen.dart';
 import '../promotions/promotions_screen.dart';
 import '../menu/menu_controller.dart';
 import '../settings/feature_settings_screen.dart';
@@ -82,6 +83,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     final tiersOn = ref.watch(menuProvider).value?.menu.feature('member_tiers') ?? false;
     final messagingOn = ref.watch(menuProvider).value?.menu.feature('customer_messaging') ?? false;
     final promotionsOn = ref.watch(menuProvider).value?.menu.feature('promotions') ?? false;
+    final inventoryOn = (ref.watch(menuProvider).value?.menu.feature('inventory') ?? false) && (user?.can('inventory.manage') ?? false);
     final device = (ref.watch(sessionProvider).value as LoggedIn?)?.device;
     final testButton = OutlinedButton(
       onPressed: saved == null || _busy
@@ -208,6 +210,28 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                     ),
                   ],
                 ),
+                if (inventoryOn) ...[
+                  const SizedBox(height: AppSpace.s4),
+                  AppSectionCard(
+                    title: 'Stok & resep',
+                    children: [
+                      Text(
+                        'Stok bahan baku terpotong otomatis dari resep setiap order lunas. Catat pembelian, bahan terbuang, '
+                        'dan stok opname; HPP produk dihitung dari resep.',
+                        style: AppType.body.copyWith(color: AppColors.inkMuted),
+                      ),
+                      const SizedBox(height: AppSpace.s3),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const InventoryScreen())),
+                          icon: const Icon(Icons.inventory_2_rounded),
+                          label: const Text('Atur stok & resep'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (promotionsOn) ...[
                   const SizedBox(height: AppSpace.s4),
                   AppSectionCard(
