@@ -282,6 +282,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             // Layar lebar: total belanja di kanan; HP: di baris kunjungan.
             return CustomerTile(
               c,
+              loyaltyUnit: ref.watch(menuProvider).value?.menu.loyalty?.unit,
               onTap: () => _open(c),
               spent: compact ? spent : null,
               trailing: compact || spent == null ? null : Text(spent, style: AppType.bodyStrong),
@@ -355,6 +356,19 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     if (saved != null) {
       _changed = true;
       _load();
+    }
+  }
+
+  /// Tambah / kurangi saldo dengan alasan (mis. pindahan kartu stempel kertas).
+  Future<void> _adjust(Customer c, String unit) async {
+    final result = await showDialog<(int, String)>(context: context, builder: (_) => _AdjustDialog(unit: unit, balance: c.loyaltyBalance ?? 0));
+    if (result == null || !mounted) return;
+    try {
+      await ref.read(customerApiProvider).adjustLoyalty(c.id, result.$1, result.$2);
+      _changed = true;
+      _load();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -437,7 +451,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   Widget _body(Customer c, Map<String, dynamic> data) {
     final favorites = ((data['favorites'] as List?) ?? const []).cast<Map<String, dynamic>>();
     final orders = ((data['recent_orders'] as List?) ?? const []).cast<Map<String, dynamic>>();
+    final entries = ((data['loyalty_entries'] as List?) ?? const []).cast<Map<String, dynamic>>();
     final compact = context.isCompact;
+    final program = ref.watch(menuProvider).value?.menu.loyalty;
 
     final info = AppSectionCard(
       title: 'Data pelanggan',
@@ -478,6 +494,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
             AppStatCard('Kunjungan', '${c.visits}×', width: w),
             AppStatCard('Rata-rata', c.average == null ? '–' : rp(c.average!), width: w),
             AppStatCard('Terakhir datang', sinceLabel(c.lastVisitAt), width: w),
+            if (program != null && c.loyaltyBalance != null)
+              AppStatCard('Saldo ${program.unit}', '${c.loyaltyBalance}', width: w),
           ],
         );
       },
@@ -491,6 +509,56 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
           AppSummaryRow('${i + 1}. ${f['name']}', '${f['qty']}×'),
       ],
     );
+
+    final loyaltyCard = program == null
+        ? null
+        : AppSectionCard(
+            title: 'Riwayat ${program.unit} · ${program.name}',
+            trailing: TextButton.icon(
+              onPressed: () => _adjust(c, program.unit),
+              icon: const Icon(Icons.tune_rounded, size: 18),
+              label: const Text('Sesuaikan'),
+            ),
+            empty: 'Belum ada ${program.unit}.',
+            children: [
+              if (c.loyaltyExpiresAt != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpace.s2),
+                  child: Text('Saldo hangus ${formatDate(c.loyaltyExpiresAt!.toIso8601String().substring(0, 10))} bila tidak belanja lagi.',
+                      style: AppType.caption.copyWith(color: AppColors.warning)),
+                ),
+              for (final e in entries)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.s1),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_entryLabel(e['kind'] as String), style: AppType.bodyStrong),
+                            Text(
+                              [
+                                formatDate((e['created_at'] as String).substring(0, 10)),
+                                if (e['order_number'] != null) e['order_number'] as String,
+                                if (e['note'] != null) e['note'] as String,
+                              ].join(' · '),
+                              style: AppType.caption.copyWith(color: AppColors.inkMuted),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '${(e['units'] as int) > 0 ? '+' : ''}${e['units']}',
+                        style: AppType.bodyStrong.copyWith(color: (e['units'] as int) > 0 ? AppColors.success : AppColors.ink),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          );
 
     final orderCard = AppSectionCard(
       title: 'Order terakhir',
@@ -541,6 +609,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                   if (compact) ...[
                     info,
                     const SizedBox(height: AppSpace.s3),
+                    if (loyaltyCard != null) ...[loyaltyCard, const SizedBox(height: AppSpace.s3)],
                     favCard,
                     const SizedBox(height: AppSpace.s3),
                     orderCard,
@@ -550,7 +619,12 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       children: [
                         Expanded(child: Column(children: [info, const SizedBox(height: AppSpace.s3), favCard])),
                         const SizedBox(width: AppSpace.s3),
-                        Expanded(child: orderCard),
+                        Expanded(
+                          child: Column(children: [
+                            if (loyaltyCard != null) ...[loyaltyCard, const SizedBox(height: AppSpace.s3)],
+                            orderCard,
+                          ]),
+                        ),
                       ],
                     ),
                 ],
@@ -561,6 +635,100 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
       ),
     );
   }
+}
+
+String _entryLabel(String kind) => switch (kind) {
+      'earn' => 'Dapat dari belanja',
+      'redeem' => 'Tukar hadiah',
+      'reverse' => 'Dibatalkan (void)',
+      'expire' => 'Hangus',
+      _ => 'Penyesuaian',
+    };
+
+/// Tambah / kurangi saldo stempel/poin + alasan (wajib, tercatat).
+class _AdjustDialog extends StatefulWidget {
+  const _AdjustDialog({required this.unit, required this.balance});
+
+  final String unit;
+  final int balance;
+
+  @override
+  State<_AdjustDialog> createState() => _AdjustDialogState();
+}
+
+class _AdjustDialogState extends State<_AdjustDialog> {
+  bool _add = true;
+  final _units = TextEditingController();
+  final _note = TextEditingController();
+  Map<String, String> _errors = {};
+
+  @override
+  void dispose() {
+    _units.dispose();
+    _note.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final n = int.tryParse(_units.text.trim());
+    final errors = <String, String>{
+      if (n == null || n < 1) 'units': 'Isi jumlah',
+      if (n != null && !_add && n > widget.balance) 'units': 'Saldo hanya ${widget.balance}',
+      if (_note.text.trim().isEmpty) 'note': 'Tulis alasannya',
+    };
+    if (errors.isNotEmpty) {
+      setState(() => _errors = errors);
+      return;
+    }
+    Navigator.pop(context, (_add ? n! : -n!, _note.text.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        scrollable: true,
+        title: Text('Sesuaikan ${widget.unit}'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Saldo sekarang: ${widget.balance} ${widget.unit}', style: AppType.body.copyWith(color: AppColors.inkMuted)),
+              const SizedBox(height: AppSpace.s3),
+              SegmentedButton<bool>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: true, label: Text('Tambah'), icon: Icon(Icons.add_rounded)),
+                  ButtonSegment(value: false, label: Text('Kurangi'), icon: Icon(Icons.remove_rounded)),
+                ],
+                selected: {_add},
+                onSelectionChanged: (v) => setState(() => _add = v.first),
+              ),
+              const SizedBox(height: AppSpace.s3),
+              TextField(
+                controller: _units,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(labelText: 'Jumlah', suffixText: widget.unit, errorText: _errors['units']),
+              ),
+              const SizedBox(height: AppSpace.s3),
+              TextField(
+                controller: _note,
+                maxLength: 120,
+                decoration: InputDecoration(
+                  labelText: 'Alasan',
+                  hintText: 'mis. pindahan kartu stempel kertas',
+                  errorText: _errors['note'],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          FilledButton(onPressed: _submit, child: const Text('Simpan')),
+        ],
+      );
 }
 
 class _InfoRow extends StatelessWidget {

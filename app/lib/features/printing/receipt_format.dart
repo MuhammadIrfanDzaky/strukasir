@@ -102,6 +102,7 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
     PrintLine(divider()),
   ];
 
+  final reward = order['reward'] as Map<String, dynamic>?;
   for (final item in items) {
     final qty = item['qty'] as int;
     final unit = (item['unit_price'] as int) + (item['modifiers_total'] as int);
@@ -114,7 +115,8 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
     if (item['note'] != null) out.addAll(_plain(wrap('  * ${item['note']}')));
     out.addAll(_plain(leftRight('  $qty x ${rupiah(unit)}', rupiah(qty * unit))));
     final disc = item['discount_total'] as int;
-    if (disc > 0) out.addAll(_plain(leftRight('  Diskon', '-${rupiah(disc)}')));
+    // Porsi gratis dari hadiah loyalitas ditulis "Hadiah", bukan diskon.
+    if (disc > 0) out.addAll(_plain(leftRight(reward?['item_id'] == item['id'] ? '  Hadiah' : '  Diskon', '-${rupiah(disc)}')));
   }
 
   final itemDiscounts = items.fold<int>(0, (s, i) => s + (i['discount_total'] as int));
@@ -125,7 +127,10 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
     ..add(PrintLine(divider()))
     ..add(PrintLine('Total Qty: ${items.fold<int>(0, (s, i) => s + (i['qty'] as int))}'))
     ..addAll(_plain(leftRight('  Sub Total', rupiah(order['subtotal'] as int))));
-  if (orderDiscount > 0) out.addAll(_plain(leftRight('  Diskon', '-${rupiah(orderDiscount)}')));
+  if (orderDiscount > 0) {
+    final label = reward != null && reward['item_id'] == null ? '  Hadiah ${reward['name']}' : '  Diskon';
+    out.addAll(_plain(leftRight(label, '-${rupiah(orderDiscount)}')));
+  }
   // Persen tarif saat transaksi, supaya pelanggan tahu besarnya (order lama tanpa tarif: label saja).
   if ((order['service_total'] as int) > 0) {
     final label = withRate('Service', order['service_bp'] as int?, included: order['service_inclusive'] == true);
@@ -147,6 +152,16 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
   }
 
   out.add(PrintLine(divider()));
+  // Stempel / poin member (order lunas): didapat, ditukar, saldo sekarang.
+  if (order['loyalty'] case {'program': final String program, 'unit': final String unit, 'earned': final int earned,
+      'redeemed': final int redeemed, 'balance': final int balance}) {
+    out.add(PrintLine(program, bold: true));
+    if (earned > 0) out.addAll(_plain(leftRight('  Dapat', '+$earned $unit')));
+    if (redeemed > 0) out.addAll(_plain(leftRight('  Ditukar', '-$redeemed $unit')));
+    out
+      ..addAll(_plain(leftRight('  Saldo', '$balance $unit')))
+      ..add(PrintLine(divider()));
+  }
   if (!paid) out.add(PrintLine(center('*** BELUM DIBAYAR ***'), bold: true));
   if (footer.isNotEmpty) {
     for (final l in footer.split('\n')) {

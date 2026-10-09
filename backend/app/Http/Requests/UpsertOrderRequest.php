@@ -16,6 +16,10 @@ class UpsertOrderRequest extends FormRequest
             'customer_label' => ['nullable', 'string', 'max:60'],
             // Pelanggan / member (fitur `customers`); keberadaan & status dicek di OrderService.
             'customer_id' => ['nullable', 'uuid'],
+            // Tukar hadiah loyalitas (satu per order); potongannya dihitung server dari data hadiah.
+            'reward' => ['nullable', 'array:id,item_id'],
+            'reward.id' => ['required_with:reward', 'uuid'],
+            'reward.item_id' => ['nullable', 'uuid'],
             'client_created_at' => ['nullable', 'date'],
             'expected_total' => ['required', 'integer', 'min:0'],
             'items' => ['required', 'array', 'min:1', 'max:100'],

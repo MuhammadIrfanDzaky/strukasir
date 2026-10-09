@@ -2,11 +2,13 @@
 
 namespace App\Http\Resources;
 
+use App\Models\LoyaltyEntry;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderItemModifier;
 use App\Models\Payment;
 use App\Models\TenantSetting;
+use App\Services\LoyaltyService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -32,6 +34,15 @@ class OrderResource extends JsonResource
                 ? ['id' => $this->customer->id, 'code' => $this->customer->code, 'name' => $this->customer->name,
                     'anonymized' => $this->customer->isAnonymized()]
                 : null,
+            // Hadiah loyalitas yang ditukar di order ini (salinan saat ditukar).
+            'reward' => $this->reward_id === null ? null : [
+                'id' => $this->reward_id,
+                'name' => $this->reward_name,
+                'cost' => $this->reward_cost,
+                'item_id' => $this->reward_item_id,
+                'discount' => $this->reward_discount,
+            ],
+            'loyalty' => $this->loyalty(),
             'cashier' => $this->cashier?->name,
             'currency' => $this->currency,
             'items' => $this->items->map(fn (OrderItem $i) => [
@@ -84,6 +95,32 @@ class OrderResource extends JsonResource
                 'header' => $settings?->receipt_header,
                 'footer' => $settings?->receipt_footer,
             ],
+        ];
+    }
+
+    /**
+     * Stempel/poin order lunas bermember untuk struk: didapat, dipakai, saldo sekarang.
+     *
+     * @return array{program: string, unit: string, earned: int, redeemed: int, balance: int}|null
+     */
+    private function loyalty(): ?array
+    {
+        if ($this->customer_id === null || $this->status !== 'paid') {
+            return null;
+        }
+        $entries = LoyaltyEntry::query()->where('order_id', $this->id)->whereIn('kind', ['earn', 'redeem'])->get(['kind', 'units']);
+        if ($entries->isEmpty()) {
+            return null;
+        }
+        $loyalty = app(LoyaltyService::class);
+        $program = $loyalty->program();
+
+        return [
+            'program' => $program?->name ?? 'Member',
+            'unit' => $program?->unit() ?? 'stempel',
+            'earned' => (int) $entries->where('kind', 'earn')->sum('units'),
+            'redeemed' => (int) -$entries->where('kind', 'redeem')->sum('units'),
+            'balance' => $loyalty->balance($this->customer_id, $program)['balance'],
         ];
     }
 }

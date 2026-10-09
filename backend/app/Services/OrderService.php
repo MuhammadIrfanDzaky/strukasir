@@ -6,6 +6,7 @@ use App\Enums\Feature;
 use App\Enums\Permission;
 use App\Models\Customer;
 use App\Models\Device;
+use App\Models\LoyaltyReward;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderItemModifier;
@@ -37,6 +38,7 @@ class OrderService
     public function __construct(
         private readonly PricingService $pricing,
         private readonly FeatureGate $features,
+        private readonly LoyaltyService $loyalty,
     ) {}
 
     /**
@@ -57,13 +59,17 @@ class OrderService
 
         $this->guardDiscountFeature($data);
         $customer = $this->resolveCustomer($data['customer_id'] ?? null, $existing);
-        $result = $this->price($lines, $data['order_discount'] ?? null);
+        [$lines, $orderDiscount, $reward] = $this->applyReward($data, $customer, $lines, $existing);
+        $result = $this->price($lines, $orderDiscount);
         $this->guardExpectedTotal($result, (int) $data['expected_total']);
+        $rewardDiscount = $reward === null ? 0
+            : ($reward['line_index'] !== null ? $result->lineDiscounts[$reward['line_index']] : $result->orderDiscount);
 
         // Persetujuan diverifikasi SEBELUM transaksi: percobaan PIN gagal harus tetap tercatat.
-        $approver = $this->authorizeDiscount($result, $lines, $cashier, $data['approval'] ?? null);
+        // Potongan hadiah sudah "dibayar" dengan stempel/poin, jadi tidak ikut batas diskon kasir.
+        $approver = $this->authorizeDiscount($result, $lines, $cashier, $data['approval'] ?? null, $rewardDiscount);
 
-        $order = DB::transaction(function () use ($orderId, $data, $cashier, $device, $tenant, $lines, $result, $customer) {
+        $order = DB::transaction(function () use ($orderId, $data, $cashier, $device, $tenant, $lines, $result, $customer, $reward, $rewardDiscount) {
             $order = Order::query()->lockForUpdate()->find($orderId);
 
             if ($order === null) {
@@ -85,6 +91,12 @@ class OrderService
                 // Member tanpa label → nama member (tampil di struk, open bill & riwayat).
                 'customer_label' => ($data['customer_label'] ?? null) ?: $customer?->name,
                 'customer_id' => $customer?->id,
+                // Salinan hadiah: nama & harga stempel saat ditukar, baris yang digratiskan, besar potongan.
+                'reward_id' => $reward['reward']->id ?? null,
+                'reward_name' => $reward['reward']->name ?? null,
+                'reward_cost' => $reward['reward']->cost ?? null,
+                'reward_item_id' => $reward === null || $reward['line_index'] === null ? null : $lines[$reward['line_index']]['id'],
+                'reward_discount' => $rewardDiscount,
                 'order_discount_type' => $data['order_discount']['type'] ?? null,
                 'order_discount_value' => $data['order_discount']['value'] ?? 0,
                 'subtotal' => $result->subtotal,
@@ -207,6 +219,9 @@ class OrderService
                 'paid_at' => $now,
             ])->save();
 
+            // Tukar hadiah & catat stempel/poin member di transaksi yang sama: gagal = bayar dibatalkan.
+            $this->loyalty->onPaid($order, $cashier);
+
             Audit::record('order.paid', $order, after: [
                 'number' => $order->number,
                 'grand_total' => $order->grand_total,
@@ -252,6 +267,10 @@ class OrderService
                     ])->save();
                     $refunded += $p->amount;
                 }
+            }
+
+            if ($order->status === 'paid') {
+                $this->loyalty->onVoid($order, $user);
             }
 
             $before = $order->status;
@@ -386,6 +405,39 @@ class OrderService
         }
     }
 
+    /**
+     * Terapkan hadiah loyalitas sebagai diskon: gratis produk = potongan harga dasar 1 porsi di barisnya;
+     * potongan Rp / % = diskon order (tidak bisa digabung dengan diskon order manual).
+     *
+     * @return array{0: list<array<string, mixed>>, 1: ?array{type: string, value: int}, 2: ?array{reward: LoyaltyReward, line_index: ?int}}
+     */
+    private function applyReward(array $data, ?Customer $customer, array $lines, ?Order $existing): array
+    {
+        $orderDiscount = $data['order_discount'] ?? null;
+        $reward = $this->loyalty->resolveReward($data['reward'] ?? null, $customer, $lines, $existing);
+        if ($reward === null) {
+            return [$lines, $orderDiscount, null];
+        }
+
+        $r = $reward['reward'];
+        if ($r->type === 'free_product') {
+            $i = $reward['line_index'];
+            $lines[$i]['discount'] = ['type' => 'amount', 'value' => $lines[$i]['product']->price];
+            $lines[$i]['reward'] = true;
+
+            return [$lines, $orderDiscount, $reward];
+        }
+
+        if (! empty($orderDiscount['value'])) {
+            throw ValidationException::withMessages(['order_discount' => 'Hadiah potongan tidak bisa digabung dengan diskon order.']);
+        }
+        $orderDiscount = $r->type === 'percent'
+            ? ['type' => 'percent', 'value' => $r->value]
+            : ['type' => 'amount', 'value' => min($r->value, $this->price($lines, null)->subtotal)];
+
+        return [$lines, $orderDiscount, $reward];
+    }
+
     private function guardDiscountFeature(array $data): void
     {
         $hasDiscount = ! empty($data['order_discount']['value'])
@@ -409,9 +461,9 @@ class OrderService
      * Diskon sampai batas kedai boleh oleh kasir; di atasnya wajib persetujuan owner.
      * Persentase dihitung dari total diskon terhadap total kotor seluruh baris.
      */
-    private function authorizeDiscount(PricingResult $result, array $lines, User $cashier, ?array $approval): ?User
+    private function authorizeDiscount(PricingResult $result, array $lines, User $cashier, ?array $approval, int $rewardDiscount = 0): ?User
     {
-        $discount = $result->discountTotal();
+        $discount = $result->discountTotal() - $rewardDiscount;
         if ($discount === 0 || Gate::forUser($cashier)->allows(Permission::DiscountOverLimit->value)) {
             return null;
         }
@@ -442,8 +494,9 @@ class OrderService
             'unit_cost' => $line['product']->cost,
             'qty' => $line['qty'],
             'modifiers_total' => $line['modifiers_total'],
-            'discount_type' => $line['discount']['type'] ?? null,
-            'discount_value' => $line['discount']['value'] ?? 0,
+            // Baris hadiah: potongan tercatat di discount_total, bukan sebagai diskon manual.
+            'discount_type' => ($line['reward'] ?? false) ? null : ($line['discount']['type'] ?? null),
+            'discount_value' => ($line['reward'] ?? false) ? 0 : ($line['discount']['value'] ?? 0),
             'discount_total' => $result->lineDiscounts[$i],
             'line_total' => $result->lines[$i],
             'note' => $line['note'],

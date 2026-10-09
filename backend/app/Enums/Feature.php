@@ -16,6 +16,7 @@ enum Feature: string
     case SplitPayment = 'split_payment';
     case Reports = 'reports';
     case Customers = 'customers';
+    case Loyalty = 'loyalty';
 
     public function description(): string
     {
@@ -28,6 +29,7 @@ enum Feature: string
             self::SplitPayment => 'Satu order dibayar dengan beberapa metode',
             self::Reports => 'Laporan penjualan untuk owner',
             self::Customers => 'Data pelanggan / member: cari & tautkan ke order, riwayat belanja, kelompok pelanggan',
+            self::Loyalty => 'Program loyalitas: stempel / poin dari belanja member, tukar hadiah',
         };
     }
 
@@ -43,6 +45,7 @@ enum Feature: string
             self::SplitPayment => 'Bayar dengan beberapa metode',
             self::Reports => 'Laporan',
             self::Customers => 'Pelanggan / member',
+            self::Loyalty => 'Program loyalitas',
         };
     }
 
@@ -58,6 +61,8 @@ enum Feature: string
         return match ($this) {
             // Order yang disimpan harus bisa dikenali saat dibuka lagi.
             self::OpenBill => self::CustomerName,
+            // Stempel / poin dicatat per member.
+            self::Loyalty => self::Customers,
             default => null,
         };
     }

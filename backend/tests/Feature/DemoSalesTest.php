@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Product;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /** pos:demo-sales: data contoh development lewat jalur order sungguhan. */
@@ -47,5 +48,14 @@ class DemoSalesTest extends TestCase
         $this->assertSame('M0001', $codes);
         $this->artisan('pos:demo-customers', ['code' => $shop->tenant->code])->assertSuccessful();
         $this->assertSame(10, $this->tenancy()->run($shop->tenant->id, fn () => Customer::count()));
+
+        // Program loyalitas contoh: stempel dari order member yang ada (hanya minuman).
+        $this->artisan('pos:demo-loyalty', ['code' => $shop->tenant->code])->assertSuccessful();
+        [$rewards, $stamps] = $this->tenancy()->run($shop->tenant->id, fn () => [
+            DB::table('loyalty_rewards')->count(),
+            (int) DB::table('loyalty_entries')->sum('units'),
+        ]);
+        $this->assertSame(3, $rewards);
+        $this->assertGreaterThanOrEqual($linked, $stamps);
     }
 }

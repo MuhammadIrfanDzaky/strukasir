@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Customer;
+use App\Models\LoyaltyEntry;
 use App\Models\Order;
 use App\Models\TenantSetting;
 use App\Support\Audit;
@@ -115,11 +116,18 @@ class CustomerService
             ->groupBy('customer_id')
             ->selectRaw('customer_id, count(*) as visits, sum(grand_total) as total_spent, max(paid_at) as last_visit_at, min(paid_at) as first_visit_at');
 
+        // Saldo stempel/poin mentah + aktivitas terakhir (hangus dihitung di LoyaltyService::effective).
+        $loyalty = LoyaltyEntry::query()
+            ->groupBy('customer_id')
+            ->selectRaw('customer_id, sum(units) as loyalty_raw, max(created_at) as loyalty_last_at');
+
         return Customer::query()
             ->active()
             ->leftJoinSub($stats, 's', 's.customer_id', '=', 'customers.id')
+            ->leftJoinSub($loyalty, 'l', 'l.customer_id', '=', 'customers.id')
             ->select('customers.*')
-            ->selectRaw('coalesce(s.visits, 0) as visits, coalesce(s.total_spent, 0) as total_spent, s.last_visit_at, s.first_visit_at');
+            ->selectRaw('coalesce(s.visits, 0) as visits, coalesce(s.total_spent, 0) as total_spent, s.last_visit_at, s.first_visit_at')
+            ->selectRaw('coalesce(l.loyalty_raw, 0) as loyalty_raw, l.loyalty_last_at');
     }
 
     /**

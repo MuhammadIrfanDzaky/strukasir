@@ -18,6 +18,8 @@ class Customer {
     this.totalSpent,
     this.firstVisitAt,
     this.createdAt,
+    this.loyaltyBalance,
+    this.loyaltyExpiresAt,
   });
 
   factory Customer.fromJson(Map<String, dynamic> j) => Customer(
@@ -32,6 +34,8 @@ class Customer {
         totalSpent: j['total_spent'] as int?,
         firstVisitAt: _date(j['first_visit_at']),
         createdAt: _date(j['created_at']),
+        loyaltyBalance: j['loyalty_balance'] as int?,
+        loyaltyExpiresAt: _date(j['loyalty_expires_at']),
       );
 
   static DateTime? _date(Object? v) => v is String ? DateTime.tryParse(v)?.toLocal() : null;
@@ -49,6 +53,12 @@ class Customer {
   final int? totalSpent;
   final DateTime? firstVisitAt;
   final DateTime? createdAt;
+
+  /// Saldo stempel / poin (null = program loyalitas tidak berjalan).
+  final int? loyaltyBalance;
+
+  /// Saldo hangus bila tidak ada transaksi sampai tanggal ini.
+  final DateTime? loyaltyExpiresAt;
 
   /// Rata-rata belanja per kunjungan (owner).
   int? get average => totalSpent == null || visits == 0 ? null : totalSpent! ~/ visits;
@@ -148,6 +158,13 @@ class CustomerApi {
   Future<Map<String, dynamic>> detail(String id) async {
     final res = await _authed((api, token) => api.get('/customers/$id', token: token));
     return res['data'] as Map<String, dynamic>;
+  }
+
+  /// Penyesuaian saldo stempel/poin oleh owner. Mengembalikan saldo baru.
+  Future<int> adjustLoyalty(String id, int units, String note) async {
+    final res = await _authed((api, token) =>
+        api.post('/customers/$id/loyalty-adjust', token: token, data: {'units': units, 'note': note.trim()}));
+    return (res['data'] as Map<String, dynamic>)['balance'] as int;
   }
 
   Future<void> anonymize(String id) => _authed((api, token) => api.post('/customers/$id/anonymize', token: token));

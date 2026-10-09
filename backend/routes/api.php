@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\DeviceRegistrationController;
 use App\Http\Controllers\Api\V1\DeviceUnregisterController;
 use App\Http\Controllers\Api\V1\EmailVerificationController;
 use App\Http\Controllers\Api\V1\FeatureSettingsController;
+use App\Http\Controllers\Api\V1\LoyaltyController;
 use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\ModifierGroupController;
 use App\Http\Controllers\Api\V1\OrderController;
@@ -71,6 +72,7 @@ Route::prefix('v1')->group(function () {
             Route::get('customers/{customer}', [CustomerController::class, 'show']);
             Route::put('customers/{customer}', [CustomerController::class, 'update']);
             Route::post('customers/{customer}/anonymize', [CustomerController::class, 'anonymize']);
+            Route::post('customers/{customer}/loyalty-adjust', [CustomerController::class, 'adjustLoyalty']);
         });
 
         Route::middleware('can:'.Permission::ShiftOperate->value)->group(function () {
@@ -87,6 +89,8 @@ Route::prefix('v1')->group(function () {
             Route::put('settings/receipt', [ReceiptSettingsController::class, 'update']);
             Route::get('settings/features', [FeatureSettingsController::class, 'show']);
             Route::put('settings/features', [FeatureSettingsController::class, 'update']);
+            Route::get('settings/loyalty', [LoyaltyController::class, 'show']);
+            Route::put('settings/loyalty', [LoyaltyController::class, 'update']);
             Route::post('devices/current/unregister', DeviceUnregisterController::class);
         });
 

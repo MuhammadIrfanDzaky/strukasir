@@ -6,6 +6,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import 'printer_service.dart';
+import '../loyalty/loyalty_settings_screen.dart';
 import '../menu/menu_controller.dart';
 import '../settings/feature_settings_screen.dart';
 import '../session/session_controller.dart';
@@ -73,6 +74,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     final user = (ref.watch(sessionProvider).value as LoggedIn?)?.user;
     final canEditReceipt = user?.can('settings.manage') ?? false;
     final receipt = ref.watch(menuProvider).value?.menu.receipt;
+    final loyaltyOn = ref.watch(menuProvider).value?.menu.feature('loyalty') ?? false;
     final device = (ref.watch(sessionProvider).value as LoggedIn?)?.device;
     final testButton = OutlinedButton(
       onPressed: saved == null || _busy
@@ -180,6 +182,29 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                     ),
                   ],
                 ),
+                if (loyaltyOn) ...[
+                  const SizedBox(height: AppSpace.s4),
+                  AppSectionCard(
+                    title: 'Program loyalitas',
+                    children: [
+                      Text(
+                        'Stempel / poin untuk member dan hadiah yang bisa ditukar, mis. "beli 10 gratis 1".',
+                        style: AppType.body.copyWith(color: AppColors.inkMuted),
+                      ),
+                      const SizedBox(height: AppSpace.s3),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                            builder: (_) => const LoyaltySettingsScreen(),
+                          )),
+                          icon: const Icon(Icons.loyalty_rounded),
+                          label: const Text('Atur program loyalitas'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
               const SizedBox(height: AppSpace.s4),
               AppSectionCard(

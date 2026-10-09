@@ -26,6 +26,13 @@ angka no HP → pilih. Belum terdaftar? Ketuk **Pelanggan baru** (nama + no HP, 
 Kolom nama otomatis terisi nama member (boleh diganti, mis. "Meja 5"); catatan pelanggan (alergi, selera)
 tampil di keranjang. Kode member tercetak di struk (no HP tidak pernah dicetak).
 
+**Stempel / poin & hadiah** (bila program loyalitas berjalan): saldo member tampil di keranjang, begitu
+juga perkiraan "dapat +2 stempel". Untuk menukar, ketuk **Tukar hadiah** → pilih hadiah (yang saldonya
+kurang tidak bisa dipilih). Hadiah *gratis produk* butuh produknya sudah ada di keranjang; yang digratiskan
+1 porsi harga dasar (tambahan seperti extra shot tetap dibayar). Hadiah *potongan* tidak bisa digabung
+dengan diskon order. Stempel baru tercatat & hadiah baru terpotong saat **Bayar**; struk mencetak dapat,
+ditukar, dan saldo. Order di-void → stempelnya ditarik dan hadiahnya kembali ke saldo member.
+
 **Bayar nanti (Open Bill)**: ketuk **Open Bill** di bawah keranjang. Order disimpan tanpa mencetak apa pun.
 Untuk menambah pesanan atau membayar, ketuk **Open Bill** di atas keranjang dan pilih order-nya:
 - pelanggan pesan lagi → tambah produk, lalu ketuk **Simpan Bill**;
@@ -98,6 +105,20 @@ Menu **Pelanggan** (di HP: *Member*; Pengaturan pindah ke menu akun di kanan ata
 - **Dashboard**: porsi penjualan member vs non-member, member baru vs kembali, pelanggan teratas.
 - Kasir hanya bisa mencari & mendaftarkan; no HP tampil tersamar (0812****7890), tanpa total belanja.
 
+## Program loyalitas (owner)
+
+Menu **Pengaturan → Program loyalitas** (fitur *Program loyalitas* harus aktif, butuh *Pelanggan*).
+
+- **Cara dapat** (pilih satu): *stempel per item* (semua produk atau kategori tertentu, mis. hanya minuman),
+  *stempel per transaksi* (boleh dengan minimal belanja), atau *poin per belanja* (mis. 1 poin tiap Rp10.000).
+- **Hadiah**: buat daftar sendiri — *gratis produk*, *potongan Rp*, atau *potongan %* — dengan harga
+  stempel/poin masing-masing. Contoh: "10 stempel = gratis 1 Kopi Susu Aren".
+- **Masa berlaku**: tidak pernah hangus, atau hangus bila member tidak belanja 3/6/12/24 bulan.
+- **Program berjalan** mati → tidak ada stempel baru & hadiah tidak bisa ditukar (saldo tetap tersimpan).
+- **Sesuaikan saldo** (Pelanggan → detail → *Sesuaikan*): tambah/kurangi dengan alasan, mis. pindahan kartu
+  stempel kertas. Semua perubahan tercatat di riwayat stempel pelanggan.
+- **Dashboard**: stempel/poin keluar vs ditukar, nilai hadiah, hadiah terpopuler.
+
 ## Fitur (owner)
 
 Menu **Pengaturan → Atur fitur**: nyalakan hanya yang dipakai supaya layar kasir ringkas. Semua tablet
@@ -110,6 +131,7 @@ ikut berubah. Mematikan fitur tidak menghapus data.
 - **Diskon**, **Bayar dengan beberapa metode**: tombolnya hilang dari kasir saat dimatikan.
 - **Pelanggan / member**: data pelanggan, kode member, riwayat belanja. Saklar **No HP pelanggan wajib**:
   nyala = pelanggan baru harus punya no HP (tidak bisa dobel); mati = boleh nama saja.
+- **Program loyalitas**: stempel/poin & hadiah untuk member (butuh *Pelanggan / member*).
 - **Pajak & service**: isi persen (mis. PB1 10%, service 5%); 0 = tidak dipungut. Untuk tiap tarif yang
   diisi, pilih **Harga menu sudah termasuk pajak / service**: nyala = total sama dengan harga menu dan
   struk menulis "Termasuk pajak 10%"; mati = ditambahkan di atas harga. Persen ikut tercetak di struk.

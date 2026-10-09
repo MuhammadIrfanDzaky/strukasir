@@ -108,6 +108,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   gutter: gutter,
                   range: _range,
                   customersOn: ref.watch(menuProvider).value?.menu.customersOn ?? false,
+                  loyaltyUnit: ref.watch(menuProvider).value?.menu.loyalty?.unit,
                 ));
           },
         ),
@@ -129,6 +130,7 @@ class _Dashboard extends StatelessWidget {
     required this.gutter,
     required this.range,
     this.customersOn = false,
+    this.loyaltyUnit,
   });
 
   final Map<String, dynamic> report;
@@ -138,6 +140,9 @@ class _Dashboard extends StatelessWidget {
 
   /// Fitur pelanggan aktif → tampilkan bagian member.
   final bool customersOn;
+
+  /// Satuan program loyalitas yang berjalan ("stempel"/"poin"); null = tidak ada program.
+  final String? loyaltyUnit;
 
   List<Map<String, dynamic>> _list(String key) => ((report[key] as List?) ?? const []).cast<Map<String, dynamic>>();
 
@@ -329,6 +334,10 @@ class _Dashboard extends StatelessWidget {
         const SizedBox(height: AppSpace.s3),
         _customerCards(r, pair),
       ],
+      if (customersOn && loyaltyUnit != null) ...[
+        const SizedBox(height: AppSpace.s3),
+        _loyaltyCard(r, loyaltyUnit!, smallWidth),
+      ],
       const SizedBox(height: AppSpace.s3),
       Text('Penjualan = order lunas (void tidak dihitung). Laba kotor = penjualan − pajak − HPP; margin = laba kotor ÷ (penjualan − pajak).',
           style: AppType.caption.copyWith(color: AppColors.inkMuted)),
@@ -368,6 +377,27 @@ Widget _customerCards(Map<String, dynamic> r, Widget Function(Widget, Widget?) p
         ]),
     ]),
   );
+}
+
+/// Program loyalitas: stempel/poin yang keluar vs ditukar, dan hadiah yang paling sering ditukar.
+Widget _loyaltyCard(Map<String, dynamic> r, String unit, double tileWidth) {
+  final l = (r['loyalty'] as Map<String, dynamic>?) ?? const {};
+  final rewards = ((l['rewards'] as List?) ?? const []).cast<Map<String, dynamic>>();
+  final discount = rewards.fold<int>(0, (s, x) => s + (x['discount'] as int));
+  return AppSectionCard(title: 'Program loyalitas', children: [
+    Wrap(spacing: AppSpace.s3, runSpacing: AppSpace.s3, children: [
+      AppStatCard('${unit[0].toUpperCase()}${unit.substring(1)} keluar', '${l['earned'] ?? 0}', width: tileWidth),
+      AppStatCard('Ditukar', '${l['redeemed'] ?? 0}', width: tileWidth),
+      AppStatCard('Nilai hadiah', rp(discount), width: tileWidth),
+    ]),
+    const SizedBox(height: AppSpace.s3),
+    if (rewards.isEmpty)
+      const _Caption('Belum ada hadiah ditukar di periode ini.')
+    else
+      RankedBars(rows: [
+        for (final x in rewards) (x['name'] as String, x['count'] as int, '${x['count']}×', 'potongan ${rp(x['discount'] as int)}'),
+      ]),
+  ]);
 }
 
 class _Caption extends StatelessWidget {

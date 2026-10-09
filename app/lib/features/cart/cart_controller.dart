@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../menu/menu_controller.dart';
 import '../menu/menu_models.dart';
+import '../loyalty/loyalty_models.dart';
 import '../menu/modifier_selection.dart';
 import 'pricing.dart';
 
@@ -49,7 +50,7 @@ class CartLine {
 
 /// Member yang ditautkan ke order (cukup untuk tampilan kasir & struk).
 class CartCustomer {
-  const CartCustomer({required this.id, required this.code, required this.name, this.phone, this.visits, this.note});
+  const CartCustomer({required this.id, required this.code, required this.name, this.phone, this.visits, this.note, this.balance});
 
   final String id;
   final String code;
@@ -61,6 +62,9 @@ class CartCustomer {
 
   /// Catatan pelanggan (alergi, selera) — ditampilkan ke kasir.
   final String? note;
+
+  /// Saldo stempel / poin saat dipilih (null = program tidak berjalan / tidak diketahui).
+  final int? balance;
 }
 
 class CartState {
@@ -69,6 +73,8 @@ class CartState {
     this.lines = const [],
     this.customerLabel = '',
     this.customer,
+    this.reward,
+    this.rewardItemId,
     this.orderDiscount,
     this.number,
   });
@@ -80,6 +86,10 @@ class CartState {
 
   /// Pelanggan / member (opsional, fitur `customers`).
   final CartCustomer? customer;
+
+  /// Hadiah loyalitas yang ditukar (satu per order) dan baris yang digratiskan (hadiah gratis produk).
+  final LoyaltyReward? reward;
+  final String? rewardItemId;
   final Discount? orderDiscount;
 
   /// Nomor dari server bila order sudah pernah disimpan (open bill).
@@ -94,6 +104,9 @@ class CartState {
     String? customerLabel,
     CartCustomer? customer,
     bool clearCustomer = false,
+    LoyaltyReward? reward,
+    String? rewardItemId,
+    bool clearReward = false,
     Discount? orderDiscount,
     bool clearOrderDiscount = false,
     String? number,
@@ -103,6 +116,8 @@ class CartState {
         lines: lines ?? this.lines,
         customerLabel: customerLabel ?? this.customerLabel,
         customer: clearCustomer ? null : (customer ?? this.customer),
+        reward: clearReward || clearCustomer ? null : (reward ?? this.reward),
+        rewardItemId: clearReward || clearCustomer ? null : (rewardItemId ?? this.rewardItemId),
         orderDiscount: clearOrderDiscount ? null : (orderDiscount ?? this.orderDiscount),
         number: number ?? this.number,
       );
@@ -110,6 +125,7 @@ class CartState {
   Map<String, dynamic> toJson(int expectedTotal) => {
         'customer_label': customerLabel.trim().isEmpty ? null : customerLabel.trim(),
         'customer_id': customer?.id,
+        if (reward != null) 'reward': {'id': reward!.id, 'item_id': rewardItemId},
         'client_created_at': DateTime.now().toUtc().toIso8601String(),
         'expected_total': expectedTotal,
         'items': lines.map((l) => l.toJson()).toList(),
@@ -125,15 +141,68 @@ final cartTotalsProvider = Provider<PricingResult>((ref) {
   final menu = ref.watch(menuProvider).value?.menu;
   if (menu == null || cart.isEmpty) return PricingResult.empty;
   try {
-    return calculatePrice(
-      [for (final l in cart.lines) PricingLine(unitPrice: l.unitPrice, qty: l.qty, discount: l.discount)],
-      cart.orderDiscount,
-      menu.pricing,
-    );
+    return priceCart(cart, menu);
   } on PricingException {
     return PricingResult.empty;
   }
 });
+
+/// Harga keranjang termasuk hadiah loyalitas, sama dengan OrderService::applyReward di server:
+/// gratis produk = potongan harga dasar 1 porsi di barisnya; potongan Rp (maks. subtotal) / % = diskon order.
+PricingResult priceCart(CartState cart, Menu menu) {
+  final reward = cart.reward;
+  final lines = [
+    for (final l in cart.lines)
+      PricingLine(
+        unitPrice: l.unitPrice,
+        qty: l.qty,
+        discount: reward != null && reward.isFreeProduct && l.id == cart.rewardItemId
+            ? Discount.amount(l.product.price)
+            : l.discount,
+      ),
+  ];
+  var orderDiscount = cart.orderDiscount;
+  if (reward != null && !reward.isFreeProduct) {
+    if (reward.type == 'percent') {
+      orderDiscount = Discount.percent(reward.value);
+    } else {
+      final subtotal = calculatePrice(lines, null, menu.pricing).subtotal;
+      orderDiscount = Discount.amount(reward.value < subtotal ? reward.value : subtotal);
+    }
+  }
+  return calculatePrice(lines, orderDiscount, menu.pricing);
+}
+
+/// Potongan dari hadiah (untuk rincian keranjang).
+int rewardDiscount(CartState cart, PricingResult totals) {
+  final reward = cart.reward;
+  if (reward == null) return 0;
+  if (!reward.isFreeProduct) return totals.orderDiscount;
+  final i = cart.lines.indexWhere((l) => l.id == cart.rewardItemId);
+  return i >= 0 && i < totals.lineDiscounts.length ? totals.lineDiscounts[i] : 0;
+}
+
+/// Perkiraan stempel/poin yang didapat member dari order ini (server menghitung ulang saat bayar).
+int loyaltyEarnPreview(CartState cart, Menu menu, PricingResult totals) {
+  final p = menu.loyalty;
+  if (p == null || cart.customer == null || cart.isEmpty) return 0;
+  switch (p.earnMode) {
+    case 'per_order':
+      return totals.grandTotal >= (p.earnMinOrder ?? 0) ? 1 : 0;
+    case 'per_amount':
+      final per = p.earnPerAmount ?? 0;
+      return per > 0 ? totals.grandTotal ~/ per : 0;
+    default:
+      var qty = 0;
+      for (final l in cart.lines) {
+        if (p.categoryIds.isEmpty || p.categoryIds.contains(l.product.categoryId)) {
+          qty += l.qty;
+          if (cart.reward?.isFreeProduct == true && l.id == cart.rewardItemId) qty -= 1; // porsi gratis
+        }
+      }
+      return qty < 0 ? 0 : qty;
+  }
+}
 
 class CartController extends Notifier<CartState> {
   @override
@@ -159,6 +228,8 @@ class CartController extends Notifier<CartState> {
   }
 
   void setQty(String lineId, int qty) {
+    // Baris hadiah dihapus → hadiah ikut dilepas.
+    if (qty <= 0 && lineId == state.rewardItemId) state = state.copyWith(clearReward: true);
     state = state.copyWith(lines: [
       for (final l in state.lines)
         if (l.id != lineId)
@@ -183,6 +254,21 @@ class CartController extends Notifier<CartState> {
         customer: customer,
         customerLabel: state.customerLabel.trim().isEmpty ? customer.name : null,
       );
+
+  /// Tukar hadiah: gratis produk memakai baris [itemId] (diskon manualnya dilepas); potongan Rp/%
+  /// menggantikan diskon order manual.
+  void setReward(LoyaltyReward reward, {String? itemId}) {
+    state = state.copyWith(
+      reward: reward,
+      rewardItemId: reward.isFreeProduct ? itemId : null,
+      clearOrderDiscount: !reward.isFreeProduct,
+      lines: reward.isFreeProduct
+          ? [for (final l in state.lines) l.id == itemId ? l.copyWith(clearDiscount: true) : l]
+          : null,
+    );
+  }
+
+  void clearReward() => state = state.copyWith(clearReward: true);
 
   /// Lepas member; label yang masih sama dengan nama member ikut dikosongkan.
   void clearCustomer() {
@@ -236,6 +322,20 @@ class CartController extends Notifier<CartState> {
     }
 
     final customer = order['customer'] as Map<String, dynamic>?;
+    final savedReward = order['reward'] as Map<String, dynamic>?;
+    LoyaltyReward? reward;
+    if (savedReward != null) {
+      // Data hadiah lengkap dari menu; hadiah yang kini nonaktif direka ulang dari salinan di order.
+      reward = menu.loyalty?.rewards.where((r) => r.id == savedReward['id']).firstOrNull ??
+          LoyaltyReward(
+            id: savedReward['id'] as String,
+            name: savedReward['name'] as String? ?? 'Hadiah',
+            cost: savedReward['cost'] as int? ?? 0,
+            type: savedReward['item_id'] != null ? 'free_product' : 'amount',
+            productId: lines.where((l) => l.id == savedReward['item_id']).firstOrNull?.product.id,
+            value: savedReward['discount'] as int? ?? 0,
+          );
+    }
     state = CartState(
       orderId: order['id'] as String,
       lines: lines,
@@ -243,6 +343,8 @@ class CartController extends Notifier<CartState> {
       customer: customer == null
           ? null
           : CartCustomer(id: customer['id'] as String, code: customer['code'] as String, name: customer['name'] as String),
+      reward: reward,
+      rewardItemId: savedReward?['item_id'] as String?,
       orderDiscount: order['order_discount'] == null
           ? null
           : Discount.fromJson(order['order_discount'] as Map<String, dynamic>),

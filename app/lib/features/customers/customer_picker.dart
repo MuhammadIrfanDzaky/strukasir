@@ -7,6 +7,7 @@ import '../../core/api_client.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
+import '../menu/menu_controller.dart';
 import 'customer_api.dart';
 import 'customer_form.dart';
 
@@ -143,7 +144,11 @@ class _CustomerPickerState extends ConsumerState<CustomerPicker> {
                           padding: const EdgeInsets.only(bottom: AppSpace.s2),
                           itemCount: results.length,
                           separatorBuilder: (_, _) => const Divider(height: 1, indent: 72),
-                          itemBuilder: (_, i) => CustomerTile(results[i], onTap: () => Navigator.pop(context, results[i])),
+                          itemBuilder: (_, i) => CustomerTile(
+                            results[i],
+                            loyaltyUnit: ref.watch(menuProvider).value?.menu.loyalty?.unit,
+                            onTap: () => Navigator.pop(context, results[i]),
+                          ),
                         ),
         ),
         const Divider(height: 1),
@@ -163,7 +168,7 @@ class _CustomerPickerState extends ConsumerState<CustomerPicker> {
 
 /// Satu baris pelanggan: nama, kode, no HP, kunjungan, catatan.
 class CustomerTile extends StatelessWidget {
-  const CustomerTile(this.customer, {super.key, this.onTap, this.trailing, this.spent});
+  const CustomerTile(this.customer, {super.key, this.onTap, this.trailing, this.spent, this.loyaltyUnit});
 
   final Customer customer;
   final VoidCallback? onTap;
@@ -171,6 +176,9 @@ class CustomerTile extends StatelessWidget {
 
   /// Total belanja (owner), ditulis di baris kunjungan.
   final String? spent;
+
+  /// "stempel" / "poin" bila program loyalitas berjalan → saldo ikut ditulis.
+  final String? loyaltyUnit;
 
   @override
   Widget build(BuildContext context) {
@@ -180,6 +188,7 @@ class CustomerTile extends StatelessWidget {
     final visits = [
       c.visits == 0 ? 'Belum pernah belanja' : '${c.visits}× · ${sinceLabel(c.lastVisitAt).toLowerCase()}',
       ?spent,
+      if (loyaltyUnit != null && c.loyaltyBalance != null) '${c.loyaltyBalance} $loyaltyUnit',
     ].join(' · ');
     return ListTile(
       onTap: onTap,

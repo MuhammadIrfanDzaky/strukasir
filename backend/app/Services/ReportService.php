@@ -87,6 +87,15 @@ class ReportService
             ->selectRaw('customers.id, customers.code, customers.name, count(*) as orders, sum(orders.grand_total) as sales')
             ->orderByDesc('sales')->limit(5)->get();
 
+        // Loyalitas: stempel/poin keluar & ditukar (dari order lunas di periode ini), hadiah terpopuler.
+        $loyaltyUnits = DB::table('loyalty_entries')->join('orders', 'orders.id', '=', 'loyalty_entries.order_id')
+            ->where('orders.status', 'paid')->whereBetween('orders.business_date', [$from, $to])
+            ->selectRaw("coalesce(sum(units) filter (where kind = 'earn'), 0) as earned, coalesce(-sum(units) filter (where kind = 'redeem'), 0) as redeemed")
+            ->first();
+        $rewards = $paid()->whereNotNull('reward_id')->groupBy('reward_name')
+            ->selectRaw('reward_name as name, count(*) as count, sum(reward_discount) as discount')
+            ->orderByDesc('count')->limit(5)->get();
+
         $orders = (int) $totals->orders;
         $sales = (int) $totals->sales;
 
@@ -138,6 +147,11 @@ class ReportService
                 'top' => $topCustomers->map(fn ($r) => [
                     'id' => $r->id, 'code' => $r->code, 'name' => $r->name, 'orders' => (int) $r->orders, 'sales' => (int) $r->sales,
                 ]),
+            ],
+            'loyalty' => [
+                'earned' => (int) $loyaltyUnits->earned,
+                'redeemed' => (int) $loyaltyUnits->redeemed,
+                'rewards' => $rewards->map(fn ($r) => ['name' => $r->name, 'count' => (int) $r->count, 'discount' => (int) $r->discount]),
             ],
             // Periode sebelumnya dengan panjang sama (mis. 7 hari sebelumnya) untuk naik/turun di dashboard.
             'previous' => $this->totals(...self::previousRange($from, $to)),

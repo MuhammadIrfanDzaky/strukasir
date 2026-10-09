@@ -11,6 +11,7 @@ use App\Models\ModifierGroup;
 use App\Models\Product;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
+use App\Services\LoyaltyService;
 use App\Support\BusinessTemplate;
 use App\Support\Pricing\PricingSettings;
 use App\Support\Tenancy\FeatureGate;
@@ -52,6 +53,9 @@ class MenuController extends Controller
             'customer_label_hint' => BusinessTemplate::customerLabelHint($tenant?->sector, $tenant?->sales_mode),
             // Form "Pelanggan baru" di kasir: no HP wajib atau boleh kosong (Pengaturan → Fitur).
             'customer_phone_required' => $settings->customer_phone_required,
+            // Program loyalitas + hadiah aktif (null bila tidak berjalan): kasir menukar hadiah & melihat
+            // perkiraan stempel/poin; server tetap menghitung ulang saat simpan & bayar.
+            'loyalty' => app(LoyaltyService::class)->presentForMenu(),
             // Nama, alamat, penutup & logo struk; disimpan tablet bersama cache menu (struk tetap lengkap saat offline).
             'receipt' => ReceiptSettingsController::present($settings),
             'categories' => Category::query()->orderBy('sort')->orderBy('name')->get()
@@ -89,7 +93,7 @@ class MenuController extends Controller
 
     private function version(): string
     {
-        $stamps = collect(['categories', 'products', 'modifier_groups', 'modifiers', 'tenant_settings', 'tenant_features'])
+        $stamps = collect(['categories', 'products', 'modifier_groups', 'modifiers', 'tenant_settings', 'tenant_features', 'loyalty_programs', 'loyalty_rewards'])
             ->map(fn (string $table) => DB::table($table)->selectRaw('count(*) as n, max(updated_at) as t')->first())
             ->map(fn ($row) => $row->n.'@'.$row->t)
             ->implode('|');

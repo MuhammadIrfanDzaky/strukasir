@@ -2,6 +2,7 @@
 library;
 
 import '../cart/pricing.dart';
+import '../loyalty/loyalty_models.dart';
 
 class MenuCategory {
   const MenuCategory({required this.id, required this.name, required this.sort, required this.active});
@@ -176,6 +177,7 @@ class Menu {
     required this.features,
     this.customerLabelHint = 'Nama pelanggan / meja',
     this.customerPhoneRequired = true,
+    this.loyalty,
     required this.categories,
     required this.products,
     required this.modifierGroups,
@@ -189,6 +191,7 @@ class Menu {
         features: (j['features'] as Map<String, dynamic>).map((k, v) => MapEntry(k, v as bool)),
         customerLabelHint: j['customer_label_hint'] as String? ?? 'Nama pelanggan / meja',
         customerPhoneRequired: j['customer_phone_required'] as bool? ?? true,
+        loyalty: j['loyalty'] == null ? null : LoyaltyProgram.fromJson(j['loyalty'] as Map<String, dynamic>),
         categories: (j['categories'] as List)
             .cast<Map<String, dynamic>>()
             .map(MenuCategory.fromJson)
@@ -214,6 +217,9 @@ class Menu {
 
   /// Form "Pelanggan baru" di kasir: no HP wajib (Pengaturan → Fitur).
   final bool customerPhoneRequired;
+
+  /// Program loyalitas yang berjalan (null = tidak ada / fitur mati).
+  final LoyaltyProgram? loyalty;
   final List<MenuCategory> categories;
 
   bool feature(String key) => features[key] ?? false;

@@ -5,6 +5,7 @@ import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../customers/customer_picker.dart';
+import '../loyalty/reward_dialog.dart';
 import '../menu/menu_controller.dart';
 import '../menu/modifier_selection.dart';
 import '../session/session_controller.dart';
@@ -68,9 +69,20 @@ class _CartPanelState extends ConsumerState<CartPanel> {
     final c = await pickCustomer(context, phoneRequired: menu?.customerPhoneRequired ?? true);
     if (c == null || !mounted) return;
     ref.read(cartProvider.notifier).setCustomer(
-          CartCustomer(id: c.id, code: c.code, name: c.name, phone: c.phone, visits: c.visits, note: c.note),
+          CartCustomer(
+              id: c.id, code: c.code, name: c.name, phone: c.phone, visits: c.visits, note: c.note, balance: c.loyaltyBalance),
         );
     if (_labelError != null) setState(() => _labelError = null);
+  }
+
+  /// Tukar hadiah dengan saldo member.
+  Future<void> _pickReward() async {
+    final menu = ref.read(menuProvider).value?.menu;
+    final cart = ref.read(cartProvider);
+    final program = menu?.loyalty;
+    if (menu == null || program == null || cart.customer == null) return;
+    final picked = await pickReward(context, program: program, balance: cart.customer!.balance ?? 0, cart: cart, menu: menu);
+    if (picked != null) ref.read(cartProvider.notifier).setReward(picked.$1, itemId: picked.$2);
   }
 
   Future<void> _act(Future<void> Function(CheckoutFlow flow) action) async {
@@ -129,7 +141,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                               Text('Catatan: ${l.note}', style: AppType.caption.copyWith(color: AppColors.warning)),
                             if (totals.lineDiscounts.length > i && totals.lineDiscounts[i] > 0)
                               Text(
-                                'Diskon -${rupiah(totals.lineDiscounts[i])}',
+                                '${l.id == cart.rewardItemId ? 'Hadiah' : 'Diskon'} -${rupiah(totals.lineDiscounts[i])}',
                                 style: AppType.caption.copyWith(color: AppColors.success),
                               ),
                           ],
@@ -147,7 +159,8 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               const SizedBox(height: AppSpace.s3),
               AppSummaryRow('Subtotal', rupiah(totals.subtotal)),
               if (totals.orderDiscount > 0)
-                AppSummaryRow('Diskon', '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
+                AppSummaryRow(cart.reward != null && !cart.reward!.isFreeProduct ? 'Hadiah: ${cart.reward!.name}' : 'Diskon',
+                    '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
               if (totals.serviceTotal > 0)
                 AppSummaryRow(withRate('Service', pricing?.serviceBp, included: pricing?.serviceInclusive ?? false),
                     rupiah(totals.serviceTotal)),
@@ -208,6 +221,9 @@ class _CartPanelState extends ConsumerState<CartPanel> {
     final openBill = menu?.feature('open_bill') ?? false;
     final askLabel = menu?.customerNameOn ?? true;
     final memberOn = (menu?.customersOn ?? false) && (user?.can('customers.view') ?? false);
+    final program = memberOn ? menu?.loyalty : null;
+    final earn = menu == null ? 0 : loyaltyEarnPreview(cart, menu, totals);
+    final reward = cart.reward;
     final canAct = !_busy && !cart.isEmpty;
 
     if (_label.text != cart.customerLabel) _label.text = cart.customerLabel;
@@ -327,6 +343,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                                   [
                                     'Member ${customer.code}',
                                     if (customer.visits != null) '${customer.visits}× belanja',
+                                    if (program != null && customer.balance != null) '${customer.balance} ${program.unit}',
                                   ].join(' · '),
                                   style: AppType.caption.copyWith(color: AppColors.primaryStrong),
                                   maxLines: 1,
@@ -337,13 +354,32 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                                       style: AppType.caption.copyWith(color: AppColors.warning),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis),
+                                if (reward != null)
+                                  Text('Hadiah: ${reward.name} (−${reward.cost} ${program?.unit ?? 'stempel'})',
+                                      style: AppType.caption.copyWith(color: AppColors.success, fontWeight: FontWeight.w700),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis)
+                                else if (program != null && program.rewards.isNotEmpty && !cart.isEmpty)
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: TextButton.icon(
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        minimumSize: const Size(0, 36),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      onPressed: _busy ? null : _pickReward,
+                                      icon: const Icon(Icons.redeem_rounded, size: 18),
+                                      label: const Text('Tukar hadiah'),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
                           IconButton(
-                            tooltip: 'Lepas member',
+                            tooltip: reward != null ? 'Batalkan hadiah' : 'Lepas member',
                             visualDensity: VisualDensity.compact,
-                            onPressed: _busy ? null : notifier.clearCustomer,
+                            onPressed: _busy ? null : (reward != null ? notifier.clearReward : notifier.clearCustomer),
                             icon: const Icon(Icons.close_rounded, size: 18),
                           ),
                         ],
@@ -354,12 +390,13 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         Widget line(int i) {
           final l = cart.lines[i];
           final discount = totals.lineDiscounts.length > i ? totals.lineDiscounts[i] : 0;
+          final isReward = l.id == cart.rewardItemId;
           final meta = [
             if (l.modifiers.isNotEmpty) modifierSummary(l.modifiers),
             if (l.note != null && l.note!.isNotEmpty) '“${l.note}”',
           ].join(' · ');
           return InkWell(
-            onTap: () => _editLine(l, canDiscount),
+            onTap: () => _editLine(l, canDiscount && !isReward),
             child: Padding(
               padding: EdgeInsets.fromLTRB(gutter, AppSpace.s2, AppSpace.s3, AppSpace.s2),
               child: Row(
@@ -372,7 +409,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                         if (meta.isNotEmpty) Text(meta, style: AppType.caption.copyWith(color: AppColors.inkMuted)),
                         if (discount > 0)
                           Text(
-                            'Diskon -${rupiah(discount)}',
+                            '${isReward ? 'Hadiah' : 'Diskon'} -${rupiah(discount)}',
                             style: AppType.caption.copyWith(color: AppColors.success, fontWeight: FontWeight.w600),
                           ),
                       ],
@@ -408,7 +445,8 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         final breakdown = <Widget>[
           AppSummaryRow('Subtotal', rupiah(totals.subtotal)),
           if (totals.orderDiscount > 0)
-            AppSummaryRow('Diskon', '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
+            AppSummaryRow(reward != null && !reward.isFreeProduct ? 'Hadiah: ${reward.name}' : 'Diskon',
+                '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
           if (totals.serviceTotal > 0)
             AppSummaryRow(withRate('Service', menu?.pricing.serviceBp, included: menu?.pricing.serviceInclusive ?? false),
                 rupiah(totals.serviceTotal)),
@@ -416,7 +454,20 @@ class _CartPanelState extends ConsumerState<CartPanel> {
             AppSummaryRow(withRate('Pajak', menu?.pricing.taxBp, included: menu?.pricing.taxInclusive ?? false),
                 rupiah(totals.taxTotal)),
           if (totals.rounding != 0) AppSummaryRow('Pembulatan', rupiah(totals.rounding)),
-          if (canDiscount && !cart.isEmpty)
+          if (program != null && earn > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Row(children: [
+                const Icon(Icons.loyalty_rounded, size: 16, color: AppColors.primary),
+                const SizedBox(width: AppSpace.s1),
+                Expanded(
+                  child: Text('${program.name}: dapat +$earn ${program.unit}',
+                      style: AppType.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                ),
+              ]),
+            ),
+          // Hadiah potongan memakai diskon order: diskon order manual tidak bisa digabung.
+          if (canDiscount && !cart.isEmpty && (reward == null || reward.isFreeProduct))
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
@@ -481,7 +532,8 @@ class _CartPanelState extends ConsumerState<CartPanel> {
 
         // Tinggi cukup: daftar item scroll sendiri, rincian + tombol selalu terlihat di bawah.
         // Pendek (HP landscape, dok bawah): semua ikut scroll; hanya total + tombol yang menempel.
-        final short = box.maxHeight < 560;
+        // Chip member (catatan, hadiah) menambah tinggi bagian atas → lebih cepat beralih ke susunan scroll.
+        final short = box.maxHeight < (customer != null && memberOn ? 660 : 560);
         final body = short
             ? ListView(
                 padding: EdgeInsets.zero,
