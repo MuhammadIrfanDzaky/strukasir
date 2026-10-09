@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
+import '../../core/config.dart';
 import '../../core/session_store.dart';
 
 class DeviceInfo {
@@ -170,7 +171,10 @@ class SessionController extends AsyncNotifier<Session> {
 
   @override
   Future<Session> build() async {
-    final url = await _store.serverUrl();
+    // Alamat tertanam saat build (API_URL) selalu menang atas alamat yang tersimpan, supaya tablet
+    // yang dulu didaftarkan ke alamat lain (mis. IP laptop) ikut pindah tanpa daftar ulang.
+    final stored = await _store.serverUrl();
+    final url = kApiUrl.isNotEmpty && stored != null ? kApiUrl : stored;
     final deviceJson = await _store.device();
     if (url == null || deviceJson == null || await _store.deviceToken() == null) {
       return const NeedsSetup();

@@ -185,3 +185,21 @@ Jumlah baris harus sama dengan produksi pada saat backup dibuat. Menimpa produks
   2. Hapus permanen: `$C exec app php artisan pos:delete-tenant <kode> --confirm=<kode>`.
      Kedai lain tidak tersentuh, dan jejak penghapusan tercatat di log server.
   3. Data masih ada di backup lama sampai masa retensi 30 hari habis, lalu hilang sepenuhnya.
+
+## Lampiran: tunnel development (ngrok, sementara sebelum VPS)
+
+Supaya tablet di jaringan lain bisa memakai server di laptop. Alamat tetap (akun ngrok gratis):
+`https://residency-handsaw-viability.ngrok-free.dev`. Authtoken disimpan di `deploy/.env.ngrok`
+(di-ignore git; isi `NGROK_AUTHTOKEN=` tanpa tanda kutip).
+
+```bash
+# nyalakan (ikut menyala lagi saat Docker start)
+docker run -d --name strukasir-ngrok --restart unless-stopped --network berrybrew-pos_default   --env-file deploy/.env.ngrok ngrok/ngrok:latest http api:8000   --url=https://residency-handsaw-viability.ngrok-free.dev --log=stdout
+# matikan setelah selesai mencoba (server dev jadi tidak bisa diakses dari internet)
+docker rm -f strukasir-ngrok
+```
+
+APK tablet untuk tunnel ini: `flutter build apk --debug --split-per-abi --target-platform android-arm64
+--dart-define=API_URL=https://residency-handsaw-viability.ngrok-free.dev`. Alamat tertanam selalu menang
+atas alamat yang tersimpan di tablet, jadi tablet lama tidak perlu didaftarkan ulang.
+
