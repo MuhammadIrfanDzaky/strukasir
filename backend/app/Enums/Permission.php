@@ -19,6 +19,8 @@ enum Permission: string
     case CustomersManage = 'customers.manage';
     // Kasbon melewati batas pelanggan (kasir butuh PIN owner).
     case CreditOverLimit = 'credit.over_limit';
+    // Bahan, resep, pembelian, terbuang, stok opname.
+    case InventoryManage = 'inventory.manage';
 
     /** Fitur paket yang wajib aktif agar izin ini berlaku (dimensi entitlement tenant). */
     public function requiredFeature(): ?string
@@ -28,6 +30,7 @@ enum Permission: string
             self::ReportsView => Feature::Reports->value,
             self::CustomersView, self::CustomersManage => Feature::Customers->value,
             self::CreditOverLimit => Feature::CustomerCredit->value,
+            self::InventoryManage => Feature::Inventory->value,
             default => null,
         };
     }

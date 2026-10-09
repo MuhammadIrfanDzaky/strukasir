@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\Promotion;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
+use App\Services\InventoryService;
 use App\Services\LoyaltyService;
 use App\Services\PromotionService;
 use App\Services\TierService;
@@ -38,6 +39,8 @@ class MenuController extends Controller
         $settings = TenantSetting::query()->firstOrFail();
         $features = $gate->forTenant($settings->tenant_id);
         $tenant = Tenant::query()->find($settings->tenant_id);
+        // HPP dari resep (owner, fitur stok): ditampilkan di form produk menggantikan modal manual.
+        $recipeCosts = $withCost && app(InventoryService::class)->enabled() ? app(InventoryService::class)->productCosts() : [];
         $pricing = PricingSettings::fromTenant($settings, $features[Feature::TaxService->value] ?? false);
 
         return response()->json([
@@ -77,7 +80,7 @@ class MenuController extends Controller
                 'code' => $p->code,
                 'name' => $p->name,
                 'price' => $p->price,
-                ...($withCost ? ['cost' => $p->cost] : []),
+                ...($withCost ? ['cost' => $p->cost, 'recipe_cost' => $recipeCosts[$p->id] ?? null] : []),
                 'favorite' => $p->favorite,
                 'active' => $p->active,
                 'sold_out' => $p->sold_out,
@@ -102,7 +105,7 @@ class MenuController extends Controller
 
     private function version(): string
     {
-        $stamps = collect(['categories', 'products', 'modifier_groups', 'modifiers', 'tenant_settings', 'tenant_features', 'loyalty_programs', 'loyalty_rewards', 'member_tiers', 'promotions'])
+        $stamps = collect(['categories', 'products', 'modifier_groups', 'modifiers', 'tenant_settings', 'tenant_features', 'loyalty_programs', 'loyalty_rewards', 'member_tiers', 'promotions', 'ingredients', 'recipe_items'])
             ->map(fn (string $table) => DB::table($table)->selectRaw('count(*) as n, max(updated_at) as t')->first())
             ->map(fn ($row) => $row->n.'@'.$row->t)
             ->implode('|');

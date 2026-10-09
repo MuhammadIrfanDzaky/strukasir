@@ -81,6 +81,11 @@ class ShiftReportService
         if ($shift->note) {
             $lines[] = "Catatan: {$shift->note}";
         }
+        $low = app(InventoryService::class)->enabled() ? app(InventoryService::class)->lowStock() : collect();
+        if ($low->isNotEmpty()) {
+            $lines[] = 'Stok menipis: '.$low->take(8)->map(fn ($i) => $i->name.' '.self::qty((float) $i->stock).' '.$i->unit)->implode(', ')
+                .($low->count() > 8 ? ' (+'.($low->count() - 8).')' : '');
+        }
         $lines[] = '';
         $lines[] = 'Total hari ini (semua tablet): '.self::rp((int) $day->total).' · '.$day->n.' transaksi';
 
@@ -124,5 +129,11 @@ class ShiftReportService
     private static function rp(int $amount): string
     {
         return 'Rp'.number_format($amount, 0, ',', '.');
+    }
+
+    /** 1.500 / 2,5 (tanpa nol di belakang koma). */
+    private static function qty(float $qty): string
+    {
+        return rtrim(rtrim(number_format($qty, 3, ',', '.'), '0'), ',');
     }
 }

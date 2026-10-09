@@ -21,6 +21,7 @@ enum Feature: string
     case CustomerCredit = 'customer_credit';
     case CustomerMessaging = 'customer_messaging';
     case Promotions = 'promotions';
+    case Inventory = 'inventory';
 
     public function description(): string
     {
@@ -38,6 +39,7 @@ enum Feature: string
             self::CustomerCredit => 'Kasbon / piutang member: bayar nanti dengan batas, pelunasan di kasir, laporan piutang',
             self::CustomerMessaging => 'Pesan WhatsApp ke member: struk digital, ucapan ulang tahun, sapa pelanggan lama, pengingat kasbon',
             self::Promotions => 'Promo otomatis terjadwal (happy hour, beli X gratis Y) & voucher kode',
+            self::Inventory => 'Stok bahan baku & resep: potong stok otomatis, pembelian, stok opname, peringatan stok menipis, HPP otomatis',
         };
     }
 
@@ -58,6 +60,7 @@ enum Feature: string
             self::CustomerCredit => 'Kasbon (bayar nanti)',
             self::CustomerMessaging => 'Pesan WhatsApp',
             self::Promotions => 'Promo & voucher',
+            self::Inventory => 'Stok & resep',
         };
     }
 

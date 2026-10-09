@@ -27,6 +27,8 @@ class CashMovementService
             'operational' => ['Operasional (gas, air, listrik)', true],
             'wages' => ['Gaji / upah harian', true],
             'withdrawal' => ['Setor ke owner', false],
+            // Hanya dari pembelian stok (fitur `inventory`): uang jadi persediaan, biayanya masuk HPP saat terjual.
+            'stock_purchase' => ['Beli stok (persediaan)', false],
             'other_out' => ['Lainnya', true],
         ],
         'in' => [
@@ -35,6 +37,9 @@ class CashMovementService
         ],
     ];
 
+    /** Kategori yang hanya dicatat sistem (tidak bisa dipilih kasir). */
+    public const INTERNAL = ['stock_purchase'];
+
     /** Jumlah bersih (pembatalan mengurangi) per jenis, untuk ringkasan shift. */
     public static function netSql(): string
     {
@@ -42,9 +47,10 @@ class CashMovementService
     }
 
     /** @param  array{id: string, kind: string, category: string, amount: int, note?: ?string}  $data */
-    public function record(array $data, User $user, Device $device): object
+    public function record(array $data, User $user, Device $device, bool $internal = false): object
     {
-        if (! isset(self::CATEGORIES[$data['kind']][$data['category']])) {
+        if (! isset(self::CATEGORIES[$data['kind']][$data['category']])
+            || (! $internal && in_array($data['category'], self::INTERNAL, true))) {
             throw ValidationException::withMessages(['category' => 'Kategori tidak sesuai jenis kas.']);
         }
         $existing = DB::table('cash_movements')->where('id', $data['id'])->first();
@@ -145,6 +151,9 @@ class CashMovementService
         $out = [];
         foreach (self::CATEGORIES as $kind => $cats) {
             foreach ($cats as $key => [$label, $expense]) {
+                if (in_array($key, self::INTERNAL, true)) {
+                    continue;
+                }
                 $out[] = ['kind' => $kind, 'key' => $key, 'label' => $label, 'expense' => $expense];
             }
         }

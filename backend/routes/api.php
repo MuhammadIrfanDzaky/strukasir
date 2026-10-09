@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\DeviceRegistrationController;
 use App\Http\Controllers\Api\V1\DeviceUnregisterController;
 use App\Http\Controllers\Api\V1\EmailVerificationController;
 use App\Http\Controllers\Api\V1\FeatureSettingsController;
+use App\Http\Controllers\Api\V1\InventoryController;
 use App\Http\Controllers\Api\V1\LoyaltyController;
 use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\MessageController;
@@ -127,6 +128,18 @@ Route::prefix('v1')->group(function () {
             Route::get('settings/messages', [MessageController::class, 'templates']);
             Route::put('settings/messages', [MessageController::class, 'saveTemplates']);
             Route::post('devices/current/unregister', DeviceUnregisterController::class);
+        });
+
+        // Stok bahan & resep (fitur `inventory`).
+        Route::middleware('can:'.Permission::InventoryManage->value)->group(function () {
+            Route::get('inventory', [InventoryController::class, 'index']);
+            Route::post('ingredients', [InventoryController::class, 'saveIngredient']);
+            Route::put('ingredients/{ingredient}', [InventoryController::class, 'saveIngredient'])->whereUuid('ingredient');
+            Route::get('ingredients/{ingredient}/movements', [InventoryController::class, 'movements'])->whereUuid('ingredient');
+            Route::post('stock/purchases', [InventoryController::class, 'purchase']);
+            Route::post('stock/waste', [InventoryController::class, 'waste']);
+            Route::post('stock/counts', [InventoryController::class, 'count']);
+            Route::put('recipes/{target}/{id}', [InventoryController::class, 'saveRecipe'])->whereIn('target', ['product', 'modifier'])->whereUuid('id');
         });
 
         Route::middleware('can:'.Permission::MenuManage->value)->group(function () {

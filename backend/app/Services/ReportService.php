@@ -126,6 +126,13 @@ class ReportService
         $voucherUse = $paid()->whereNotNull('voucher_code')->groupBy('voucher_code')
             ->selectRaw('voucher_code as code, count(*) as orders, sum(voucher_discount) as discount')->orderByDesc('orders')->get();
 
+        // Stok (fitur `inventory`): pembelian, kerugian (terbuang + susut opname) di periode, nilai stok sekarang.
+        $stockRows = DB::table('stock_movements')->whereIn('kind', ['purchase', 'waste', 'count'])
+            ->whereRaw("((created_at at time zone 'UTC') at time zone ?)::date between ? and ?", [$tz, $from, $to])
+            ->groupBy('kind')->selectRaw('kind, sum(qty * unit_cost) as total')->pluck('total', 'kind');
+        $stockLoss = (int) round(-(float) ($stockRows['waste'] ?? 0) - (float) ($stockRows['count'] ?? 0));
+        $inventoryOn = app(InventoryService::class)->enabled();
+
         $orders = (int) $totals->orders;
         $sales = (int) $totals->sales;
 
@@ -152,7 +159,19 @@ class ReportService
                 ])->sortByDesc('total')->values(),
                 'withdrawals' => (int) ($moves['withdrawal'] ?? 0),
             ],
-            'net_profit' => $sales - (int) $totals->tax - (int) $costs->cost - (int) $expenses->sum(),
+            // Laba bersih sederhana = laba kotor − pengeluaran − kerugian stok (terbuang & susut opname).
+            'net_profit' => $sales - (int) $totals->tax - (int) $costs->cost - (int) $expenses->sum() - $stockLoss,
+            'stock' => $inventoryOn || $stockRows->isNotEmpty() ? [
+                'purchases' => (int) round((float) ($stockRows['purchase'] ?? 0)),
+                'waste' => (int) round(-(float) ($stockRows['waste'] ?? 0)),
+                'count_diff' => (int) round((float) ($stockRows['count'] ?? 0)),
+                'loss' => $stockLoss,
+                'value' => (int) round((float) DB::table('ingredients')->where('active', true)->where('stock', '>', 0)->sum(DB::raw('stock * avg_cost'))),
+                'low' => app(InventoryService::class)->lowStock()->map(fn ($i) => [
+                    'id' => $i->id, 'name' => $i->name, 'unit' => $i->unit, 'stock' => round((float) $i->stock, 3),
+                    'min_stock' => $i->min_stock === null ? null : round((float) $i->min_stock, 3),
+                ])->values(),
+            ] : null,
             'by_method' => collect(['cash', 'debit', 'qris', 'credit'])->mapWithKeys(fn ($m) => [
                 $m => (int) ($byMethod->firstWhere('method', $m)->total ?? 0),
             ]),

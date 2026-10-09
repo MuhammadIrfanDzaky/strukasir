@@ -44,6 +44,7 @@ class OrderService
         private readonly TierService $tiers,
         private readonly CreditService $credit,
         private readonly PromotionService $promotions,
+        private readonly InventoryService $inventory,
     ) {}
 
     /**
@@ -60,7 +61,7 @@ class OrderService
 
         $products = $this->loadProducts($data['items']);
         $existingItemIds = $existing?->items->pluck('id')->all() ?? [];
-        $lines = $this->buildLines($data['items'], $products, $existingItemIds);
+        $lines = $this->inventory->withUnitCosts($this->buildLines($data['items'], $products, $existingItemIds));
 
         $this->guardDiscountFeature($data);
         $customer = $this->resolveCustomer($data['customer_id'] ?? null, $existing);
@@ -256,6 +257,8 @@ class OrderService
 
             // Tukar hadiah & catat stempel/poin member di transaksi yang sama: gagal = bayar dibatalkan.
             $this->loyalty->onPaid($order, $cashier);
+            // Potong stok bahan sesuai resep (stok boleh minus; penjualan tidak ditolak).
+            $this->inventory->onPaid($order, $cashier);
 
             Audit::record('order.paid', $order, after: [
                 'number' => $order->number,
@@ -306,6 +309,7 @@ class OrderService
 
             if ($order->status === 'paid') {
                 $this->loyalty->onVoid($order, $user);
+                $this->inventory->onVoid($order, $user);
             }
 
             $before = $order->status;
@@ -594,7 +598,8 @@ class OrderService
             'name' => $line['product']->name,
             'unit_price' => $line['product']->price,
             // Salinan modal saat transaksi: laba kotor tidak berubah bila modal diubah belakangan.
-            'unit_cost' => $line['product']->cost,
+            // Dengan fitur stok: HPP dari resep × modal rata-rata (lihat InventoryService::withUnitCosts).
+            'unit_cost' => array_key_exists('unit_cost', $line) ? $line['unit_cost'] : $line['product']->cost,
             'qty' => $line['qty'],
             'modifiers_total' => $line['modifiers_total'],
             // Baris hadiah: potongan tercatat di discount_total, bukan sebagai diskon manual.

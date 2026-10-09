@@ -19,7 +19,8 @@ class TenantDataService
     public const TABLES = [
         'tenant_settings', 'tenant_features', 'users', 'devices', 'member_tiers', 'customers',
         'categories', 'modifier_groups', 'modifiers', 'products', 'product_modifier_groups', 'loyalty_programs', 'loyalty_rewards', 'promotions', 'vouchers',
-        'shifts', 'order_counters', 'orders', 'order_items', 'order_item_modifiers', 'payments', 'loyalty_entries', 'credit_repayments', 'message_templates', 'message_logs', 'cash_movements',
+        'ingredients', 'recipe_items',
+        'shifts', 'order_counters', 'orders', 'order_items', 'order_item_modifiers', 'payments', 'loyalty_entries', 'credit_repayments', 'message_templates', 'message_logs', 'cash_movements', 'stock_movements',
         'audit_logs',
     ];
 
