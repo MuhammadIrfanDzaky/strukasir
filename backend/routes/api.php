@@ -98,6 +98,7 @@ Route::prefix('v1')->group(function () {
             Route::post('shifts/close', [ShiftController::class, 'close']);
             // Kas keluar / masuk di luar penjualan (pembatalan: kasir butuh PIN owner).
             Route::get('shifts/current/cash-movements', [ShiftController::class, 'cashMovements']);
+            Route::get('shifts/{shift}/report', [ShiftController::class, 'report'])->whereUuid('shift');
             Route::post('shifts/current/cash-movements', [ShiftController::class, 'recordCashMovement']);
             Route::post('cash-movements/{movement}/cancel', [ShiftController::class, 'cancelCashMovement'])->whereUuid('movement');
         });

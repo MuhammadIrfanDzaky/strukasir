@@ -68,6 +68,9 @@ pengeluaran; setor ke owner tidak dihitung sebagai biaya).
 1. Hitung semua uang tunai di laci, termasuk modal awal.
 2. Ketuk chip shift di kanan atas → **Tutup shift**, lalu isi jumlah yang dihitung.
 3. App menampilkan **selisih** (lebih/kurang). Ketuk **Cetak laporan shift** dan simpan kertasnya.
+4. Laporan shift (penjualan, metode bayar, kas keluar, selisih, terlaris, total hari ini) **otomatis terkirim ke
+   email owner** bila email sudah diverifikasi. Untuk WhatsApp, ketuk **Kirim ke WA owner** lalu tekan kirim.
+   Atur di Pengaturan → Fitur → *Laporan tutup shift ke owner* (nomor WA kosong = no HP saat daftar).
 
 ## Diskon & pembatalan
 

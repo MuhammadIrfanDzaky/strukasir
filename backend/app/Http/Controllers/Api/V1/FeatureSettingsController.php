@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\TenantSetting;
 use App\Support\Audit;
+use App\Support\PhoneNumber;
 use App\Support\Tenancy\FeatureGate;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -39,7 +40,13 @@ class FeatureSettingsController extends Controller
             'service_inclusive' => ['sometimes', 'boolean'],
             'customer_phone_required' => ['sometimes', 'boolean'],
             'credit_default_limit' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000000'],
+            // Laporan tutup shift ke owner.
+            'report_email' => ['sometimes', 'boolean'],
+            'report_whatsapp' => ['sometimes', 'nullable', 'string', 'max:30'],
         ]);
+        if (isset($data['report_whatsapp']) && trim($data['report_whatsapp']) !== '' && PhoneNumber::normalize($data['report_whatsapp']) === null) {
+            throw ValidationException::withMessages(['report_whatsapp' => 'No WhatsApp tidak valid.']);
+        }
 
         $tenantId = $context->id();
         $current = $gate->forTenant($tenantId);
@@ -91,6 +98,12 @@ class FeatureSettingsController extends Controller
                     $settings->{"{$prefix}_rate_bp"} = $bp;
                     $settings->{"{$prefix}_enabled"} = $bp > 0;
                 }
+            }
+            if (array_key_exists('report_whatsapp', $data)) {
+                $settings->report_whatsapp = PhoneNumber::normalize($data['report_whatsapp']);
+            }
+            if (array_key_exists('report_email', $data)) {
+                $settings->report_email = (bool) $data['report_email'];
             }
             if (array_key_exists('credit_default_limit', $data)) {
                 $settings->credit_default_limit = $data['credit_default_limit'];
@@ -146,6 +159,10 @@ class FeatureSettingsController extends Controller
             'service_inclusive' => (bool) $settings->service_inclusive,
             'customer_phone_required' => (bool) $settings->customer_phone_required,
             'credit_default_limit' => $settings->credit_default_limit === null ? null : (int) $settings->credit_default_limit,
+            'report_email' => (bool) $settings->report_email,
+            // Kosong = pakai no HP saat daftar.
+            'report_whatsapp' => $settings->report_whatsapp,
+            'signup_phone' => DB::table('tenants')->where('id', $tenantId)->value('phone'),
         ];
     }
 }

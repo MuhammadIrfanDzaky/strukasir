@@ -66,6 +66,11 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
 
   /// Batas kasbon default (kosong = tanpa batas).
   final _creditLimit = TextEditingController();
+
+  /// Laporan tutup shift ke owner: email otomatis & nomor WhatsApp (kosong = no HP saat daftar).
+  bool _reportEmail = true;
+  final _reportWhatsApp = TextEditingController();
+  String? _signupPhone;
   String? _loadError;
   String? _error;
   Map<String, String> _fieldErrors = {};
@@ -94,6 +99,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
   @override
   void dispose() {
     _creditLimit.dispose();
+    _reportWhatsApp.dispose();
     _tax.dispose();
     _service.dispose();
     super.dispose();
@@ -116,6 +122,10 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
       _phoneRequired = data['customer_phone_required'] as bool? ?? true;
       final limit = data['credit_default_limit'] as int?;
       _creditLimit.text = limit == null ? '' : rupiah(limit);
+      _reportEmail = data['report_email'] as bool? ?? true;
+      final wa = data['report_whatsapp'] as String?;
+      _reportWhatsApp.text = wa == null ? '' : (wa.startsWith('+62') ? '0${wa.substring(3)}' : wa);
+      _signupPhone = data['signup_phone'] as String?;
     });
   }
 
@@ -184,6 +194,8 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
             'features': _on,
             if (_on['customers'] ?? false) 'customer_phone_required': _phoneRequired,
             if (_on['customer_credit'] ?? false) 'credit_default_limit': parseRupiah(_creditLimit.text),
+            'report_email': _reportEmail,
+            'report_whatsapp': _reportWhatsApp.text.trim(),
             if (_on['tax_service'] ?? false) ...{
               'tax_percent': tax,
               'service_percent': service,
@@ -263,6 +275,32 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
                             ],
                           ),
                         ),
+                        const SizedBox(height: AppSpace.s4),
+                        AppSectionCard(title: 'Laporan tutup shift ke owner', children: [
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: _reportEmail,
+                            onChanged: _busy ? null : (v) => setState(() => _reportEmail = v),
+                            title: Text('Kirim ke email owner', style: AppType.body),
+                            subtitle: Text('Otomatis setiap shift ditutup (email harus sudah diverifikasi)',
+                                style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+                          ),
+                          const SizedBox(height: AppSpace.s2),
+                          TextField(
+                            controller: _reportWhatsApp,
+                            keyboardType: TextInputType.phone,
+                            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s]'))],
+                            decoration: InputDecoration(
+                              labelText: 'No WhatsApp owner',
+                              hintText: '0812-3456-7890',
+                              helperText: _signupPhone == null
+                                  ? 'Tombol "Kirim ke WA owner" muncul saat tutup shift'
+                                  : 'Kosongkan = pakai no HP saat daftar',
+                              errorText: _fieldErrors['report_whatsapp'],
+                              isDense: true,
+                            ),
+                          ),
+                        ]),
                         if (_error != null) ...[
                           const SizedBox(height: AppSpace.s3),
                           Text(_error!, style: AppType.body.copyWith(color: AppColors.danger)),

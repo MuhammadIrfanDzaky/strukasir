@@ -37,6 +37,7 @@ import 'package:berrybrew_pos/features/session/signup_options.dart';
 import 'package:berrybrew_pos/features/settings/feature_settings_screen.dart';
 import 'package:berrybrew_pos/features/shift/cash_dialogs.dart';
 import 'package:berrybrew_pos/features/shift/shift_controller.dart';
+import 'package:berrybrew_pos/features/shift/shift_dialogs.dart';
 import 'package:berrybrew_pos/home_shell.dart';
 import 'package:berrybrew_pos/main.dart' show appBuilder;
 import 'package:dio/dio.dart';
@@ -718,6 +719,21 @@ final scenarios = <Scenario>[
       await settle(t);
       expect(find.text('Rekap pajak (PB1) per hari'), findsOneWidget);
     },
+  ),
+  (
+    name: 'shift-ditutup',
+    session: loggedIn,
+    home: (_) => dialogHost(const ShiftResultDialog(shift: {
+          'id': 's1', 'opened_at': '2026-10-06T00:58:00Z', 'closed_at': '2026-10-06T14:00:00Z', 'opened_by': 'Budi', 'closed_by': 'Budi',
+          'expected_cash': 1225000, 'counted_cash': 1220000, 'difference': -5000, 'note': null,
+          'summary': {
+            'opening_cash': 200000, 'cash_in': 1100000, 'cash_refund': 0, 'cash_extra_in': 50000, 'cash_out': 125000,
+            'credit_repaid_cash': 0, 'by_method': {'cash': 1100000, 'debit': 150000, 'qris': 640000, 'credit': 45000},
+            'paid_orders': 58, 'refunds': 1,
+          },
+        })),
+    fillCart: false,
+    act: null,
   ),
   (name: 'riwayat', session: loggedIn, home: (s) => home(s, 1), fillCart: false, act: null),
   (

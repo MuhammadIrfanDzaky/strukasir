@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../core/api_client.dart';
 import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../printing/printer_service.dart';
 import '../printing/receipt_format.dart';
+import '../session/session_controller.dart';
 import 'shift_controller.dart';
 
 /// Minta modal awal lalu buka shift. Mengembalikan true jika shift terbuka.
@@ -159,6 +162,25 @@ class ShiftResultDialog extends ConsumerWidget {
         ]),
       ),
       actions: [
+        // Laporan ke owner lewat WhatsApp (email terkirim otomatis bila diaktifkan).
+        TextButton.icon(
+          onPressed: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            try {
+              final res = await ref.read(sessionProvider.notifier).authed((api, token) => api.get('/shifts/${shift['id']}/report', token: token));
+              final url = (res['data'] as Map)['whatsapp_url'] as String?;
+              if (url == null) {
+                messenger.showSnackBar(const SnackBar(content: Text('Isi no WhatsApp owner di Pengaturan → Fitur → Laporan tutup shift.')));
+                return;
+              }
+              await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+            } on ApiException catch (e) {
+              messenger.showSnackBar(SnackBar(content: Text(e.message)));
+            }
+          },
+          icon: const Icon(Icons.chat_rounded, size: 18),
+          label: const Text('Kirim ke WA owner'),
+        ),
         TextButton(
           onPressed: () async {
             try {

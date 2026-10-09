@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\CashMovementService;
+use App\Services\ShiftReportService;
 use App\Services\ShiftService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -79,8 +80,21 @@ class ShiftController extends Controller
         abort_if($shift === null, 409, 'Tidak ada shift terbuka di tablet ini.');
 
         $closed = $shifts->close($shift, $request->user(), $data['counted_cash'], $data['note'] ?? null);
+        app(ShiftReportService::class)->emailOwner($closed); // setelah respons; kasir tidak menunggu
 
         return response()->json(['data' => $this->present($closed, $shifts->summary($closed))]);
+    }
+
+    /** Teks laporan shift + tautan WhatsApp ke owner (bila nomornya ada). */
+    public function report(Shift $shift, ShiftReportService $reports): JsonResponse
+    {
+        $text = $reports->text($shift);
+        $phone = $reports->ownerWhatsApp();
+
+        return response()->json(['data' => [
+            'text' => $text,
+            'whatsapp_url' => $phone ? 'https://wa.me/'.ltrim($phone, '+').'?text='.rawurlencode($text) : null,
+        ]]);
     }
 
     /** Riwayat shift untuk owner (laporan kas). */
