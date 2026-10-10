@@ -34,6 +34,7 @@ import 'package:berrybrew_pos/features/inventory/inventory_models.dart';
 import 'package:berrybrew_pos/features/inventory/inventory_screen.dart';
 import 'package:berrybrew_pos/features/outlets/outlets_screen.dart';
 import 'package:berrybrew_pos/features/settings/settings_screen.dart';
+import 'package:berrybrew_pos/features/staff/staff_screen.dart';
 import 'package:berrybrew_pos/features/promotions/promotion_models.dart';
 import 'package:berrybrew_pos/features/promotions/promotions_screen.dart';
 import 'package:berrybrew_pos/features/promotions/voucher_dialog.dart';
@@ -407,6 +408,13 @@ Dio fakeDio() => Dio()
             ],
             'placeholders': ['{nama}', '{kedai}', '{kode}', '{tingkat}', '{stempel}', '{sisa_kasbon}', '{struk}', '{total}', '{nomor}'],
           }}
+        : path == '/staff'
+        ? {'data': [
+            {'id': 'u1', 'name': 'Rina Amelia', 'role': 'owner', 'active': true, 'locked': false},
+            {'id': 'u2', 'name': 'Budi Santoso Wicaksono Pratama', 'role': 'cashier', 'active': true, 'locked': true},
+            {'id': 'u3', 'name': 'Sari', 'role': 'cashier', 'active': true, 'locked': false},
+            {'id': 'u4', 'name': 'Andi', 'role': 'cashier', 'active': false, 'locked': false},
+          ]}
         : path == '/outlets'
         ? {'data': {
             'enabled': true,
@@ -846,6 +854,31 @@ final scenarios = <Scenario>[
       await t.tap(find.text('HEMAT10'));
       await settle(t);
       expect(find.text('Ubah voucher'), findsOneWidget);
+    },
+  ),
+  (name: 'pegawai', session: loggedIn, home: (_) => const StaffScreen(), fillCart: false, act: null),
+  (
+    name: 'pegawai-tambah',
+    session: loggedIn,
+    home: (_) => const StaffScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Tambah kasir'));
+      await settle(t);
+      expect(find.text('PIN 6 angka'), findsOneWidget);
+    },
+  ),
+  (
+    name: 'pegawai-ubah',
+    session: loggedIn,
+    home: (_) => const StaffScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Budi Santoso Wicaksono Pratama'));
+      await settle(t);
+      expect(find.text('Ubah kasir'), findsOneWidget);
+      await t.tap(find.text('Ganti PIN'));
+      await settle(t);
     },
   ),
   (name: 'outlet', session: loggedIn, home: (_) => const OutletsScreen(), fillCart: false, act: null),

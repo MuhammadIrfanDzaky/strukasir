@@ -216,6 +216,17 @@ Menu **Pengaturan → Atur outlet** (outlet kedua dst. butuh fitur *Multi-outlet
   outlet tablet ini.
 - Outlet tidak bisa dihapus; nonaktifkan bila tutup (tabletnya dipindah dulu). Minimal satu outlet tetap aktif.
 
+## Pegawai (owner)
+
+Menu **Pengaturan → Pegawai**.
+
+- **Tambah kasir**: isi nama (tampil di layar login & struk) dan PIN 6 angka; hindari angka sama semua / berurutan.
+  Kasir langsung muncul di layar login semua tablet.
+- **Ubah kasir**: ganti nama, nonaktifkan (pegawai berhenti: tidak bisa login dan langsung keluar dari semua tablet;
+  riwayat transaksinya tetap ada), atau **Ganti PIN** (kasir lupa PIN / PIN bocor; juga membuka kunci akun yang
+  terkunci karena PIN salah berkali-kali).
+- Pegawai tidak bisa dihapus. Akun owner diatur lewat email & password, bukan dari layar ini.
+
 ## Kasbon (owner)
 
 - **Batas default** per member: Pengaturan → Fitur → *Kasbon* (kosong = tanpa batas). Batas khusus per

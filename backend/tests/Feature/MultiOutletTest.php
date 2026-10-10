@@ -110,8 +110,8 @@ class MultiOutletTest extends TestCase
         $paid = $this->sell($dago->cashier);
         // Struk: nama outlet + alamat outlet menggantikan header umum.
         $this->api('GET', "/api/v1/orders/{$paid}", $dago->cashier)
-            ->assertJsonPath('data.receipt.outlet', 'BerryBrew Dago')->assertJsonPath('data.receipt.header', "Jl. Dago 10
-Telp. 022-123");
+            ->assertJsonPath('data.receipt.outlet', 'BerryBrew Dago')->assertJsonPath('data.receipt.header', 'Jl. Dago 10
+Telp. 022-123');
 
         $this->assertSame([$bill], array_column($this->api('GET', '/api/v1/orders?status=open', $this->cashier)->json('data'), 'id'));
         $this->assertSame([], $this->api('GET', '/api/v1/orders?status=open', $dago->cashier)->json('data'));

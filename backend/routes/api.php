@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\V1\ShiftController;
 use App\Http\Controllers\Api\V1\SignupController;
 use App\Http\Controllers\Api\V1\SignupEmailCodeController;
 use App\Http\Controllers\Api\V1\SignupOptionsController;
+use App\Http\Controllers\Api\V1\StaffController;
 use App\Http\Controllers\Api\V1\TierController;
 use Illuminate\Support\Facades\Route;
 
@@ -134,6 +135,14 @@ Route::prefix('v1')->group(function () {
             Route::post('outlets', [OutletController::class, 'save']);
             Route::put('outlets/{outlet}', [OutletController::class, 'save'])->whereUuid('outlet');
             Route::put('devices/{device}/outlet', [OutletController::class, 'moveDevice'])->whereUuid('device');
+        });
+
+        // Pegawai (owner): tambah kasir, ganti nama, reset PIN, nonaktifkan.
+        Route::middleware('can:'.Permission::UsersManage->value)->group(function () {
+            Route::get('staff', [StaffController::class, 'index']);
+            Route::post('staff', [StaffController::class, 'store']);
+            Route::put('staff/{staff}', [StaffController::class, 'update'])->whereUuid('staff');
+            Route::post('staff/{staff}/pin', [StaffController::class, 'resetPin'])->whereUuid('staff');
         });
 
         // Stok bahan & resep (fitur `inventory`).

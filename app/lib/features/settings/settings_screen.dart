@@ -17,6 +17,7 @@ import '../printing/receipt_settings_screen.dart';
 import '../printing/stations_screen.dart';
 import '../promotions/promotions_screen.dart';
 import '../session/session_controller.dart';
+import '../staff/staff_screen.dart';
 import 'feature_settings_screen.dart';
 
 /// Warna kelompok pengaturan (peran token design system): ikon berwarna di atas latar lembut,
@@ -137,6 +138,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: menu?.outlet == null ? 'Cabang & tablet per outlet' : 'Tablet ini di ${menu!.outlet!.name}',
             keywords: 'cabang toko tablet pindah',
             onTap: () => _open(const OutletsScreen()),
+          ),
+          _Item(
+            icon: Icons.badge_rounded,
+            title: 'Pegawai',
+            subtitle: 'Tambah kasir, ganti PIN, nonaktifkan',
+            keywords: 'kasir staf karyawan pin akses user',
+            onTap: () => _open(const StaffScreen()),
           ),
           _Item(
             icon: Icons.receipt_long_rounded,
