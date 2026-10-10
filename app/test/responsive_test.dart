@@ -33,6 +33,7 @@ import 'package:berrybrew_pos/features/printing/stations.dart';
 import 'package:berrybrew_pos/features/inventory/inventory_models.dart';
 import 'package:berrybrew_pos/features/inventory/inventory_screen.dart';
 import 'package:berrybrew_pos/features/outlets/outlets_screen.dart';
+import 'package:berrybrew_pos/features/settings/settings_screen.dart';
 import 'package:berrybrew_pos/features/promotions/promotion_models.dart';
 import 'package:berrybrew_pos/features/promotions/promotions_screen.dart';
 import 'package:berrybrew_pos/features/promotions/voucher_dialog.dart';
@@ -520,6 +521,7 @@ SessionUser get unverifiedOwner => SessionUser(
     email: 'rina@contoh.id', emailVerified: false);
 
 LoggedIn get loggedIn => LoggedIn('http://test', device, owner, 'token');
+LoggedIn get cashierSession => LoggedIn('http://test', device, const SessionUser(id: 'u2', name: 'Budi', role: 'cashier', permissions: {'order.create', 'shift.operate'}), 'token');
 
 /// Tampilkan [dialog] di atas layar kosong (dialog yang dibuka dari dalam alur).
 Widget dialogHost(Widget dialog) => Builder(builder: (context) {
@@ -980,7 +982,33 @@ final scenarios = <Scenario>[
   (
     name: 'printer-halaman',
     session: loggedIn,
-    home: (_) => Scaffold(appBar: AppBar(title: const Text('Pengaturan')), body: const PrinterSettingsScreen()),
+    home: (_) => const PrinterSettingsScreen(),
+    fillCart: false,
+    act: null,
+  ),
+  (
+    name: 'pengaturan-halaman',
+    session: loggedIn,
+    home: (_) => Scaffold(appBar: AppBar(title: const Text('Pengaturan')), body: const SettingsScreen()),
+    fillCart: false,
+    act: null,
+  ),
+  (
+    name: 'pengaturan-cari',
+    session: loggedIn,
+    home: (_) => Scaffold(appBar: AppBar(title: const Text('Pengaturan')), body: const SettingsScreen()),
+    fillCart: false,
+    act: (t) async {
+      await t.enterText(find.byType(TextField).first, 'stok');
+      await settle(t);
+      expect(find.text('Stok & resep'), findsOneWidget);
+      expect(find.text('Printer struk'), findsNothing);
+    },
+  ),
+  (
+    name: 'pengaturan-kasir',
+    session: cashierSession,
+    home: (_) => Scaffold(appBar: AppBar(title: const Text('Pengaturan')), body: const SettingsScreen()),
     fillCart: false,
     act: null,
   ),

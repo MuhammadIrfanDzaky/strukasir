@@ -9,7 +9,7 @@ import 'features/history/history_screen.dart';
 import 'features/menu/menu_controller.dart';
 import 'features/menu_admin/menu_admin_screen.dart';
 import 'features/pos/pos_screen.dart';
-import 'features/printing/printer_settings_screen.dart';
+import 'features/settings/settings_screen.dart';
 import 'features/reports/reports_screen.dart';
 import 'features/session/account_dialogs.dart';
 import 'features/session/session_controller.dart';
@@ -59,8 +59,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         _Destination('Kelola Menu', Icons.restaurant_menu_rounded, (_) => const MenuAdminScreen()),
       if (customersOn && user.can('customers.manage'))
         _Destination('Pelanggan', Icons.groups_rounded, (_) => const CustomersScreen()),
-      // Printer untuk semua; Fitur & Struk hanya owner (lihat PrinterSettingsScreen).
-      _Destination('Pengaturan', Icons.settings_rounded, (_) => const PrinterSettingsScreen()),
+      // Pusat pengaturan: printer & tiket untuk semua; sisanya owner (lihat SettingsScreen).
+      _Destination('Pengaturan', Icons.settings_rounded, (_) => const SettingsScreen()),
     ];
     // Bar bawah HP maksimal 5 tab (lebih dari itu labelnya terpotong): Pengaturan pindah ke menu akun.
     final settingsInMenu = compact && all.length > 5;
@@ -89,7 +89,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 builder: (_) => Scaffold(
                   backgroundColor: AppColors.surfaceApp,
                   appBar: AppBar(title: const Text('Pengaturan')),
-                  body: const PrinterSettingsScreen(),
+                  body: const SettingsScreen(),
                 ),
               ))
           : null,
