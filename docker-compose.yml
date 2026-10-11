@@ -1,4 +1,7 @@
 # Lingkungan development lokal. Jalankan: docker compose up -d
+# Nama proyek tetap (bukan nama folder): container strukasir-api-1 / strukasir-db-1, volume strukasir_pgdata.
+name: strukasir
+
 services:
   db:
     image: postgres:17

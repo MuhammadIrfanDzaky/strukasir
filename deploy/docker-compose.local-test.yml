@@ -1,7 +1,7 @@
 # HANYA untuk menguji paket produksi di laptop: HTTPS sertifikat lokal Caddy + server S3 lokal
 # (rclone serve s3) sebagai pengganti R2. Butuh deploy/.env.local-test dan deploy/backup.env
 # (provider Other, endpoint http://s3:9000, kunci = LOCAL_S3_KEY/LOCAL_S3_SECRET).
-#   docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.local-test.yml --env-file deploy/.env.local-test -p berrybrew-prodtest up -d --build
+#   docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.local-test.yml --env-file deploy/.env.local-test -p strukasir-prodtest up -d --build
 services:
   backup:
     depends_on:

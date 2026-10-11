@@ -71,7 +71,7 @@ echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-swap.conf && sudo sysctl --s
 ## 3. Deploy pertama
 
 ```bash
-git clone git@github.com:MuhammadIrfanDzaky/berrybrew-pos.git && cd berrybrew-pos
+git clone git@github.com:MuhammadIrfanDzaky/strukasir.git && cd strukasir
 cp deploy/.env.example deploy/.env && nano deploy/.env
 cp deploy/backup.env.gdrive.example deploy/backup.env && nano deploy/backup.env   # atau backup.env.r2.example
 ```
@@ -194,7 +194,7 @@ Supaya tablet di jaringan lain bisa memakai server di laptop. Alamat tetap (akun
 
 ```bash
 # nyalakan (ikut menyala lagi saat Docker start)
-docker run -d --name strukasir-ngrok --restart unless-stopped --network berrybrew-pos_default   --env-file deploy/.env.ngrok ngrok/ngrok:latest http api:8000   --url=https://residency-handsaw-viability.ngrok-free.dev --log=stdout
+docker run -d --name strukasir-ngrok --restart unless-stopped --network strukasir_default   --env-file deploy/.env.ngrok ngrok/ngrok:latest http api:8000   --url=https://residency-handsaw-viability.ngrok-free.dev --log=stdout
 # matikan setelah selesai mencoba (server dev jadi tidak bisa diakses dari internet)
 docker rm -f strukasir-ngrok
 ```
