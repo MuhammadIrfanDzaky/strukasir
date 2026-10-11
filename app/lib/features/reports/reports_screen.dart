@@ -72,13 +72,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 padding: const EdgeInsets.fromLTRB(AppSpace.s4, 0, AppSpace.s4, AppSpace.s2),
                 child: Text('Unduh CSV (Excel / Google Sheets) · ${_isoDate(from)} s/d ${_isoDate(to)}', style: AppType.bodyStrong),
               ),
-              for (final (key, label, sub, icon) in const [
-                ('orders', 'Penjualan per transaksi', 'Nomor, kasir, pelanggan, total, metode bayar', Icons.receipt_long_rounded),
-                ('items', 'Penjualan per item', 'Produk, kategori, qty, diskon, modal', Icons.local_cafe_rounded),
-                ('tax', 'Rekap pajak (PB1) per hari', 'Untuk lapor pajak daerah', Icons.account_balance_rounded),
-                ('cash', 'Kas keluar / masuk', 'Pengeluaran & setoran per shift', Icons.swap_vert_rounded),
+              for (final (key, label, sub) in const [
+                ('orders', 'Penjualan per transaksi', 'Nomor, kasir, pelanggan, total, metode bayar'),
+                ('items', 'Penjualan per item', 'Produk, kategori, qty, diskon, modal'),
+                ('tax', 'Rekap pajak (PB1) per hari', 'Untuk lapor pajak daerah'),
+                ('cash', 'Kas keluar / masuk', 'Pengeluaran & setoran per shift'),
               ])
-                ListTile(leading: Icon(icon), title: Text(label), subtitle: Text(sub), onTap: () => Navigator.pop(context, key)),
+                ListTile(title: Text(label), subtitle: Text(sub), trailing: const Icon(Icons.chevron_right_rounded), onTap: () => Navigator.pop(context, key)),
               const SizedBox(height: AppSpace.s2),
             ],
           ),
@@ -294,8 +294,6 @@ class _Dashboard extends StatelessWidget {
 
     final hourCard = DashPanel(
       title: 'Jam ramai',
-      icon: Icons.schedule_rounded,
-      tone: DashTone.sales,
       subtitle: hasSales && peakHour != null ? 'Puncak ${hourRange(peakHour['hour'] as int)} · ${rp(peakHour['sales'] as int)}' : null,
       children: [hasSales ? PeakColumnChart(bars: hourBars, labelEvery: hourBars.length > 12 ? 2 : 1) : const _NoData()],
     );
@@ -303,8 +301,6 @@ class _Dashboard extends StatelessWidget {
         ? null
         : DashPanel(
             title: 'Hari tersibuk',
-            icon: Icons.calendar_view_week_rounded,
-            tone: DashTone.sales,
             subtitle: hasSales && peakDay != null
                 ? 'Puncak hari ${const ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'][(peakDay['day'] as int) - 1]}'
                       ' · ${rp(peakDay['sales'] as int)}'
@@ -320,8 +316,6 @@ class _Dashboard extends StatelessWidget {
 
     final methodCard = DashPanel(
       title: 'Metode pembayaran',
-      icon: Icons.account_balance_wallet_rounded,
-      tone: DashTone.money,
       subtitle: 'Uang masuk per cara bayar',
       children: [
         ShareBar(
@@ -343,8 +337,6 @@ class _Dashboard extends StatelessWidget {
     final hasNet = expenseTotal > 0 || stockLoss != 0;
     final statementCard = DashPanel(
       title: 'Laba rugi',
-      icon: Icons.query_stats_rounded,
-      tone: DashTone.money,
       subtitle: 'Dari penjualan sampai laba ${hasNet ? 'bersih' : 'kotor'}',
       children: [
         ProfitStatement(
@@ -363,12 +355,9 @@ class _Dashboard extends StatelessWidget {
     final expenseCard = (expenses['by_category'] as List?)?.isNotEmpty ?? false
         ? DashPanel(
             title: 'Pengeluaran',
-            icon: Icons.outbound_rounded,
-            tone: DashTone.risk,
             subtitle: 'Kas keluar · setor ke owner ${rp((expenses['withdrawals'] as int?) ?? 0)} tidak dihitung',
             children: [
               RankedBars(
-                tone: DashTone.risk,
                 rows: [
                   for (final e in (expenses['by_category'] as List).cast<Map<String, dynamic>>())
                     (e['label'] as String, e['total'] as int, rp(e['total'] as int), null),
@@ -380,15 +369,12 @@ class _Dashboard extends StatelessWidget {
 
     final productCard = DashPanel(
       title: 'Produk terlaris',
-      icon: Icons.local_cafe_rounded,
-      tone: DashTone.product,
       subtitle: 'Jumlah terjual',
       children: [
         if (products.isEmpty)
           const _NoData()
         else
           RankedBars(
-            tone: DashTone.product,
             limit: 8,
             rows: [
               for (final p in products)
@@ -404,15 +390,12 @@ class _Dashboard extends StatelessWidget {
     );
     final categoryCard = DashPanel(
       title: 'Per kategori',
-      icon: Icons.category_rounded,
-      tone: DashTone.product,
       subtitle: 'Porsi omzet',
       children: [
         if (categories.isEmpty)
           const _NoData()
         else
           RankedBars(
-            tone: DashTone.product,
             limit: 8,
             rows: [
               for (final c in categories)
@@ -428,28 +411,20 @@ class _Dashboard extends StatelessWidget {
     );
     final cashierCard = DashPanel(
       title: 'Kasir',
-      icon: Icons.badge_rounded,
-      tone: DashTone.ops,
       subtitle: 'Penjualan per kasir',
       children: [
         if (cashiers.isEmpty)
           const _NoData()
         else
-          RankedBars(
-            tone: DashTone.ops,
-            rows: [for (final c in cashiers) (c['name'] as String, c['sales'] as int, rp(c['sales'] as int), '${c['orders']} transaksi')],
-          ),
+          RankedBars(rows: [for (final c in cashiers) (c['name'] as String, c['sales'] as int, rp(c['sales'] as int), '${c['orders']} transaksi')]),
       ],
     );
     final outletCard = r['by_outlet'] is List
         ? DashPanel(
             title: 'Per outlet',
-            icon: Icons.storefront_rounded,
-            tone: DashTone.ops,
             subtitle: 'Penjualan tiap outlet',
             children: [
               RankedBars(
-                tone: DashTone.ops,
                 rows: [
                   for (final o in (r['by_outlet'] as List).cast<Map<String, dynamic>>())
                     (o['name'] as String, o['sales'] as int, rp(o['sales'] as int), '${o['orders']} transaksi'),
@@ -462,12 +437,9 @@ class _Dashboard extends StatelessWidget {
     final promoCard = ((promos['promos'] as List?)?.isNotEmpty ?? false) || ((promos['vouchers'] as List?)?.isNotEmpty ?? false)
         ? DashPanel(
             title: 'Promo & voucher',
-            icon: Icons.local_offer_rounded,
-            tone: DashTone.product,
             subtitle: 'Potongan yang terpakai',
             children: [
               RankedBars(
-                tone: DashTone.product,
                 rows: [
                   for (final p in ((promos['promos'] as List?) ?? const []).cast<Map<String, dynamic>>())
                     (p['name'] as String, p['discount'] as int, '-${rp(p['discount'] as int)}', '${p['qty']} item'),
@@ -483,14 +455,11 @@ class _Dashboard extends StatelessWidget {
     final creditCard = customersOn && credit != null && ((credit['outstanding'] as int? ?? 0) > 0 || (credit['issued'] as int? ?? 0) > 0)
         ? DashPanel(
             title: 'Kasbon / piutang',
-            icon: Icons.request_quote_rounded,
-            tone: DashTone.risk,
             subtitle: 'Piutang sekarang ${rp(credit['outstanding'] as int)} · ${credit['debtors']} member',
             children: [
               _MiniStats(items: [('Kasbon baru', rp(credit['issued'] as int)), ('Dilunasi', rp(credit['repaid'] as int))]),
               const SizedBox(height: AppSpace.s3),
               RankedBars(
-                tone: DashTone.risk,
                 rows: [
                   for (final d in (credit['top'] as List).cast<Map<String, dynamic>>())
                     ('${d['name']} · ${d['code']}', d['balance'] as int, rp(d['balance'] as int), 'sisa kasbon'),
@@ -502,8 +471,6 @@ class _Dashboard extends StatelessWidget {
     final tierCard = customersOn && _list('by_tier').isNotEmpty
         ? DashPanel(
             title: 'Per tingkat member',
-            icon: Icons.workspace_premium_rounded,
-            tone: DashTone.sales,
             subtitle: 'Penjualan & diskon tingkat',
             children: [
               RankedBars(
@@ -522,53 +489,28 @@ class _Dashboard extends StatelessWidget {
         : null;
 
     final cols = wide ? 2 : 1;
-    final stripItems = <(IconData, DashTone, String, String)>[
-      (Icons.local_offer_rounded, DashTone.product, 'Diskon', rp(r['discounts'] as int)),
-      if ((r['service'] as int) > 0) (Icons.room_service_rounded, DashTone.sales, 'Service', rp(r['service'] as int)),
-      if (tax > 0) (Icons.account_balance_rounded, DashTone.ops, 'Pajak', rp(tax)),
-      (Icons.block_rounded, DashTone.risk, 'Void', '${voids['orders']} · ${rp(voids['refunded'] as int)}'),
-      if ((r['rounding'] as int? ?? 0) != 0) (Icons.exposure_rounded, DashTone.ops, 'Pembulatan', rp(r['rounding'] as int)),
+    final stripItems = <(String, String)>[
+      ('Diskon', rp(r['discounts'] as int)),
+      if ((r['service'] as int) > 0) ('Service', rp(r['service'] as int)),
+      if (tax > 0) ('Pajak', rp(tax)),
+      ('Void', '${voids['orders']} · ${rp(voids['refunded'] as int)}'),
+      if ((r['rounding'] as int? ?? 0) != 0) ('Pembulatan', rp(r['rounding'] as int)),
     ];
 
     return ListView(
       padding: EdgeInsets.fromLTRB(gutter, 0, gutter, gutter),
       children: [
-        DashSection('Ringkasan', DashTone.sales, caption: '${_dayLabel(from)}${from == to ? '' : ' – ${_dayLabel(to)}'} · $_previousLabel'),
+        DashSection('Ringkasan', caption: '${_dayLabel(from)}${from == to ? '' : ' – ${_dayLabel(to)}'} · $_previousLabel'),
         KpiGrid(
           columns: kpiCols,
           height: wide ? 148 : 156,
           children: [
+            KpiTile(label: 'Penjualan', value: rp(sales), current: sales, previous: prev['sales'] as int?, hero: true),
+            KpiTile(label: 'Transaksi', value: '${r['orders']}', current: r['orders'] as int, previous: prev['orders'] as int?),
+            KpiTile(label: 'Rata-rata / transaksi', value: rp(r['average'] as int), current: r['average'] as int, previous: prev['average'] as int?),
             KpiTile(
-              showIcon: width / kpiCols >= 190,
-              label: 'Penjualan',
-              value: rp(sales),
-              icon: Icons.payments_rounded,
-              current: sales,
-              previous: prev['sales'] as int?,
-              hero: true,
-            ),
-            KpiTile(
-              showIcon: width / kpiCols >= 190,
-              label: 'Transaksi',
-              value: '${r['orders']}',
-              icon: Icons.receipt_long_rounded,
-              current: r['orders'] as int,
-              previous: prev['orders'] as int?,
-            ),
-            KpiTile(
-              showIcon: width / kpiCols >= 190,
-              label: 'Rata-rata / transaksi',
-              value: rp(r['average'] as int),
-              icon: Icons.shopping_basket_rounded,
-              current: r['average'] as int,
-              previous: prev['average'] as int?,
-            ),
-            KpiTile(
-              showIcon: width / kpiCols >= 190,
               label: 'Laba kotor',
               value: rp(gp),
-              icon: Icons.savings_rounded,
-              tone: DashTone.money,
               current: gp,
               previous: prev['gross_profit'] as int?,
               note: netSales > 0 ? 'margin ${(gp * 100 / netSales).round()}%' : null,
@@ -578,7 +520,7 @@ class _Dashboard extends StatelessWidget {
         const SizedBox(height: AppSpace.s3),
         MetricStrip(items: stripItems, columns: math.min(stripItems.length, stripCols)),
         if (((r['cost_missing_items'] as int?) ?? 0) > 0) _MissingCostNote(count: r['cost_missing_items'] as int),
-        const DashSection('Keuangan', DashTone.money),
+        const DashSection('Keuangan'),
         DashGrid(
           columns: cols,
           children: [
@@ -588,22 +530,20 @@ class _Dashboard extends StatelessWidget {
             if (stock != null) _StockCard(stock: stock),
           ],
         ),
-        const DashSection('Pola penjualan', DashTone.sales),
+        const DashSection('Pola penjualan'),
         if (trend.length > 1) ...[
           DashPanel(
             title: 'Tren penjualan',
-            icon: Icons.show_chart_rounded,
-            tone: DashTone.sales,
             subtitle: 'Total ${rp(sales)} dalam ${trend.length} hari · sentuh grafik untuk detail',
             children: [SalesTrendChart(points: trend)],
           ),
           const SizedBox(height: AppSpace.s3),
         ],
         DashGrid(columns: cols, children: [hourCard, ?dayCard]),
-        const DashSection('Produk & tim', DashTone.product),
+        const DashSection('Produk & tim'),
         DashGrid(columns: cols, children: [productCard, categoryCard, cashierCard, ?outletCard, ?promoCard]),
         if (customersOn) ...[
-          const DashSection('Pelanggan', DashTone.sales),
+          const DashSection('Pelanggan'),
           DashGrid(columns: cols, children: [..._customerCards(r), ?creditCard, ?tierCard, if (loyaltyUnit != null) _loyaltyCard(r, loyaltyUnit!)]),
         ],
         const SizedBox(height: AppSpace.s4),
@@ -630,8 +570,6 @@ List<Widget> _customerCards(Map<String, dynamic> r) {
   return [
     DashPanel(
       title: 'Pelanggan member',
-      icon: Icons.groups_rounded,
-      tone: DashTone.sales,
       subtitle: orders == 0 ? null : '$memberOrders dari $orders transaksi ($share%) oleh member',
       children: [
         if (orders == 0)
@@ -645,8 +583,6 @@ List<Widget> _customerCards(Map<String, dynamic> r) {
     ),
     DashPanel(
       title: 'Pelanggan teratas',
-      icon: Icons.emoji_events_rounded,
-      tone: DashTone.sales,
       subtitle: 'Belanja terbanyak',
       empty: 'Belum ada transaksi member di periode ini.',
       children: [
@@ -664,8 +600,6 @@ Widget _loyaltyCard(Map<String, dynamic> r, String unit) {
   final discount = rewards.fold<int>(0, (s, x) => s + (x['discount'] as int));
   return DashPanel(
     title: 'Program loyalitas',
-    icon: Icons.loyalty_rounded,
-    tone: DashTone.product,
     subtitle: 'Hadiah ditukar senilai ${rp(discount)}',
     children: [
       _MiniStats(items: [('${unit[0].toUpperCase()}${unit.substring(1)} keluar', '${l['earned'] ?? 0}'), ('Ditukar', '${l['redeemed'] ?? 0}')]),
@@ -673,10 +607,7 @@ Widget _loyaltyCard(Map<String, dynamic> r, String unit) {
       if (rewards.isEmpty)
         const _Caption('Belum ada hadiah ditukar di periode ini.')
       else
-        RankedBars(
-          tone: DashTone.product,
-          rows: [for (final x in rewards) (x['name'] as String, x['count'] as int, '${x['count']}×', 'potongan ${rp(x['discount'] as int)}')],
-        ),
+        RankedBars(rows: [for (final x in rewards) (x['name'] as String, x['count'] as int, '${x['count']}×', 'potongan ${rp(x['discount'] as int)}')]),
     ],
   );
 }
@@ -751,8 +682,6 @@ class _MissingCostNote extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline_rounded, size: 20, color: AppColors.warning),
-        const SizedBox(width: AppSpace.s2),
         Expanded(
           child: Text(
             '$count item terjual belum punya harga modal, jadi laba kotor terlihat lebih besar dari sebenarnya. '
@@ -778,8 +707,6 @@ class _StockCard extends ConsumerWidget {
     final countDiff = stock['count_diff'] as int? ?? 0;
     return DashPanel(
       title: 'Stok bahan',
-      icon: Icons.inventory_2_rounded,
-      tone: DashTone.ops,
       subtitle: 'Kerugian stok mengurangi laba bersih',
       trailing: canManage
           ? TextButton(

@@ -109,11 +109,7 @@ class _ProductsTabState extends ConsumerState<_ProductsTab> {
         icon: Icons.category_rounded,
         title: 'Belum ada kategori',
         message: 'Buat kategori dulu di tab "Kategori", atau import menu dari file CSV.',
-        action: OutlinedButton.icon(
-          onPressed: () => importProducts(context, ref),
-          icon: const Icon(Icons.upload_file_rounded),
-          label: const Text('Import CSV'),
-        ),
+        action: OutlinedButton(onPressed: () => importProducts(context, ref), child: const Text('Import CSV'), ),
       );
     }
 
@@ -152,11 +148,7 @@ class _ProductsTabState extends ConsumerState<_ProductsTab> {
                       onPressed: () => importProducts(context, ref),
                       icon: const Icon(Icons.upload_file_rounded),
                     )
-                  : OutlinedButton.icon(
-                      onPressed: () => importProducts(context, ref),
-                      icon: const Icon(Icons.upload_file_rounded),
-                      label: const Text('Import CSV'),
-                    ),
+                  : OutlinedButton(onPressed: () => importProducts(context, ref), child: const Text('Import CSV'), ),
             ],
           ),
           const SizedBox(height: AppSpace.s2),
@@ -262,7 +254,7 @@ class _ProductRow extends StatelessWidget {
                             color: p.active ? AppColors.ink : AppColors.inkMuted,
                           ),
                         ),
-                        if (p.favorite) const Icon(Icons.star_rounded, size: 18, color: AppColors.accent),
+                        if (p.favorite) const Icon(Icons.star_rounded, size: 16, color: AppColors.inkMuted),
                         if (p.code != null) AppBadge(p.code!),
                         if (!p.active) const AppBadge('Nonaktif'),
                         if (p.soldOut) const AppBadge('Habis', tone: AppTone.danger),
@@ -727,11 +719,7 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
                     ]);
                   }),
                 ),
-              TextButton.icon(
-                onPressed: () => setState(() => _rows.add(_OptionRow())),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Tambah pilihan'),
-              ),
+              TextButton(onPressed: () => setState(() => _rows.add(_OptionRow())), child: const Text('Tambah pilihan'), ),
             ],
           ),
         ),

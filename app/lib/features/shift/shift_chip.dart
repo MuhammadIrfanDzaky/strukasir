@@ -16,14 +16,13 @@ Future<void> _menu(BuildContext context, WidgetRef ref) async {
     builder: (context) => SafeArea(
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-        for (final (value, icon, label, sub) in const [
+        for (final (value, _, label, sub) in const [
           ('out', Icons.north_east_rounded, 'Kas keluar', 'Beli bahan, gas, upah harian, setor ke owner'),
           ('in', Icons.south_west_rounded, 'Kas masuk', 'Tambah uang kecil untuk kembalian'),
           ('list', Icons.list_alt_rounded, 'Catatan kas shift ini', 'Lihat atau batalkan yang salah catat'),
           ('close', Icons.lock_rounded, 'Tutup shift', 'Hitung uang di laci'),
         ])
           ListTile(
-            leading: Icon(icon),
             title: Text(label, style: AppType.bodyStrong),
             subtitle: Text(sub),
             onTap: () => Navigator.pop(context, value),

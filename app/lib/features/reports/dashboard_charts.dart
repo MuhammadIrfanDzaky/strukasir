@@ -327,93 +327,31 @@ class ShareBar extends StatelessWidget {
   }
 }
 
-/// Warna kelompok informasi di dashboard (peran token design system): ikon berwarna di atas latar
-/// lembut + warna batang, supaya tiap kelompok mudah dibedakan sekilas.
-enum DashTone {
-  sales(AppColors.primary, AppColors.primarySoft),
-  money(AppColors.success, AppColors.successSoft),
-  product(AppColors.warning, AppColors.accentSoft),
-  ops(AppColors.inkMuted, AppColors.surfaceSunken),
-  risk(AppColors.danger, AppColors.dangerSoft);
-
-  const DashTone(this.fg, this.bg);
-
-  final Color fg;
-  final Color bg;
-
-  /// Warna batang: "warning" (amber tua) untuk teks, batang produk memakai accent yang lebih cerah.
-  Color get bar => this == DashTone.product ? AppColors.accent : fg;
-}
-
-/// Ikon kelompok: kotak lembut dengan ikon berwarna.
-class DashIcon extends StatelessWidget {
-  const DashIcon(this.icon, this.tone, {super.key, this.size = 32});
-
-  final IconData icon;
-  final DashTone tone;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(color: tone.bg, borderRadius: AppRadius.mdAll),
-    child: Icon(icon, size: size * 0.58, color: tone.fg),
-  );
-}
-
-/// Judul bagian dashboard: garis warna + label kapital (Ringkasan, Keuangan, …).
+/// Judul bagian dashboard: label kapital abu-abu + keterangan. Hierarki lewat tipografi, bukan warna.
 class DashSection extends StatelessWidget {
-  const DashSection(this.label, this.tone, {super.key, this.caption});
+  const DashSection(this.label, {super.key, this.caption});
 
   final String label;
-  final DashTone tone;
   final String? caption;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(2, AppSpace.s5, 2, AppSpace.s3),
-    child: Row(
+    padding: const EdgeInsets.fromLTRB(2, AppSpace.s6, 2, AppSpace.s3),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 4,
-          height: 16,
-          decoration: BoxDecoration(color: tone.fg, borderRadius: BorderRadius.circular(2)),
-        ),
-        const SizedBox(width: AppSpace.s2),
-        Text(label.toUpperCase(), style: AppType.overline.copyWith(color: AppColors.ink)),
-        if (caption != null) ...[
-          const SizedBox(width: AppSpace.s2),
-          Expanded(
-            child: Text(
-              caption!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AppType.caption.copyWith(color: AppColors.inkMuted),
-            ),
-          ),
-        ],
+        Text(label.toUpperCase(), style: AppType.overline.copyWith(color: AppColors.inkMuted)),
+        if (caption != null) ...[const SizedBox(height: 2), Text(caption!, style: AppType.caption.copyWith(color: AppColors.inkMuted))],
       ],
     ),
   );
 }
 
-/// Panel dashboard: kepala (ikon kelompok + judul + keterangan) lalu isi. Tinggi mengikuti baris grid.
+/// Panel dashboard: judul + keterangan, lalu isi. Datar (garis tipis), tanpa ikon hiasan.
 class DashPanel extends StatelessWidget {
-  const DashPanel({
-    super.key,
-    required this.title,
-    required this.icon,
-    required this.tone,
-    required this.children,
-    this.subtitle,
-    this.trailing,
-    this.empty = 'Belum ada data di periode ini.',
-  });
+  const DashPanel({super.key, required this.title, required this.children, this.subtitle, this.trailing, this.empty = 'Belum ada data di periode ini.'});
 
   final String title;
-  final IconData icon;
-  final DashTone tone;
   final String? subtitle;
   final Widget? trailing;
   final List<Widget> children;
@@ -426,15 +364,13 @@ class DashPanel extends StatelessWidget {
       color: AppColors.surface,
       borderRadius: AppRadius.lgAll,
       border: Border.all(color: AppColors.line),
-      boxShadow: AppShadow.raised,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            DashIcon(icon, tone),
-            const SizedBox(width: AppSpace.s3),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -453,12 +389,10 @@ class DashPanel extends StatelessWidget {
             ?trailing,
           ],
         ),
-        const SizedBox(height: AppSpace.s3),
-        const Divider(height: 1, color: AppColors.line),
-        const SizedBox(height: AppSpace.s3),
+        const SizedBox(height: AppSpace.s4),
         if (children.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpace.s3),
+            padding: const EdgeInsets.symmetric(vertical: AppSpace.s2),
             child: Text(empty, style: AppType.body.copyWith(color: AppColors.inkMuted)),
           )
         else
@@ -492,15 +426,14 @@ class DashGrid extends StatelessWidget {
   }
 }
 
-/// Batang horizontal berlabel (urut terbesar): peringkat, nama + nilai, batang tipis berwarna kelompok,
-/// keterangan kecil. Label selalu terlihat — tidak bergantung pada hover.
+/// Batang horizontal berlabel (urut terbesar): nama + nilai, batang tipis, keterangan kecil.
+/// Satu warna: batang teratas indigo, sisanya abu-abu — penekanan pada yang terbesar saja.
 class RankedBars extends StatelessWidget {
-  const RankedBars({super.key, required this.rows, this.highlightFirst = true, this.tone = DashTone.sales, this.limit});
+  const RankedBars({super.key, required this.rows, this.highlightFirst = true, this.limit});
 
   /// (nama, nilai batang, teks nilai, keterangan kecil opsional)
   final List<(String, int, String, String?)> rows;
   final bool highlightFirst;
-  final DashTone tone;
 
   /// Tampilkan paling banyak N baris (sisanya diringkas).
   final int? limit;
@@ -515,75 +448,56 @@ class RankedBars extends StatelessWidget {
         for (final (i, r) in shown.indexed)
           Padding(
             padding: EdgeInsets.only(bottom: i == shown.length - 1 ? 0 : AppSpace.s3),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Peringkat: nomor dalam lingkaran (pertama berwarna penuh).
-                Container(
-                  width: 22,
-                  height: 22,
-                  margin: const EdgeInsets.only(top: 1, right: AppSpace.s2),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(color: highlightFirst && i == 0 ? tone.bar : tone.bg, shape: BoxShape.circle),
-                  child: Text(
-                    '${i + 1}',
-                    style: AppType.caption.copyWith(fontWeight: FontWeight.w700, color: highlightFirst && i == 0 ? AppColors.surface : tone.fg),
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Text(r.$1, style: AppType.body, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ),
+                    const SizedBox(width: AppSpace.s2),
+                    Text(r.$3, style: AppType.bodyStrong),
+                  ],
                 ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            child: Text(r.$1, style: AppType.bodyStrong, maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 4),
+                LayoutBuilder(
+                  builder: (context, box) {
+                    final w = max > 0 ? box.maxWidth * r.$2 / max : 0.0;
+                    return Stack(
+                      children: [
+                        Container(
+                          height: 4,
+                          decoration: BoxDecoration(color: AppColors.surfaceSunken, borderRadius: BorderRadius.circular(2)),
+                        ),
+                        Container(
+                          width: math.max(w, r.$2 > 0 ? 3 : 0),
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: highlightFirst && i == 0 ? ChartColors.series : ChartColors.muted,
+                            borderRadius: BorderRadius.circular(2),
                           ),
-                          const SizedBox(width: AppSpace.s2),
-                          Text(r.$3, style: AppType.bodyStrong.copyWith(color: tone == DashTone.ops ? AppColors.ink : tone.fg)),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      LayoutBuilder(
-                        builder: (context, box) {
-                          final w = max > 0 ? box.maxWidth * r.$2 / max : 0.0;
-                          return Stack(
-                            children: [
-                              Container(
-                                height: 6,
-                                decoration: BoxDecoration(color: AppColors.surfaceSunken, borderRadius: BorderRadius.circular(3)),
-                              ),
-                              Container(
-                                width: math.max(w, r.$2 > 0 ? 4 : 0),
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: highlightFirst && i == 0 ? tone.bar : tone.bar.withValues(alpha: 0.5),
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      if (r.$4 != null && r.$4!.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          r.$4!,
-                          style: AppType.caption.copyWith(color: AppColors.inkMuted),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                    ],
-                  ),
+                    );
+                  },
                 ),
+                if (r.$4 != null && r.$4!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    r.$4!,
+                    style: AppType.caption.copyWith(color: AppColors.inkMuted),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
             ),
           ),
         if (limit != null && rows.length > limit!)
           Padding(
-            padding: const EdgeInsets.only(top: AppSpace.s2, left: 30),
+            padding: const EdgeInsets.only(top: AppSpace.s2),
             child: Text('+${rows.length - limit!} lainnya', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
           ),
       ],
@@ -591,9 +505,9 @@ class RankedBars extends StatelessWidget {
   }
 }
 
-/// Naik/turun dibanding periode sebelumnya sebagai pill (ikon + teks, bukan warna saja).
-class DeltaPill extends StatelessWidget {
-  const DeltaPill({super.key, required this.current, required this.previous, this.onDark = false});
+/// Naik/turun dibanding periode sebelumnya: panah + persen (hijau/merah hanya di teks ini).
+class DeltaText extends StatelessWidget {
+  const DeltaText({super.key, required this.current, required this.previous, this.onDark = false});
 
   final int current;
   final int previous;
@@ -601,60 +515,39 @@ class DeltaPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final muted = onDark ? AppColors.primarySoft : AppColors.inkMuted;
     if (previous == 0) {
-      return Text(
-        current > 0 ? 'Baru di periode ini' : 'Sama dengan sebelumnya',
-        style: AppType.caption.copyWith(color: onDark ? AppColors.primarySoft : AppColors.inkMuted),
-      );
+      return Text(current > 0 ? 'baru di periode ini' : 'sama dengan sebelumnya', style: AppType.caption.copyWith(color: muted));
     }
     final pct = (current - previous) * 100 / previous;
     final up = pct >= 0;
     final fg = onDark ? AppColors.onPrimary : (up ? AppColors.success : AppColors.danger);
-    final bg = onDark ? AppColors.onPrimary.withValues(alpha: 0.16) : (up ? AppColors.successSoft : AppColors.dangerSoft);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpace.s2, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    return Text.rich(
+      TextSpan(
         children: [
-          Icon(up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 14, color: fg),
-          const SizedBox(width: 2),
-          Flexible(
-            child: Text(
-              '${up ? 'naik' : 'turun'} ${pct.abs().toStringAsFixed(pct.abs() < 10 ? 1 : 0).replaceAll('.', ',')}%',
-              style: AppType.caption.copyWith(color: fg, fontWeight: FontWeight.w700),
-              overflow: TextOverflow.ellipsis,
-            ),
+          TextSpan(
+            text: '${up ? '▲' : '▼'} ${pct.abs().toStringAsFixed(pct.abs() < 10 ? 1 : 0).replaceAll('.', ',')}%',
+            style: AppType.caption.copyWith(color: fg, fontWeight: FontWeight.w700),
+          ),
+          TextSpan(
+            text: ' vs sebelumnya',
+            style: AppType.caption.copyWith(color: muted),
           ),
         ],
       ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }
 
-/// Kartu KPI: ikon kelompok, label, angka besar, perbandingan (pill) + keterangan. Tinggi mengikuti
-/// KpiGrid, jadi semua kartu dalam satu baris sama tinggi.
+/// Kartu KPI: label, angka besar, perbandingan + keterangan. Satu kartu utama (hero) berwarna merek;
+/// sisanya putih. Tinggi mengikuti KpiGrid supaya satu baris sama tinggi.
 class KpiTile extends StatelessWidget {
-  const KpiTile({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.tone = DashTone.sales,
-    this.current,
-    this.previous,
-    this.note,
-    this.hero = false,
-    this.showIcon = true,
-  });
+  const KpiTile({super.key, required this.label, required this.value, this.current, this.previous, this.note, this.hero = false});
 
   final String label;
   final String value;
-  final IconData icon;
-
-  /// Kartu sempit (HP): tanpa ikon supaya label tidak terpotong.
-  final bool showIcon;
-  final DashTone tone;
   final int? current;
   final int? previous;
 
@@ -671,52 +564,31 @@ class KpiTile extends StatelessWidget {
         color: hero ? AppColors.primary : AppColors.surface,
         borderRadius: AppRadius.lgAll,
         border: hero ? null : Border.all(color: AppColors.line),
-        boxShadow: AppShadow.raised,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              if (showIcon) ...[
-                if (hero)
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(color: AppColors.onPrimary.withValues(alpha: 0.16), borderRadius: AppRadius.mdAll),
-                    child: Icon(icon, size: 18, color: AppColors.onPrimary),
-                  )
-                else
-                  DashIcon(icon, tone),
-                const SizedBox(width: AppSpace.s2),
-              ],
-              Expanded(
-                child: Text(
-                  label.toUpperCase(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppType.overline.copyWith(color: muted),
-                ),
-              ),
-            ],
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppType.body.copyWith(color: muted),
           ),
           const Spacer(),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(value, style: (hero ? AppType.moneyLg : AppType.titleLg).copyWith(color: hero ? AppColors.onPrimary : AppColors.ink)),
+            child: Text(value, style: (hero ? AppType.moneyLg : AppType.headline).copyWith(color: hero ? AppColors.onPrimary : AppColors.ink)),
           ),
-          const SizedBox(height: AppSpace.s2),
-          // Wrap: di kartu sempit (HP) keterangan turun ke baris berikutnya, tidak terpotong.
-          Wrap(
-            spacing: AppSpace.s2,
-            runSpacing: AppSpace.s1,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (current != null && previous != null) DeltaPill(current: current!, previous: previous!, onDark: hero),
-              if (note != null) Text(note!, style: AppType.caption.copyWith(color: muted)),
-            ],
-          ),
+          const SizedBox(height: AppSpace.s1),
+          if (current != null && previous != null) DeltaText(current: current!, previous: previous!, onDark: hero),
+          if (note != null)
+            Text(
+              note!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppType.caption.copyWith(color: muted),
+            ),
         ],
       ),
     );
@@ -725,7 +597,7 @@ class KpiTile extends StatelessWidget {
 
 /// Baris KPI sama tinggi: [columns] per baris (2 di HP, 4 di layar lebar).
 class KpiGrid extends StatelessWidget {
-  const KpiGrid({super.key, required this.children, required this.columns, this.height = 160});
+  const KpiGrid({super.key, required this.children, required this.columns, this.height = 140});
 
   final List<Widget> children;
   final int columns;
@@ -760,8 +632,8 @@ class KpiGrid extends StatelessWidget {
 /// Satu baris laporan laba-rugi. [kind]: '+' / '-' (baris biasa) atau '=' (subtotal, ditebalkan).
 typedef StatementLine = ({String label, int amount, String kind, String? note});
 
-/// Laba-rugi ringkas: penjualan dikurangi pajak, HPP, pengeluaran, kerugian stok → laba bersih.
-/// Subtotal berlatar; pengurang bertanda merah, hasil akhir hijau (untung) / merah (rugi).
+/// Laba-rugi ringkas seperti laporan keuangan: baris biasa, subtotal dengan garis di atasnya,
+/// hasil akhir paling tebal. Merah hanya bila hasil akhir rugi.
 class ProfitStatement extends StatelessWidget {
   const ProfitStatement({super.key, required this.lines});
 
@@ -774,79 +646,63 @@ class ProfitStatement extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final (i, l) in lines.indexed)
-          if (l.kind == '=')
-            Container(
-              margin: EdgeInsets.only(top: i == 0 ? 0 : AppSpace.s1, bottom: i == last ? 0 : AppSpace.s1),
-              padding: const EdgeInsets.symmetric(horizontal: AppSpace.s3, vertical: AppSpace.s2),
-              decoration: BoxDecoration(
-                color: i == last ? (l.amount >= 0 ? AppColors.successSoft : AppColors.dangerSoft) : AppColors.surfaceSunken,
-                borderRadius: AppRadius.mdAll,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          Container(
+            margin: EdgeInsets.only(top: l.kind == '=' && i > 0 ? AppSpace.s1 : 0),
+            padding: EdgeInsets.symmetric(vertical: l.kind == '=' ? AppSpace.s2 : 5),
+            decoration: l.kind == '=' && i > 0
+                ? const BoxDecoration(
+                    border: Border(top: BorderSide(color: AppColors.lineStrong)),
+                  )
+                : null,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
                       children: [
-                        Text(l.label, style: AppType.bodyStrong),
-                        if (l.note != null) Text(l.note!, style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+                        TextSpan(text: l.label, style: l.kind == '=' ? AppType.bodyStrong : AppType.body),
+                        if (l.note != null)
+                          TextSpan(
+                            text: '  ${l.note}',
+                            style: AppType.caption.copyWith(color: AppColors.inkMuted),
+                          ),
                       ],
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                    rp(l.amount),
-                    style: (i == last ? AppType.titleLg : AppType.title).copyWith(
-                      color: i == last ? (l.amount >= 0 ? AppColors.success : AppColors.danger) : AppColors.ink,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpace.s3, vertical: 5),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 18,
-                    child: Text(l.kind == '-' ? '−' : '+', style: AppType.bodyStrong.copyWith(color: l.kind == '-' ? AppColors.danger : AppColors.success)),
-                  ),
-                  Expanded(
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(text: l.label, style: AppType.body),
-                          if (l.note != null)
-                            TextSpan(
-                              text: '  ${l.note}',
-                              style: AppType.caption.copyWith(color: AppColors.inkMuted),
-                            ),
-                        ],
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Text(rp(l.amount), style: AppType.bodyStrong.copyWith(color: l.kind == '-' && l.amount > 0 ? AppColors.danger : AppColors.ink)),
-                ],
-              ),
+                ),
+                Text(
+                  '${l.kind == '-' ? '−' : ''}${rp(l.amount)}',
+                  style:
+                      (i == last
+                              ? AppType.titleLg
+                              : l.kind == '='
+                              ? AppType.bodyStrong
+                              : AppType.body)
+                          .copyWith(color: i == last && l.amount < 0 ? AppColors.danger : AppColors.ink),
+                ),
+              ],
             ),
+          ),
       ],
     );
   }
 }
 
-/// Angka kecil berderet (diskon, void, …) dalam satu panel: ikon kelompok + label + nilai, dibagi rata.
+/// Angka kecil berderet (diskon, void, …) dalam satu panel, dibagi rata dengan garis tipis.
 class MetricStrip extends StatelessWidget {
   const MetricStrip({super.key, required this.items, required this.columns});
 
-  /// (ikon, warna kelompok, label, nilai)
-  final List<(IconData, DashTone, String, String)> items;
+  /// (label, nilai)
+  final List<(String, String)> items;
   final int columns;
 
   @override
   Widget build(BuildContext context) {
-    final rows = <List<(IconData, DashTone, String, String)>>[];
+    final rows = <List<(String, String)>>[];
     for (var i = 0; i < items.length; i += columns) {
       rows.add(items.sublist(i, math.min(i + columns, items.length)));
     }
@@ -855,7 +711,6 @@ class MetricStrip extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: AppRadius.lgAll,
         border: Border.all(color: AppColors.line),
-        boxShadow: AppShadow.raised,
       ),
       child: Column(
         children: [
@@ -873,28 +728,21 @@ class MetricStrip extends StatelessWidget {
                     child: j >= row.length
                         ? const SizedBox()
                         : Padding(
-                            padding: const EdgeInsets.all(AppSpace.s3),
-                            child: Row(
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpace.s4, vertical: AppSpace.s3),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                DashIcon(row[j].$1, row[j].$2, size: 30),
-                                const SizedBox(width: AppSpace.s2),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        row[j].$3,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: AppType.caption.copyWith(color: AppColors.inkMuted),
-                                      ),
-                                      FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: Alignment.centerLeft,
-                                        child: Text(row[j].$4, style: AppType.bodyStrong),
-                                      ),
-                                    ],
-                                  ),
+                                Text(
+                                  row[j].$1,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppType.caption.copyWith(color: AppColors.inkMuted),
+                                ),
+                                const SizedBox(height: 2),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(row[j].$2, style: AppType.title),
                                 ),
                               ],
                             ),

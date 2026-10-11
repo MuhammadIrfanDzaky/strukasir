@@ -91,7 +91,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           children: [
             if (s.fromCache)
               MaterialBanner(
-                leading: const Icon(Icons.cloud_off_rounded, color: AppColors.warning),
                 content: Text(
                   s.refreshError == null
                       ? 'Memakai menu tersimpan, sedang memeriksa pembaruan…'
@@ -144,7 +143,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             icon: const Icon(Icons.search_rounded),
                           ),
                           chip('Semua', null),
-                          if (hasFavorites) chip('Favorit', _favorites, icon: Icons.star_rounded),
+                          if (hasFavorites) chip('Favorit', _favorites),
                           for (final c in categories) chip(c.name, c.id),
                         ],
                       ),
@@ -313,12 +312,7 @@ class _CartBar extends ConsumerWidget {
                         ),
                 ),
                 const SizedBox(width: AppSpace.s3),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(minimumSize: Size(0, short ? AppSize.touch : AppSize.touchLg)),
-                  onPressed: cart.isEmpty ? null : onOpen,
-                  icon: const Icon(Icons.shopping_bag_rounded),
-                  label: const Text('Lihat pesanan'),
-                ),
+                FilledButton(style: FilledButton.styleFrom(minimumSize: Size(0, short ? AppSize.touch : AppSize.touchLg)), onPressed: cart.isEmpty ? null : onOpen, child: const Text('Lihat pesanan'), ),
               ],
             ),
           ),
@@ -339,12 +333,6 @@ class _CategoryHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 4,
-          height: 18,
-          decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.smAll),
-        ),
-        const SizedBox(width: AppSpace.s2),
         // Lebar nama dibatasi (bukan Flexible) supaya garis pembatas memenuhi sisa baris.
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 240),
@@ -396,7 +384,7 @@ class _ProductTile extends StatelessWidget {
               if (soldOut)
                 const AppBadge('Habis', tone: AppTone.danger)
               else
-                Text(rp(product.price), style: AppType.title.copyWith(color: AppColors.primary)),
+                Text(rp(product.price), style: AppType.title),
             ],
           ),
         ),

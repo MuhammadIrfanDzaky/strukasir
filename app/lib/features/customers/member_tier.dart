@@ -70,11 +70,7 @@ class TierBadge extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: dense ? 6 : 8, vertical: dense ? 1 : 2),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadius.full)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(tier.manual ? Icons.lock_rounded : Icons.workspace_premium_rounded, size: dense ? 12 : 14, color: fg),
-        const SizedBox(width: 3),
-        Text(tier.name, style: AppType.caption.copyWith(color: fg, fontWeight: FontWeight.w700, fontSize: dense ? 11 : 12)),
-      ]),
+      child: Text(tier.name, style: AppType.caption.copyWith(color: fg, fontWeight: FontWeight.w700, fontSize: dense ? 11 : 12)),
     );
   }
 }

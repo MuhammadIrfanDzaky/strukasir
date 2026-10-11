@@ -46,10 +46,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   Widget build(BuildContext context) {
     final compact = context.isCompact;
     final gutter = compact ? AppSpace.s3 : AppSpace.s5;
-    final dateButton = OutlinedButton.icon(
-      icon: const Icon(Icons.calendar_today_rounded, size: 20),
-      label: Text(_isoDate(_date)),
-      onPressed: () async {
+    final dateButton = OutlinedButton(child: Text(_isoDate(_date)), onPressed: () async {
         final picked = await showDatePicker(
           context: context,
           initialDate: _date,
@@ -60,8 +57,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           _date = picked;
           _reload();
         }
-      },
-    );
+      }, );
     final search = TextField(
       decoration: const InputDecoration(
         prefixIcon: Icon(Icons.search_rounded),

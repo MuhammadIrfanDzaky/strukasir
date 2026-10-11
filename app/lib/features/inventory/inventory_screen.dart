@@ -133,22 +133,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           spacing: AppSpace.s2,
           runSpacing: AppSpace.s2,
           children: [
-            FilledButton.icon(
-              onPressed: active.isEmpty ? null : () => _open(_StockDialog(kind: 'purchase', data: data, outletId: _outlet), refreshMenu: true),
-              icon: const Icon(Icons.add_shopping_cart_rounded),
-              label: const Text('Pembelian'),
-            ),
-            OutlinedButton.icon(
-              onPressed: active.isEmpty ? null : () => _open(_StockDialog(kind: 'waste', data: data, outletId: _outlet)),
-              icon: const Icon(Icons.delete_sweep_rounded),
-              label: const Text('Terbuang'),
-            ),
-            OutlinedButton.icon(
-              onPressed: active.isEmpty ? null : () => _open(_StockDialog(kind: 'count', data: data, outletId: _outlet)),
-              icon: const Icon(Icons.fact_check_rounded),
-              label: const Text('Stok opname'),
-            ),
-            OutlinedButton.icon(onPressed: () => _open(const _IngredientForm()), icon: const Icon(Icons.add_rounded), label: const Text('Tambah bahan')),
+            FilledButton(onPressed: active.isEmpty ? null : () => _open(_StockDialog(kind: 'purchase', data: data, outletId: _outlet), refreshMenu: true), child: const Text('Pembelian'), ),
+            OutlinedButton(onPressed: active.isEmpty ? null : () => _open(_StockDialog(kind: 'waste', data: data, outletId: _outlet)), child: const Text('Terbuang'), ),
+            OutlinedButton(onPressed: active.isEmpty ? null : () => _open(_StockDialog(kind: 'count', data: data, outletId: _outlet)), child: const Text('Stok opname'), ),
+            OutlinedButton(onPressed: () => _open(const _IngredientForm()), child: const Text('Tambah bahan'), ),
           ],
         ),
         const SizedBox(height: AppSpace.s3),
@@ -167,14 +155,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => IngredientScreen(ingredient: i, outletId: _outlet)));
                 _load();
               },
-              leading: Icon(
-                Icons.inventory_2_rounded,
-                color: !i.active
-                    ? AppColors.inkDisabled
-                    : i.low
-                    ? AppColors.danger
-                    : AppColors.primary,
-              ),
               title: Text(i.name, style: AppType.bodyStrong.copyWith(color: i.active ? null : AppColors.inkMuted)),
               subtitle: Text(
                 [
@@ -330,14 +310,6 @@ class _IngredientScreenState extends ConsumerState<IngredientScreen> {
     }
   }
 
-  static const _icons = {
-    'purchase': Icons.add_shopping_cart_rounded,
-    'sale': Icons.point_of_sale_rounded,
-    'void': Icons.undo_rounded,
-    'waste': Icons.delete_sweep_rounded,
-    'count': Icons.fact_check_rounded,
-  };
-
   @override
   Widget build(BuildContext context) {
     final i = _ingredient;
@@ -387,7 +359,6 @@ class _IngredientScreenState extends ConsumerState<IngredientScreen> {
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         dense: true,
-                        leading: Icon(_icons[m['kind']] ?? Icons.swap_vert_rounded, color: AppColors.inkMuted),
                         title: Text(
                           '${m['kind_label']} ${(m['qty'] as num) > 0 ? '+' : ''}${qtyText((m['qty'] as num).toDouble())} ${i.unit}',
                           style: AppType.bodyStrong.copyWith(color: (m['qty'] as num) < 0 ? AppColors.danger : AppColors.success),
@@ -738,11 +709,7 @@ class _StockDialogState extends ConsumerState<_StockDialog> {
                 ),
               Align(
                 alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: _lines.length >= 50 ? null : () => setState(() => _lines.add(_Line())),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Tambah bahan'),
-                ),
+                child: TextButton(onPressed: _lines.length >= 50 ? null : () => setState(() => _lines.add(_Line())), child: const Text('Tambah bahan'), ),
               ),
             ],
             if (widget.kind == 'purchase') ...[
@@ -925,11 +892,7 @@ class _RecipeDialogState extends ConsumerState<_RecipeDialog> {
               ),
             Align(
               alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _lines.length >= 30 ? null : () => setState(() => _lines.add(_Line())),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Tambah bahan'),
-              ),
+              child: TextButton(onPressed: _lines.length >= 30 ? null : () => setState(() => _lines.add(_Line())), child: const Text('Tambah bahan'), ),
             ),
             const Divider(),
             AppSummaryRow(widget.allowNegative ? 'Tambahan HPP' : 'HPP per porsi', '${cost < 0 ? '−' : ''}${rp(cost.abs())}'),

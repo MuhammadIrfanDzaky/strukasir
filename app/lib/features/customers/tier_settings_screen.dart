@@ -155,11 +155,7 @@ class _TierSettingsScreenState extends ConsumerState<TierSettingsScreen> {
                         const SizedBox(height: AppSpace.s3),
                         AppSectionCard(
                           title: 'Tingkat',
-                          trailing: TextButton.icon(
-                            onPressed: _busy || _tiers.length >= 6 ? null : () => _edit(),
-                            icon: const Icon(Icons.add_rounded),
-                            label: const Text('Tambah'),
-                          ),
+                          trailing: TextButton(onPressed: _busy || _tiers.length >= 6 ? null : () => _edit(), child: const Text('Tambah'), ),
                           empty: 'Belum ada tingkat. Contoh: Silver (belanja Rp500.000) diskon 5%, Gold (Rp2.000.000) diskon 10% & stempel 2×.',
                           children: [
                             for (final (i, t) in _tiers.indexed)

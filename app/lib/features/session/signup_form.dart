@@ -300,11 +300,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           if (ServerUrlField.needed) ...[ServerUrlField(controller: _server), const SizedBox(height: AppSpace.s3)],
           TextFormField(
             controller: _businessName,
-            decoration: const InputDecoration(
-              labelText: 'Nama usaha',
-              helperText: 'Tercetak di bagian atas struk',
-              prefixIcon: Icon(Icons.storefront_rounded),
-            ),
+            decoration: const InputDecoration(labelText: 'Nama usaha', helperText: 'Tercetak di bagian atas struk', ),
             textCapitalization: TextCapitalization.words,
             maxLength: 80,
             validator: (v) => (v?.trim().isNotEmpty ?? false) ? null : 'Wajib diisi',
@@ -323,11 +319,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             const SizedBox(height: AppSpace.s3),
             TextFormField(
               controller: _sectorOther,
-              decoration: const InputDecoration(
-                labelText: 'Sebutkan bidang usaha',
-                hintText: 'mis. Rental PS, Toko mainan',
-                prefixIcon: Icon(Icons.edit_note_rounded),
-              ),
+              decoration: const InputDecoration(labelText: 'Sebutkan bidang usaha', hintText: 'mis. Rental PS, Toko mainan', ),
               maxLength: 60,
               validator: (v) => (v?.trim().isNotEmpty ?? false) ? _serverError('sector_other') : 'Wajib diisi',
             ),
@@ -399,13 +391,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           const SizedBox(height: AppSpace.s3),
           TextFormField(
             controller: _address,
-            decoration: const InputDecoration(
-              labelText: 'Detail alamat (opsional)',
-              hintText: 'Jalan, nomor, kelurahan',
-              helperText: 'Tercetak di bawah nama usaha pada struk',
-              helperMaxLines: 2,
-              prefixIcon: Icon(Icons.place_rounded),
-            ),
+            decoration: const InputDecoration(labelText: 'Detail alamat (opsional)', hintText: 'Jalan, nomor, kelurahan', helperText: 'Tercetak di bawah nama usaha pada struk', helperMaxLines: 2, ),
             minLines: 1,
             maxLines: 3,
             maxLength: 300,
@@ -414,7 +400,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           const SizedBox(height: AppSpace.s3),
           TextFormField(
             controller: _phone,
-            decoration: const InputDecoration(labelText: 'Nomor HP / WA (opsional)', prefixIcon: Icon(Icons.phone_rounded)),
+            decoration: const InputDecoration(labelText: 'Nomor HP / WA (opsional)', ),
             keyboardType: TextInputType.phone,
             validator: (v) {
               final t = v?.trim() ?? '';
@@ -456,7 +442,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             const SizedBox(height: AppSpace.s5),
             TextFormField(
               controller: _ownerName,
-              decoration: const InputDecoration(labelText: 'Nama Anda', prefixIcon: Icon(Icons.person_rounded)),
+              decoration: const InputDecoration(labelText: 'Nama Anda', ),
               textCapitalization: TextCapitalization.words,
               autofillHints: const [AutofillHints.name],
               maxLength: 60,
@@ -465,7 +451,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             const SizedBox(height: AppSpace.s3),
             TextFormField(
               controller: _email,
-              decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.alternate_email_rounded)),
+              decoration: const InputDecoration(labelText: 'Email', ),
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
               validator: (v) {
@@ -477,16 +463,11 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             const SizedBox(height: AppSpace.s3),
             TextFormField(
               controller: _password,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                helperText: 'Minimal 8 karakter, ada huruf dan angka',
-                prefixIcon: const Icon(Icons.lock_outline_rounded),
-                suffixIcon: IconButton(
+              decoration: InputDecoration(labelText: 'Password', helperText: 'Minimal 8 karakter, ada huruf dan angka', suffixIcon: IconButton(
                   tooltip: _showPassword ? 'Sembunyikan' : 'Tampilkan',
                   onPressed: () => setState(() => _showPassword = !_showPassword),
                   icon: Icon(_showPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded),
-                ),
-              ),
+                ), ),
               obscureText: !_showPassword,
               autofillHints: const [AutofillHints.newPassword],
               validator: (v) {
@@ -569,12 +550,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
         TextField(
           controller: _emailCode,
           autofocus: true,
-          decoration: InputDecoration(
-            labelText: 'Kode 6 digit dari email',
-            prefixIcon: const Icon(Icons.mark_email_read_rounded),
-            counterText: '',
-            errorText: _serverErrors['email_code'],
-          ),
+          decoration: InputDecoration(labelText: 'Kode 6 digit dari email', counterText: '', errorText: _serverErrors['email_code'], ),
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           maxLength: 6,
@@ -586,16 +562,8 @@ class _SignupFormState extends ConsumerState<SignupForm> {
         Wrap(
           spacing: AppSpace.s2,
           children: [
-            TextButton.icon(
-              onPressed: _busy ? null : () => _sendCode(resend: true),
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Kirim ulang kode'),
-            ),
-            TextButton.icon(
-              onPressed: _busy ? null : () => setState(() => _step = 1),
-              icon: const Icon(Icons.edit_rounded),
-              label: const Text('Ubah email'),
-            ),
+            TextButton(onPressed: _busy ? null : () => _sendCode(resend: true), child: const Text('Kirim ulang kode'), ),
+            TextButton(onPressed: _busy ? null : () => setState(() => _step = 1), child: const Text('Ubah email'), ),
           ],
         ),
         Text(
@@ -620,7 +588,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
 
   Widget _pinField(TextEditingController c, String label, FormFieldValidator<String> validator) => TextFormField(
         controller: c,
-        decoration: InputDecoration(labelText: label, counterText: '', prefixIcon: const Icon(Icons.pin_rounded)),
+        decoration: InputDecoration(labelText: label, counterText: '', ),
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         obscureText: true,

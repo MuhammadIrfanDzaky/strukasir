@@ -137,12 +137,7 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
               textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.next,
               maxLength: 80,
-              decoration: InputDecoration(
-                labelText: 'Nama *',
-                prefixIcon: const Icon(Icons.person_outline_rounded),
-                errorText: _errors['name'],
-                counterText: '',
-              ),
+              decoration: InputDecoration(labelText: 'Nama *', errorText: _errors['name'], counterText: '', ),
             ),
             const SizedBox(height: AppSpace.s3),
             TextField(
@@ -151,29 +146,18 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
               keyboardType: TextInputType.phone,
               textInputAction: TextInputAction.next,
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s]'))],
-              decoration: InputDecoration(
-                labelText: widget.phoneRequired ? 'No HP / WhatsApp *' : 'No HP / WhatsApp',
-                hintText: '0812-3456-7890',
-                prefixIcon: const Icon(Icons.phone_rounded),
-                errorText: _errors['phone'],
-                helperText: widget.phoneRequired ? null : 'Boleh dikosongkan',
-              ),
+              decoration: InputDecoration(labelText: widget.phoneRequired ? 'No HP / WhatsApp *' : 'No HP / WhatsApp', hintText: '0812-3456-7890', errorText: _errors['phone'], helperText: widget.phoneRequired ? null : 'Boleh dikosongkan', ),
             ),
             if (widget.full) ...[
               const SizedBox(height: AppSpace.s3),
               InputDecorator(
-                decoration: InputDecoration(
-                  labelText: 'Tanggal lahir',
-                  prefixIcon: const Icon(Icons.cake_outlined),
-                  errorText: _errors['birth_date'],
-                  suffixIcon: _birthDate == null
+                decoration: InputDecoration(labelText: 'Tanggal lahir', errorText: _errors['birth_date'], suffixIcon: _birthDate == null
                       ? null
                       : IconButton(
                           tooltip: 'Hapus tanggal lahir',
                           onPressed: () => setState(() => _birthDate = null),
                           icon: const Icon(Icons.close_rounded),
-                        ),
-                ),
+                        ), ),
                 child: InkWell(
                   onTap: _busy ? null : _pickBirthDate,
                   child: Text(_birthDate == null ? 'Pilih tanggal (opsional)' : formatDate(_birthDate!),
@@ -188,12 +172,7 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
               maxLines: 2,
               minLines: 1,
               textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(
-                labelText: 'Catatan',
-                hintText: 'mis. alergi susu, suka less sugar',
-                prefixIcon: const Icon(Icons.sticky_note_2_outlined),
-                errorText: _errors['note'],
-              ),
+              decoration: InputDecoration(labelText: 'Catatan', hintText: 'mis. alergi susu, suka less sugar', errorText: _errors['note'], ),
             ),
             if (!editing)
               Text(

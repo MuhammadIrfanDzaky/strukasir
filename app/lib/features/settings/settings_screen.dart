@@ -20,26 +20,10 @@ import '../session/session_controller.dart';
 import '../staff/staff_screen.dart';
 import 'feature_settings_screen.dart';
 
-/// Warna kelompok pengaturan (peran token design system): ikon berwarna di atas latar lembut,
-/// supaya tiap kelompok terasa terpisah tanpa menambah warna baru.
-enum _Tone {
-  brand(AppColors.primary, AppColors.primarySoft),
-  device(AppColors.ink, AppColors.surfaceSunken),
-  sales(AppColors.warning, AppColors.accentSoft),
-  customer(AppColors.success, AppColors.successSoft),
-  danger(AppColors.danger, AppColors.dangerSoft);
-
-  const _Tone(this.fg, this.bg);
-
-  final Color fg;
-  final Color bg;
-}
-
 /// Satu baris pengaturan: judul (apa), keterangan (isi/status), lalu buka halaman atau jalankan aksi.
 class _Item {
-  const _Item({required this.icon, required this.title, required this.subtitle, required this.onTap, this.badge, this.keywords = ''});
+  const _Item({required this.title, required this.subtitle, required this.onTap, this.badge, this.keywords = ''});
 
-  final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
@@ -54,11 +38,13 @@ class _Item {
 }
 
 class _Group {
-  const _Group(this.label, this.tone, this.items);
+  const _Group(this.label, this.items, {this.danger = false});
 
   final String label;
-  final _Tone tone;
   final List<_Item> items;
+
+  /// Aksi berisiko (keluarkan tablet): judul baris merah, tanpa warna lain.
+  final bool danger;
 }
 
 /// Pusat pengaturan: kartu akun, pencarian, lalu kelompok (Usaha, Perangkat, Penjualan, Pelanggan).
@@ -124,30 +110,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return [
       if (owner)
-        _Group('Usaha', _Tone.brand, [
+        _Group('Usaha', [
           _Item(
-            icon: Icons.toggle_on_rounded,
             title: 'Fitur',
             subtitle: 'Open bill, varian, diskon, pajak & service, laporan',
             keywords: 'modul paket aktifkan',
             onTap: () => _open(const FeatureSettingsScreen()),
           ),
           _Item(
-            icon: Icons.storefront_rounded,
             title: 'Outlet',
             subtitle: menu?.outlet == null ? 'Cabang & tablet per outlet' : 'Tablet ini di ${menu!.outlet!.name}',
             keywords: 'cabang toko tablet pindah',
             onTap: () => _open(const OutletsScreen()),
           ),
           _Item(
-            icon: Icons.badge_rounded,
             title: 'Pegawai',
             subtitle: 'Tambah kasir, ganti PIN, nonaktifkan',
             keywords: 'kasir staf karyawan pin akses user',
             onTap: () => _open(const StaffScreen()),
           ),
           _Item(
-            icon: Icons.receipt_long_rounded,
             title: 'Struk & logo',
             subtitle: 'Nama usaha, alamat, pesan penutup',
             keywords: 'header footer cetak',
@@ -157,9 +139,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
           ),
         ]),
-      _Group('Perangkat', _Tone.device, [
+      _Group('Perangkat', [
         _Item(
-          icon: Icons.print_rounded,
           title: 'Printer struk',
           subtitle: printer == null ? 'Pilih printer Bluetooth' : printer.name,
           badge: printer == null ? const AppBadge('Belum dipilih', tone: AppTone.warning) : null,
@@ -167,7 +148,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           onTap: () => _open(const PrinterSettingsScreen()),
         ),
         _Item(
-          icon: Icons.local_cafe_rounded,
           title: 'Tiket bar / dapur',
           subtitle: 'Cetak pesanan per stasiun, tanpa harga',
           keywords: 'checker kitchen printer',
@@ -175,10 +155,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ]),
       if (owner && (on('promotions') || (on('inventory') && can('inventory.manage'))))
-        _Group('Penjualan & produk', _Tone.sales, [
+        _Group('Penjualan & produk', [
           if (on('promotions'))
             _Item(
-              icon: Icons.local_offer_rounded,
               title: 'Promo & voucher',
               subtitle: 'Happy hour, beli X gratis Y, kode voucher',
               keywords: 'diskon',
@@ -186,7 +165,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           if (on('inventory') && can('inventory.manage'))
             _Item(
-              icon: Icons.inventory_2_rounded,
               title: 'Stok & resep',
               subtitle: 'Bahan baku, pembelian, opname, HPP',
               keywords: 'inventory gudang supplier',
@@ -194,10 +172,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
         ]),
       if (owner && (on('loyalty') || on('member_tiers') || on('customer_messaging')))
-        _Group('Pelanggan', _Tone.customer, [
+        _Group('Pelanggan', [
           if (on('loyalty'))
             _Item(
-              icon: Icons.loyalty_rounded,
               title: 'Program loyalitas',
               subtitle: 'Stempel / poin & hadiah',
               keywords: 'member reward',
@@ -205,7 +182,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           if (on('member_tiers'))
             _Item(
-              icon: Icons.workspace_premium_rounded,
               title: 'Tingkat member',
               subtitle: 'Silver, Gold: diskon & pengali stempel',
               keywords: 'tier level',
@@ -213,7 +189,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           if (on('customer_messaging'))
             _Item(
-              icon: Icons.chat_rounded,
               title: 'Pesan WhatsApp',
               subtitle: 'Struk digital, ulang tahun, pengingat kasbon',
               keywords: 'wa template',
@@ -221,9 +196,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
         ]),
       if (owner && device != null)
-        _Group('Tablet ini', _Tone.danger, [
+        _Group('Tablet ini', danger: true, [
           _Item(
-            icon: Icons.logout_rounded,
             title: 'Keluarkan tablet dari usaha',
             subtitle: '${device.name} (${device.code}) · butuh akun owner untuk daftar lagi',
             keywords: 'cabut perangkat',
@@ -239,7 +213,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final q = _query.trim().toLowerCase();
     final groups = [
       for (final g in _groups())
-        if (g.items.where((i) => q.isEmpty || i.matches(q)).toList() case final items when items.isNotEmpty) _Group(g.label, g.tone, items),
+        if (g.items.where((i) => q.isEmpty || i.matches(q)).toList() case final items when items.isNotEmpty) _Group(g.label, items, danger: g.danger),
     ];
 
     return ListView(
@@ -278,20 +252,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: AppEmptyState(icon: Icons.search_off_rounded, title: 'Pengaturan tidak ditemukan'),
                   ),
                 for (final g in groups) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(AppSpace.s1, AppSpace.s6, AppSpace.s1, AppSpace.s2),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 4,
-                          height: 14,
-                          decoration: BoxDecoration(color: g.tone.fg, borderRadius: AppRadius.mdAll),
-                        ),
-                        const SizedBox(width: AppSpace.s2),
-                        AppOverline(g.label, color: g.tone == _Tone.danger ? AppColors.danger : AppColors.inkMuted),
-                      ],
-                    ),
-                  ),
+                  Padding(padding: const EdgeInsets.fromLTRB(AppSpace.s1, AppSpace.s6, AppSpace.s1, AppSpace.s2), child: AppOverline(g.label)),
                   _GroupCard(group: g),
                 ],
                 const SizedBox(height: AppSpace.s6),
@@ -316,7 +277,6 @@ class _AccountCard extends ConsumerWidget {
     final user = session?.user;
     final device = session?.device;
     final name = user?.name ?? '-';
-    final initials = name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).take(2).map((w) => w[0].toUpperCase()).join();
     final place = [
       if ((device?.tenantName ?? '').isNotEmpty) device!.tenantName,
       if (menu?.multiOutlet ?? false) ?menu?.outlet?.name,
@@ -325,35 +285,28 @@ class _AccountCard extends ConsumerWidget {
 
     return Container(
       padding: const EdgeInsets.all(AppSpace.s4),
-      decoration: BoxDecoration(color: AppColors.ink, borderRadius: AppRadius.lgAll),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.lgAll,
+        border: Border.all(color: AppColors.line),
+      ),
       child: Row(
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.mdAll),
-            child: Text(initials, style: AppType.title.copyWith(color: AppColors.onAccent)),
-          ),
+          AppAvatar(name, size: 48),
           const SizedBox(width: AppSpace.s4),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AppOverline(user?.role == 'owner' ? 'Owner' : 'Kasir', color: AppColors.onInkMuted),
+                AppOverline(user?.role == 'owner' ? 'Owner' : 'Kasir'),
                 const SizedBox(height: 2),
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppType.titleLg.copyWith(color: AppColors.onInk),
-                ),
+                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.titleLg),
                 if (place.isNotEmpty)
                   Text(
                     place,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: AppType.caption.copyWith(color: AppColors.onInkMuted),
+                    style: AppType.caption.copyWith(color: AppColors.inkMuted),
                   ),
               ],
             ),
@@ -375,14 +328,13 @@ class _GroupCard extends StatelessWidget {
       color: AppColors.surface,
       borderRadius: AppRadius.lgAll,
       border: Border.all(color: AppColors.line),
-      boxShadow: AppShadow.raised,
     ),
     clipBehavior: Clip.antiAlias,
     child: Column(
       children: [
         for (final (i, item) in group.items.indexed) ...[
-          if (i > 0) const Divider(height: 1, indent: 72, color: AppColors.line),
-          _Row(item: item, tone: group.tone),
+          if (i > 0) const Divider(height: 1, indent: AppSpace.s4, color: AppColors.line),
+          _Row(item: item, danger: group.danger),
         ],
       ],
     ),
@@ -390,10 +342,10 @@ class _GroupCard extends StatelessWidget {
 }
 
 class _Row extends StatelessWidget {
-  const _Row({required this.item, required this.tone});
+  const _Row({required this.item, this.danger = false});
 
   final _Item item;
-  final _Tone tone;
+  final bool danger;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -401,23 +353,16 @@ class _Row extends StatelessWidget {
     child: InkWell(
       onTap: item.onTap,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 72),
+        constraints: const BoxConstraints(minHeight: 64),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.s4, vertical: AppSpace.s3),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(color: tone.bg, borderRadius: AppRadius.mdAll),
-                child: Icon(item.icon, size: 22, color: tone.fg),
-              ),
-              const SizedBox(width: AppSpace.s4),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.title, style: AppType.title.copyWith(color: tone == _Tone.danger ? AppColors.danger : AppColors.ink)),
+                    Text(item.title, style: AppType.bodyStrong.copyWith(color: danger ? AppColors.danger : AppColors.ink)),
                     const SizedBox(height: 2),
                     Text(
                       item.subtitle,

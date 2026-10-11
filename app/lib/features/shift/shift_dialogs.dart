@@ -163,8 +163,7 @@ class ShiftResultDialog extends ConsumerWidget {
       ),
       actions: [
         // Laporan ke owner lewat WhatsApp (email terkirim otomatis bila diaktifkan).
-        TextButton.icon(
-          onPressed: () async {
+        TextButton(onPressed: () async {
             final messenger = ScaffoldMessenger.of(context);
             try {
               final res = await ref.read(sessionProvider.notifier).authed((api, token) => api.get('/shifts/${shift['id']}/report', token: token));
@@ -177,10 +176,7 @@ class ShiftResultDialog extends ConsumerWidget {
             } on ApiException catch (e) {
               messenger.showSnackBar(SnackBar(content: Text(e.message)));
             }
-          },
-          icon: const Icon(Icons.chat_rounded, size: 18),
-          label: const Text('Kirim ke WA owner'),
-        ),
+          }, child: const Text('Kirim ke WA owner'), ),
         TextButton(
           onPressed: () async {
             try {

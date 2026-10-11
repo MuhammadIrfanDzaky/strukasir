@@ -229,12 +229,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                 const PopupMenuDivider(),
                 const PopupMenuItem(
                   value: 'import',
-                  child: ListTile(leading: Icon(Icons.upload_file_rounded), title: Text('Import CSV')),
+                  child: ListTile(title: Text('Import CSV')),
                 ),
                 if (messagingOn)
                   const PopupMenuItem(
                     value: 'messages',
-                    child: ListTile(leading: Icon(Icons.chat_rounded), title: Text('Kirim pesan WA')),
+                    child: ListTile(title: Text('Kirim pesan WA')),
                   ),
               ],
             ),
@@ -243,7 +243,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             sortMenu,
             IconButton(tooltip: 'Import CSV', onPressed: _import, icon: const Icon(Icons.upload_file_rounded)),
             if (messagingOn) IconButton(tooltip: 'Kirim pesan WA', onPressed: openMessaging, icon: const Icon(Icons.chat_rounded)),
-            FilledButton.icon(onPressed: _add, icon: const Icon(Icons.person_add_alt_1_rounded), label: const Text('Tambah')),
+            FilledButton(onPressed: _add, child: const Text('Tambah'), ),
           ];
 
     final tiers = ref.watch(menuProvider).value?.menu.memberTiers ?? const <MemberTier>[];
@@ -266,7 +266,6 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   for (final t in tiers) CheckedPopupMenuItem(value: t.id, checked: _tierId == t.id, child: Text(t.name)),
                 ],
                 child: Chip(
-                  avatar: const Icon(Icons.workspace_premium_rounded, size: 18),
                   label: Text(tiers.where((t) => t.id == _tierId).firstOrNull?.name ?? 'Tingkat'),
                   backgroundColor: _tierId == null ? null : AppColors.primarySoft,
                 ),
@@ -303,7 +302,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         message: filtered
             ? (_segment != null ? _segmentHelp[_segment] : null)
             : 'Daftarkan pelanggan dari layar kasir (ikon cari di kolom nama), tambah di sini, atau import CSV.',
-        action: filtered ? null : FilledButton.icon(onPressed: _add, icon: const Icon(Icons.person_add_alt_1_rounded), label: const Text('Tambah pelanggan')),
+        action: filtered ? null : FilledButton(onPressed: _add, child: const Text('Tambah pelanggan'), ),
       );
     } else {
       body = RefreshIndicator(
@@ -472,7 +471,6 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
           SimpleDialogOption(
             onPressed: () => Navigator.pop(context, ''),
             child: const ListTile(
-              leading: Icon(Icons.autorenew_rounded),
               title: Text('Otomatis dari belanja'),
               subtitle: Text('Naik / turun sendiri'),
             ),
@@ -565,9 +563,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                   icon: const Icon(Icons.chat_rounded),
                   onSelected: (t) => openWhatsApp(context, ref, c.id, t),
                   itemBuilder: (_) => [
-                    for (final (key, label, icon) in ownerTemplates)
+                    for (final (key, label, _) in ownerTemplates)
                       if (key != 'credit_reminder' || (c.creditBalance ?? 0) > 0)
-                        PopupMenuItem(value: key, child: ListTile(leading: Icon(icon), title: Text(label))),
+                        PopupMenuItem(value: key, child: ListTile(title: Text(label))),
                   ],
                 ),
               PopupMenuButton<String>(
@@ -577,7 +575,6 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                   PopupMenuItem(
                     value: 'anonymize',
                     child: ListTile(
-                      leading: Icon(Icons.person_off_rounded, color: AppColors.danger),
                       title: Text('Hapus data pelanggan'),
                     ),
                   ),
@@ -665,11 +662,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
         ? null
         : AppSectionCard(
             title: 'Tingkat member',
-            trailing: TextButton.icon(
-              onPressed: () => _lockTier(c, tiers),
-              icon: const Icon(Icons.edit_rounded, size: 18),
-              label: const Text('Ubah'),
-            ),
+            trailing: TextButton(onPressed: () => _lockTier(c, tiers), child: const Text('Ubah'), ),
             children: [
               Row(children: [
                 if (c.tier != null) TierBadge(c.tier!) else const AppBadge('Belum bertingkat'),
@@ -712,11 +705,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
         ? null
         : AppSectionCard(
             title: 'Kasbon',
-            trailing: TextButton.icon(
-              onPressed: () => _editLimit(c),
-              icon: const Icon(Icons.tune_rounded, size: 18),
-              label: const Text('Batas'),
-            ),
+            trailing: TextButton(onPressed: () => _editLimit(c), child: const Text('Batas'), ),
             empty: 'Belum pernah kasbon.',
             children: [
               AppSummaryRow('Sisa kasbon', rp(c.creditBalance!), emphasis: true,
@@ -725,11 +714,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
               if (c.creditBalance! > 0)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: AppSpace.s2),
-                  child: FilledButton.tonalIcon(
-                    onPressed: () => _repay(c),
-                    icon: const Icon(Icons.payments_rounded),
-                    label: const Text('Catat pelunasan'),
-                  ),
+                  child: FilledButton.tonal(onPressed: () => _repay(c), child: const Text('Catat pelunasan'), ),
                 ),
               for (final e in creditHistory)
                 Padding(
@@ -776,11 +761,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
         ? null
         : AppSectionCard(
             title: 'Riwayat ${program.unit} · ${program.name}',
-            trailing: TextButton.icon(
-              onPressed: () => _adjust(c, program.unit),
-              icon: const Icon(Icons.tune_rounded, size: 18),
-              label: const Text('Sesuaikan'),
-            ),
+            trailing: TextButton(onPressed: () => _adjust(c, program.unit), child: const Text('Sesuaikan'), ),
             empty: 'Belum ada ${program.unit}.',
             children: [
               if (c.loyaltyExpiresAt != null)

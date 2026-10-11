@@ -262,18 +262,12 @@ class _LoyaltySettingsScreenState extends ConsumerState<LoyaltySettingsScreen> {
                         const SizedBox(height: AppSpace.s3),
                         AppSectionCard(
                           title: 'Hadiah',
-                          trailing: TextButton.icon(
-                            onPressed: _busy || _rewards.length >= 20 ? null : () => _editReward(),
-                            icon: const Icon(Icons.add_rounded),
-                            label: const Text('Tambah'),
-                          ),
+                          trailing: TextButton(onPressed: _busy || _rewards.length >= 20 ? null : () => _editReward(), child: const Text('Tambah'), ),
                           empty: 'Belum ada hadiah. Tambahkan mis. "10 stempel = gratis 1 kopi".',
                           children: [
                             for (final (i, r) in _rewards.indexed)
                               ListTile(
                                 contentPadding: EdgeInsets.zero,
-                                leading: Icon(r.type == 'free_product' ? Icons.local_cafe_rounded : Icons.sell_rounded,
-                                    color: AppColors.primary),
                                 title: Text(r.name, style: AppType.bodyStrong),
                                 subtitle: Text(
                                   [
@@ -402,11 +396,9 @@ class _Summary extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(AppSpace.s3),
-        decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: AppRadius.mdAll),
+        decoration: BoxDecoration(color: AppColors.surfaceSunken, borderRadius: AppRadius.mdAll),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Icon(Icons.info_outline_rounded, size: 20, color: AppColors.primaryStrong),
-          const SizedBox(width: AppSpace.s2),
-          Expanded(child: Text(text, style: AppType.body.copyWith(color: AppColors.primaryStrong))),
+          Expanded(child: Text(text, style: AppType.body.copyWith(color: AppColors.inkMuted))),
         ]),
       );
 }

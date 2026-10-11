@@ -89,7 +89,6 @@ class _PromotionsScreenState extends ConsumerState<PromotionsScreen> {
                         Card(
                           child: ListTile(
                             onTap: () => _editPromo(p),
-                            leading: Icon(Icons.local_offer_rounded, color: p.active ? AppColors.primary : AppColors.inkDisabled),
                             title: Text(p.name, style: AppType.bodyStrong),
                             subtitle: Text(
                               [p.effect, _target(p, menu), p.schedule, if (!p.active) 'nonaktif'].join(' · '),
@@ -101,7 +100,7 @@ class _PromotionsScreenState extends ConsumerState<PromotionsScreen> {
                       const SizedBox(height: AppSpace.s3),
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: FilledButton.icon(onPressed: () => _editPromo(), icon: const Icon(Icons.add_rounded), label: const Text('Tambah promo')),
+                        child: FilledButton(onPressed: () => _editPromo(), child: const Text('Tambah promo'), ),
                       ),
                     ]),
                     ListView(padding: EdgeInsets.fromLTRB(pad, pad, pad, 96), children: [
@@ -113,8 +112,6 @@ class _PromotionsScreenState extends ConsumerState<PromotionsScreen> {
                         Card(
                           child: ListTile(
                             onTap: () => _editVoucher(v),
-                            leading: Icon(Icons.confirmation_number_rounded,
-                                color: v['active'] == true ? AppColors.primary : AppColors.inkDisabled),
                             title: Text(v['code'] as String, style: AppType.bodyStrong.copyWith(letterSpacing: 1)),
                             subtitle: Text(
                               [
@@ -131,7 +128,7 @@ class _PromotionsScreenState extends ConsumerState<PromotionsScreen> {
                       const SizedBox(height: AppSpace.s3),
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: FilledButton.icon(onPressed: () => _editVoucher(), icon: const Icon(Icons.add_rounded), label: const Text('Tambah voucher')),
+                        child: FilledButton(onPressed: () => _editVoucher(), child: const Text('Tambah voucher'), ),
                       ),
                     ]),
                   ]),

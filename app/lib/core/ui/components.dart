@@ -64,9 +64,9 @@ class AppBadge extends StatelessWidget {
 
   /// Status order dari API: paid / open / void.
   factory AppBadge.orderStatus(String status, {Key? key}) => switch (status) {
-        'paid' => AppBadge('Lunas', key: key, tone: AppTone.success, icon: Icons.check_rounded),
-        'open' => AppBadge('Belum bayar', key: key, tone: AppTone.warning, icon: Icons.schedule_rounded),
-        _ => AppBadge('Void', key: key, tone: AppTone.danger, icon: Icons.block_rounded),
+        'paid' => AppBadge('Lunas', key: key, tone: AppTone.success, ),
+        'open' => AppBadge('Belum bayar', key: key, tone: AppTone.warning, ),
+        _ => AppBadge('Void', key: key, tone: AppTone.danger, ),
       };
 
   final String label;
@@ -164,11 +164,7 @@ class AppErrorState extends StatelessWidget {
         icon: Icons.cloud_off_rounded,
         title: title,
         message: message,
-        action: FilledButton.icon(
-          onPressed: onRetry,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Coba lagi'),
-        ),
+        action: FilledButton(onPressed: onRetry, child: const Text('Coba lagi'), ),
       );
 }
 

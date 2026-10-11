@@ -167,11 +167,7 @@ class _FormatDialog extends StatelessWidget {
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
-        FilledButton.icon(
-          onPressed: () => Navigator.pop(context, true),
-          icon: const Icon(Icons.upload_file_rounded),
-          label: const Text('Pilih file CSV'),
-        ),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Pilih file CSV'), ),
       ],
     );
   }

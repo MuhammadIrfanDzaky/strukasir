@@ -218,18 +218,12 @@ class PickerField extends StatelessWidget {
       borderRadius: AppRadius.mdAll,
       child: InputDecorator(
         isEmpty: value == null,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: icon == null ? null : Icon(icon),
-          suffixIcon: loading
+        decoration: InputDecoration(labelText: label, suffixIcon: loading
               ? const Padding(
                   padding: EdgeInsets.all(14),
                   child: SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                 )
-              : const Icon(Icons.expand_more_rounded),
-          errorText: errorText,
-          enabled: enabled,
-        ),
+              : const Icon(Icons.expand_more_rounded), errorText: errorText, enabled: enabled, ),
         child: value == null ? null : Text(value!, style: AppType.body, maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
     );

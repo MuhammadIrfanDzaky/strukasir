@@ -138,10 +138,9 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                       for (final d in _devices)
                         ListTile(
                           contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.bluetooth_rounded),
                           title: Text(d.name),
                           subtitle: Text(d.macAdress),
-                          trailing: saved?.mac == d.macAdress ? const AppBadge('Dipakai', tone: AppTone.success, icon: Icons.check_rounded) : null,
+                          trailing: saved?.mac == d.macAdress ? const AppBadge('Dipakai', tone: AppTone.success, ) : null,
                           onTap: _busy ? null : () => _run(() => service.choose(d)),
                         ),
                     ],

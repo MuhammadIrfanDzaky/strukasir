@@ -76,23 +76,6 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
   Map<String, String> _fieldErrors = {};
   bool _busy = false;
 
-  static const _icons = {
-    'customer_name': Icons.badge_rounded,
-    'open_bill': Icons.receipt_long_rounded,
-    'modifiers': Icons.tune_rounded,
-    'discounts': Icons.percent_rounded,
-    'tax_service': Icons.account_balance_rounded,
-    'split_payment': Icons.call_split_rounded,
-    'customers': Icons.groups_rounded,
-    'loyalty': Icons.loyalty_rounded,
-    'member_tiers': Icons.workspace_premium_rounded,
-    'customer_credit': Icons.menu_book_rounded,
-    'customer_messaging': Icons.chat_rounded,
-    'promotions': Icons.local_offer_rounded,
-    'inventory': Icons.inventory_2_rounded,
-    'multi_outlet': Icons.storefront_rounded,
-  };
-
   @override
   void initState() {
     super.initState();
@@ -332,7 +315,6 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
     return SwitchListTile(
       value: on,
       onChanged: _busy || locked ? null : (v) => _toggle(o, v),
-      secondary: Icon(_icons[o.key] ?? Icons.extension_rounded, color: on ? AppColors.primary : AppColors.inkMuted),
       title: Text(o.label, style: AppType.bodyStrong),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

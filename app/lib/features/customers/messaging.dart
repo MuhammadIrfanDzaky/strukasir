@@ -169,11 +169,7 @@ class _AudienceListState extends ConsumerState<_AudienceList> with AutomaticKeep
                         onPressed: () => _send(r),
                         child: const Text('Kirim lagi'),
                       )
-                    : FilledButton.icon(
-                        onPressed: () => _send(r),
-                        icon: const Icon(Icons.chat_rounded, size: 18),
-                        label: const Text('WA'),
-                      ),
+                    : FilledButton(onPressed: () => _send(r), child: const Text('WA'), ),
               ),
               const Divider(height: 1, indent: 72),
             ],

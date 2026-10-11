@@ -155,12 +155,7 @@ class _CustomerPickerState extends ConsumerState<CustomerPicker> {
         const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.all(AppSpace.s3),
-          child: FilledButton.tonalIcon(
-            onPressed: _create,
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(AppSize.touch)),
-            icon: const Icon(Icons.person_add_alt_1_rounded),
-            label: const Text('Pelanggan baru'),
-          ),
+          child: FilledButton.tonal(onPressed: _create, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(AppSize.touch)), child: const Text('Pelanggan baru'), ),
         ),
       ],
     );

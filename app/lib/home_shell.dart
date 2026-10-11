@@ -299,20 +299,20 @@ class _TopBar extends StatelessWidget {
               if (onVerifyEmail != null)
                 const PopupMenuItem(
                   value: 'verify',
-                  child: ListTile(leading: Icon(Icons.mark_email_unread_rounded), title: Text('Verifikasi email')),
+                  child: ListTile(title: Text('Verifikasi email')),
                 ),
               if (onSettings != null)
                 const PopupMenuItem(
                   value: 'settings',
-                  child: ListTile(leading: Icon(Icons.settings_rounded), title: Text('Pengaturan')),
+                  child: ListTile(title: Text('Pengaturan')),
                 ),
               const PopupMenuItem(
                 value: 'refresh',
-                child: ListTile(leading: Icon(Icons.sync_rounded), title: Text('Muat ulang menu')),
+                child: ListTile(title: Text('Muat ulang menu')),
               ),
               const PopupMenuItem(
                 value: 'logout',
-                child: ListTile(leading: Icon(Icons.logout_rounded), title: Text('Keluar')),
+                child: ListTile(title: Text('Keluar')),
               ),
             ],
             child: Padding(

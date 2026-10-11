@@ -164,14 +164,10 @@ class _PaymentDialogState extends State<PaymentDialog> {
             if (r.method == 'credit') _creditNote(r.amountValue),
           ],
           if (widget.splitEnabled && _rows.length < 3)
-            TextButton.icon(
-              onPressed: () => setState(() {
+            TextButton(onPressed: () => setState(() {
                 final rest = widget.total - _sum;
                 _rows.add(_Row('qris', rest > 0 ? rest : 0));
-              }),
-              icon: const Icon(Icons.call_split_rounded),
-              label: const Text('Bagi ke metode lain'),
-            ),
+              }), child: const Text('Bagi ke metode lain'), ),
           if (problem != null && _rows.length > 1)
             Text(problem, style: AppType.caption.copyWith(color: AppColors.danger)),
         ]),

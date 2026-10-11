@@ -222,11 +222,7 @@ class CheckoutFlow {
           ),
           actions: [
             if (whatsAppTo != null)
-              TextButton.icon(
-                onPressed: () => openWhatsApp(context, ref, whatsAppTo, 'receipt', orderId: order['id'] as String),
-                icon: const Icon(Icons.chat_rounded, size: 18),
-                label: const Text('Struk via WA'),
-              ),
+              TextButton(onPressed: () => openWhatsApp(context, ref, whatsAppTo, 'receipt', orderId: order['id'] as String), child: const Text('Struk via WA'), ),
             TextButton(onPressed: () => reprint(order), child: const Text('Cetak ulang struk')),
             FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Order baru')),
           ],

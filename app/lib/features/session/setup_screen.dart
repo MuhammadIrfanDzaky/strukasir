@@ -82,19 +82,9 @@ class _Welcome extends StatelessWidget {
         const SizedBox(height: AppSpace.s1),
         Text('Kasir, struk, dan laporan untuk usaha Anda.', style: AppType.body.copyWith(color: AppColors.inkMuted)),
         const SizedBox(height: AppSpace.s6),
-        FilledButton.icon(
-          onPressed: onSignup,
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(AppSize.touchLg)),
-          icon: const Icon(Icons.storefront_rounded),
-          label: const Text('Daftar usaha baru'),
-        ),
+        FilledButton(onPressed: onSignup, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(AppSize.touchLg)), child: const Text('Daftar usaha baru'), ),
         const SizedBox(height: AppSpace.s3),
-        OutlinedButton.icon(
-          onPressed: onSignin,
-          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(AppSize.touchLg)),
-          icon: const Icon(Icons.login_rounded),
-          label: const Text('Sudah punya akun? Masuk'),
-        ),
+        OutlinedButton(onPressed: onSignin, style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(AppSize.touchLg)), child: const Text('Sudah punya akun? Masuk'), ),
         const SizedBox(height: AppSpace.s3),
         Text(
           'Pakai "Masuk" untuk menambah tablet ke usaha yang sudah terdaftar.',
@@ -118,11 +108,7 @@ class ServerUrlField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
-      decoration: const InputDecoration(
-        labelText: 'Alamat server (development)',
-        hintText: 'http://10.0.2.2:8000',
-        prefixIcon: Icon(Icons.dns_rounded),
-      ),
+      decoration: const InputDecoration(labelText: 'Alamat server (development)', hintText: 'http://10.0.2.2:8000', ),
       keyboardType: TextInputType.url,
       validator: (v) {
         final uri = Uri.tryParse(v?.trim() ?? '');
@@ -195,7 +181,6 @@ class _OwnerSignInState extends ConsumerState<_OwnerSignIn> {
                   onPressed: () => Navigator.pop(context, o['id'] as String),
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.storefront_rounded),
                     title: Text(o['name'] as String),
                     subtitle: o['address'] == null ? null : Text(o['address'] as String),
                   ),
@@ -260,7 +245,7 @@ class _OwnerSignInState extends ConsumerState<_OwnerSignIn> {
           if (ServerUrlField.needed) ...[ServerUrlField(controller: _server), const SizedBox(height: AppSpace.s3)],
           TextFormField(
             controller: _email,
-            decoration: const InputDecoration(labelText: 'Email owner', prefixIcon: Icon(Icons.alternate_email_rounded)),
+            decoration: const InputDecoration(labelText: 'Email owner', ),
             keyboardType: TextInputType.emailAddress,
             autofillHints: const [AutofillHints.email],
             validator: (v) => (v?.contains('@') ?? false) ? null : 'Email tidak valid',
@@ -268,15 +253,11 @@ class _OwnerSignInState extends ConsumerState<_OwnerSignIn> {
           const SizedBox(height: AppSpace.s3),
           TextFormField(
             controller: _password,
-            decoration: InputDecoration(
-              labelText: 'Password',
-              prefixIcon: const Icon(Icons.lock_outline_rounded),
-              suffixIcon: IconButton(
+            decoration: InputDecoration(labelText: 'Password', suffixIcon: IconButton(
                 tooltip: _showPassword ? 'Sembunyikan' : 'Tampilkan',
                 onPressed: () => setState(() => _showPassword = !_showPassword),
                 icon: Icon(_showPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded),
-              ),
-            ),
+              ), ),
             obscureText: !_showPassword,
             validator: (v) => (v?.isNotEmpty ?? false) ? null : 'Wajib diisi',
           ),
@@ -289,11 +270,7 @@ class _OwnerSignInState extends ConsumerState<_OwnerSignIn> {
             TextFormField(
               controller: _otp,
               autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Kode 2FA (6 digit)',
-                helperText: 'Dari aplikasi authenticator di HP owner',
-                prefixIcon: Icon(Icons.verified_user_rounded),
-              ),
+              decoration: const InputDecoration(labelText: 'Kode 2FA (6 digit)', helperText: 'Dari aplikasi authenticator di HP owner', ),
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               maxLength: 6,

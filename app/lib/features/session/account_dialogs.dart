@@ -6,12 +6,7 @@ import '../../core/api_client.dart';
 import '../../core/theme/tokens.dart';
 import 'session_controller.dart';
 
-InputDecoration _codeDecoration(String? error) => InputDecoration(
-      labelText: 'Kode 6 digit dari email',
-      prefixIcon: const Icon(Icons.mark_email_read_rounded),
-      counterText: '',
-      errorText: error,
-    );
+InputDecoration _codeDecoration(String? error) => InputDecoration(labelText: 'Kode 6 digit dari email', counterText: '', errorText: error, );
 
 Widget _codeField(TextEditingController c, String? error, {bool autofocus = false}) => TextField(
       controller: c,
@@ -119,11 +114,7 @@ class _ForgotPasswordDialogState extends ConsumerState<ForgotPasswordDialog> {
             TextField(
               controller: _email,
               enabled: !_codeSent,
-              decoration: InputDecoration(
-                labelText: 'Email owner',
-                prefixIcon: const Icon(Icons.alternate_email_rounded),
-                errorText: _fieldErrors['email'],
-              ),
+              decoration: InputDecoration(labelText: 'Email owner', errorText: _fieldErrors['email'], ),
               keyboardType: TextInputType.emailAddress,
             ),
             if (_codeSent) ...[
@@ -133,12 +124,7 @@ class _ForgotPasswordDialogState extends ConsumerState<ForgotPasswordDialog> {
               TextField(
                 controller: _password,
                 obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Password baru',
-                  helperText: 'Minimal 8 karakter, ada huruf dan angka',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                  errorText: _fieldErrors['password'],
-                ),
+                decoration: InputDecoration(labelText: 'Password baru', helperText: 'Minimal 8 karakter, ada huruf dan angka', errorText: _fieldErrors['password'], ),
               ),
               Align(
                 alignment: Alignment.centerLeft,

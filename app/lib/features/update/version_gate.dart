@@ -83,11 +83,7 @@ class VersionGate extends ConsumerWidget {
                 style: AppType.body.copyWith(color: AppColors.inkMuted)),
             const SizedBox(height: AppSpace.s6),
             if (info.downloadUrl != null)
-              FilledButton.icon(
-                onPressed: () => launchUrl(Uri.parse(info.downloadUrl!), mode: LaunchMode.externalApplication),
-                icon: const Icon(Icons.download_rounded),
-                label: const Text('Unduh versi terbaru'),
-              )
+              FilledButton(onPressed: () => launchUrl(Uri.parse(info.downloadUrl!), mode: LaunchMode.externalApplication), child: const Text('Unduh versi terbaru'), )
             else
               Text('Hubungi admin untuk file pembaruan.', style: AppType.bodyStrong),
             const SizedBox(height: AppSpace.s2),

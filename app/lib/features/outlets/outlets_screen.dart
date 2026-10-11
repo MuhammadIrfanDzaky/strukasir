@@ -61,7 +61,6 @@ class OutletPicker extends ConsumerWidget {
           isDense: true,
           isExpanded: true,
           borderRadius: AppRadius.mdAll,
-          icon: const Icon(Icons.storefront_rounded, size: 18),
           items: [
             if (allLabel != null) DropdownMenuItem<String?>(value: null, child: Text(allLabel!)),
             for (final o in outlets)
@@ -144,8 +143,6 @@ class OutletsScreen extends ConsumerWidget {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.storefront_rounded, color: o.active ? AppColors.primary : AppColors.inkDisabled),
-                          const SizedBox(width: AppSpace.s2),
                           Expanded(
                             child: Text(o.name, style: AppType.title.copyWith(color: o.active ? null : AppColors.inkMuted)),
                           ),
@@ -165,7 +162,6 @@ class OutletsScreen extends ConsumerWidget {
                           children: [
                             for (final dev in o.devices)
                               ActionChip(
-                                avatar: const Icon(Icons.tablet_android_rounded, size: 18),
                                 label: Text('${dev['code']} · ${dev['name']}${dev['current'] == true ? ' (tablet ini)' : ''}'),
                                 onPressed: d.outlets.where((x) => x.active).length < 2 ? null : () => _move(context, ref, dev, o, d.outlets),
                               ),
@@ -186,11 +182,7 @@ class OutletsScreen extends ConsumerWidget {
               ),
             Align(
               alignment: Alignment.centerLeft,
-              child: FilledButton.icon(
-                onPressed: d.enabled ? () => _edit(context, ref) : null,
-                icon: const Icon(Icons.add_business_rounded),
-                label: const Text('Tambah outlet'),
-              ),
+              child: FilledButton(onPressed: d.enabled ? () => _edit(context, ref) : null, child: const Text('Tambah outlet'), ),
             ),
             if (d.outlets.where((x) => x.active).length > 1) ...[
               const SizedBox(height: AppSpace.s2),

@@ -159,7 +159,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                             if (totals.lineDiscounts.length > i && totals.lineDiscounts[i] > 0)
                               Text(
                                 '${l.id == cart.rewardItemId ? 'Hadiah' : (pricingMenu == null ? null : lineBenefit(cart, pricingMenu, l, DateTime.now()))?.label ?? 'Diskon'} -${rupiah(totals.lineDiscounts[i])}',
-                                style: AppType.caption.copyWith(color: AppColors.success),
+                                style: AppType.caption.copyWith(color: AppColors.inkMuted),
                               ),
                           ],
                         ),
@@ -179,7 +179,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 AppSummaryRow(cart.reward != null && !cart.reward!.isFreeProduct
                     ? 'Hadiah: ${cart.reward!.name}'
                     : cart.voucher != null ? 'Voucher ${cart.voucher!.code}' : 'Diskon',
-                    '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
+                    '-${rupiah(totals.orderDiscount)}'),
               if (totals.serviceTotal > 0)
                 AppSummaryRow(withRate('Service', pricing?.serviceBp, included: pricing?.serviceInclusive ?? false),
                     rupiah(totals.serviceTotal)),
@@ -278,11 +278,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                         onPressed: _busy ? null : _openBills,
                         icon: const Icon(Icons.receipt_long_rounded),
                       )
-                    : TextButton.icon(
-                        onPressed: _busy ? null : _openBills,
-                        icon: const Icon(Icons.receipt_long_rounded),
-                        label: const Text('Open Bill'),
-                      ),
+                    : TextButton(onPressed: _busy ? null : _openBills, child: const Text('Open Bill'), ),
               IconButton(
                 tooltip: 'Kosongkan',
                 onPressed: canAct ? notifier.clear : null,
@@ -300,19 +296,13 @@ class _CartPanelState extends ConsumerState<CartPanel> {
             focusNode: _labelFocus,
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.done,
-            decoration: InputDecoration(
-              labelText: '${menu?.customerLabelHint ?? 'Nama pelanggan / meja'} *',
-              isDense: true,
-              prefixIcon: const Icon(Icons.person_outline_rounded),
-              errorText: _labelError,
-              suffixIcon: memberOn && cart.customer == null
+            decoration: InputDecoration(labelText: '${menu?.customerLabelHint ?? 'Nama pelanggan / meja'} *', isDense: true, errorText: _labelError, suffixIcon: memberOn && cart.customer == null
                   ? IconButton(
                       tooltip: 'Pilih member',
                       onPressed: _busy ? null : _pickMember,
                       icon: const Icon(Icons.person_search_rounded),
                     )
-                  : null,
-            ),
+                  : null, ),
             onChanged: (v) {
               notifier.setCustomerLabel(v);
               if (_labelError != null && v.trim().isNotEmpty) setState(() => _labelError = null);
@@ -332,22 +322,16 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                         padding: EdgeInsets.fromLTRB(gutter - AppSpace.s2, AppSpace.s2, gutter, 0),
                         child: Align(
                           alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: _busy ? null : _pickMember,
-                            icon: const Icon(Icons.person_search_rounded),
-                            label: const Text('Tambah member'),
-                          ),
+                          child: TextButton(onPressed: _busy ? null : _pickMember, child: const Text('Tambah member'), ),
                         ),
                       ))
                 : Padding(
                     padding: EdgeInsets.fromLTRB(gutter, askLabel ? 0 : AppSpace.s3, gutter, AppSpace.s2),
                     child: Container(
                       padding: const EdgeInsets.fromLTRB(AppSpace.s3, AppSpace.s1, AppSpace.s1, AppSpace.s1),
-                      decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: AppRadius.mdAll),
+                      decoration: BoxDecoration(color: AppColors.surfaceSunken, borderRadius: AppRadius.mdAll),
                       child: Row(
                         children: [
-                          const Icon(Icons.card_membership_rounded, size: 20, color: AppColors.primaryStrong),
-                          const SizedBox(width: AppSpace.s2),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,7 +340,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                                   Flexible(
                                     child: Text(
                                       customer.name,
-                                      style: AppType.caption.copyWith(color: AppColors.primaryStrong, fontWeight: FontWeight.w700),
+                                      style: AppType.caption.copyWith(color: AppColors.ink, fontWeight: FontWeight.w700),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -366,7 +350,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                                 if (customer.tier != null && customer.tier!.benefits.isNotEmpty)
                                   Text(
                                     '${customer.tier!.name}: ${customer.tier!.benefits}',
-                                    style: AppType.caption.copyWith(color: AppColors.primaryStrong),
+                                    style: AppType.caption.copyWith(color: AppColors.inkMuted),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -376,7 +360,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                                     if (customer.visits != null) '${customer.visits}× belanja',
                                     if (program != null && customer.balance != null) '${customer.balance} ${program.unit}',
                                   ].join(' · '),
-                                  style: AppType.caption.copyWith(color: AppColors.primaryStrong),
+                                  style: AppType.caption.copyWith(color: AppColors.inkMuted),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -403,22 +387,17 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                                   ]),
                                 if (reward != null)
                                   Text('Hadiah: ${reward.name} (−${reward.cost} ${program?.unit ?? 'stempel'})',
-                                      style: AppType.caption.copyWith(color: AppColors.success, fontWeight: FontWeight.w700),
+                                      style: AppType.caption.copyWith(color: AppColors.inkMuted, fontWeight: FontWeight.w700),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis)
                                 else if (program != null && program.rewards.isNotEmpty && !cart.isEmpty)
                                   Align(
                                     alignment: Alignment.centerLeft,
-                                    child: TextButton.icon(
-                                      style: TextButton.styleFrom(
+                                    child: TextButton(style: TextButton.styleFrom(
                                         padding: EdgeInsets.zero,
                                         minimumSize: const Size(0, 36),
                                         visualDensity: VisualDensity.compact,
-                                      ),
-                                      onPressed: _busy ? null : _pickReward,
-                                      icon: const Icon(Icons.redeem_rounded, size: 18),
-                                      label: const Text('Tukar hadiah'),
-                                    ),
+                                      ), onPressed: _busy ? null : _pickReward, child: const Text('Tukar hadiah'), ),
                                   ),
                               ],
                             ),
@@ -459,7 +438,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                         if (discount > 0)
                           Text(
                             '${isReward ? 'Hadiah' : auto?.label ?? 'Diskon'} -${rupiah(discount)}',
-                            style: AppType.caption.copyWith(color: AppColors.success, fontWeight: FontWeight.w600),
+                            style: AppType.caption.copyWith(color: AppColors.inkMuted),
                           ),
                       ],
                     ),
@@ -497,7 +476,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
             AppSummaryRow(reward != null && !reward.isFreeProduct
                 ? 'Hadiah: ${reward.name}'
                 : cart.voucher != null ? 'Voucher ${cart.voucher!.code}' : 'Diskon',
-                '-${rupiah(totals.orderDiscount)}', valueColor: AppColors.success),
+                '-${rupiah(totals.orderDiscount)}'),
           if (totals.serviceTotal > 0)
             AppSummaryRow(withRate('Service', menu?.pricing.serviceBp, included: menu?.pricing.serviceInclusive ?? false),
                 rupiah(totals.serviceTotal)),
@@ -509,11 +488,9 @@ class _CartPanelState extends ConsumerState<CartPanel> {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Row(children: [
-                const Icon(Icons.loyalty_rounded, size: 16, color: AppColors.primary),
-                const SizedBox(width: AppSpace.s1),
                 Expanded(
                   child: Text('${program.name}: dapat +$earn ${program.unit}',
-                      style: AppType.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                      style: AppType.caption.copyWith(color: AppColors.inkMuted)),
                 ),
               ]),
             ),
@@ -525,7 +502,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                   totals.orderDiscount > 0
                       ? 'Voucher ${cart.voucher!.code} terpasang'
                       : 'Voucher ${cart.voucher!.code}: minimal belanja ${rp(cart.voucher!.minSpend)}',
-                  style: AppType.caption.copyWith(color: totals.orderDiscount > 0 ? AppColors.success : AppColors.warning),
+                  style: AppType.caption.copyWith(color: totals.orderDiscount > 0 ? AppColors.inkMuted : AppColors.warning),
                 ),
               ),
               TextButton(
@@ -537,34 +514,24 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           ] else if ((menu?.feature('promotions') ?? false) && !cart.isEmpty && cart.orderDiscount == null && (reward == null || reward.isFreeProduct))
             Align(
               alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40)),
-                onPressed: _busy
+              child: TextButton(style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40)), onPressed: _busy
                     ? null
                     : () async {
                         final v = await showVoucherDialog(context);
                         if (v != null) notifier.setVoucher(v);
-                      },
-                icon: const Icon(Icons.confirmation_number_rounded, size: 18),
-                label: const Text('Pakai voucher'),
-              ),
+                      }, child: const Text('Pakai voucher'), ),
             ),
           if (canDiscount && !cart.isEmpty && cart.voucher == null && (reward == null || reward.isFreeProduct))
             Align(
               alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40)),
-                onPressed: () async {
+              child: TextButton(style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40)), onPressed: () async {
                   final (changed, d) = await showDiscountDialog(
                     context,
                     current: cart.orderDiscount,
                     maxAmount: totals.subtotal,
                   );
                   if (changed) notifier.setOrderDiscount(d);
-                },
-                icon: const Icon(Icons.percent_rounded, size: 18),
-                label: Text(cart.orderDiscount == null ? 'Diskon order' : 'Ubah diskon order'),
-              ),
+                }, child: Text(cart.orderDiscount == null ? 'Diskon order' : 'Ubah diskon order'), ),
             ),
         ];
 

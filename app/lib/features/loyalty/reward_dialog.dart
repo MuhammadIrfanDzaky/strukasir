@@ -69,10 +69,6 @@ class _RewardTile extends StatelessWidget {
       child: ListTile(
         enabled: blocker == null,
         onTap: blocker == null ? () => Navigator.pop(context, (reward, line?.id)) : null,
-        leading: Icon(
-          reward.isFreeProduct ? Icons.local_cafe_rounded : Icons.sell_rounded,
-          color: blocker == null ? AppColors.primary : AppColors.inkDisabled,
-        ),
         title: Text(reward.name, style: AppType.bodyStrong),
         subtitle: details.isEmpty
             ? null

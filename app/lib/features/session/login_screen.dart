@@ -32,12 +32,7 @@ class LoginScreen extends ConsumerWidget {
     ]);
 
     // Kembali ke layar awal (Daftar / Masuk) — mis. tablet dipakai usaha lain. Butuh PIN owner.
-    final leave = TextButton.icon(
-      style: TextButton.styleFrom(foregroundColor: AppColors.onInkMuted, padding: EdgeInsets.zero),
-      onPressed: () => _leave(context, ref, staff.value ?? const []),
-      icon: const Icon(Icons.logout_rounded, size: 18),
-      label: const Text('Ganti usaha / keluarkan tablet'),
-    );
+    final leave = TextButton(style: TextButton.styleFrom(foregroundColor: AppColors.onInkMuted, padding: EdgeInsets.zero), onPressed: () => _leave(context, ref, staff.value ?? const []), child: const Text('Ganti usaha / keluarkan tablet'), );
 
     final brand = stacked
         ? Container(
@@ -212,8 +207,8 @@ class _StaffCard extends StatelessWidget {
               Text(member.name, style: AppType.title, maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
               owner
-                  ? const AppBadge('Owner', tone: AppTone.brand, icon: Icons.verified_user_rounded)
-                  : const AppBadge('Kasir', icon: Icons.person_rounded),
+                  ? const AppBadge('Owner', tone: AppTone.brand, )
+                  : const AppBadge('Kasir', ),
             ]),
           ),
         ),

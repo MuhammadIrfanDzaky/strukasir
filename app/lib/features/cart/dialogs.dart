@@ -96,11 +96,7 @@ class _ApprovalDialogState extends ConsumerState<ApprovalDialog> {
 
     return AlertDialog(
       scrollable: true,
-      title: const Row(children: [
-        Icon(Icons.verified_user_rounded, color: AppColors.primary),
-        SizedBox(width: AppSpace.s2),
-        Text('Persetujuan owner'),
-      ]),
+      title: const Text('Persetujuan owner'),
       content: SizedBox(
         width: 380,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [

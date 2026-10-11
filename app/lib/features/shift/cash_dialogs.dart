@@ -253,8 +253,6 @@ class _CashListState extends ConsumerState<_CashList> {
                 for (final r in rows)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(r['kind'] == 'out' ? Icons.north_east_rounded : Icons.south_west_rounded,
-                        color: r['cancelled'] == true ? AppColors.inkDisabled : (r['kind'] == 'out' ? AppColors.danger : AppColors.success)),
                     title: Text(
                       '${r['kind'] == 'out' ? '−' : '+'}${rp(r['amount'] as int)} · ${r['category_label']}',
                       style: AppType.bodyStrong.copyWith(

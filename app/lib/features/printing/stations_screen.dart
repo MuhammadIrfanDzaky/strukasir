@@ -81,7 +81,6 @@ class StationsScreen extends ConsumerWidget {
                 for (final (i, s) in stations.indexed)
                   Card(
                     child: ListTile(
-                      leading: const Icon(Icons.receipt_rounded, color: AppColors.primary),
                       title: Text(s.name, style: AppType.bodyStrong),
                       subtitle: Text(
                         [

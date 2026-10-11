@@ -166,35 +166,22 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
           spacing: AppSpace.s2,
           runSpacing: AppSpace.s2,
           children: [
-            FilledButton.tonalIcon(
-              onPressed: _processing || _saving ? null : _pickLogo,
-              icon: const Icon(Icons.image_rounded),
-              label: Text(_logo == null ? 'Pilih logo' : 'Ganti logo'),
-            ),
+            FilledButton.tonal(onPressed: _processing || _saving ? null : _pickLogo, child: Text(_logo == null ? 'Pilih logo' : 'Ganti logo'), ),
             if (_source != null)
-              OutlinedButton.icon(
-                onPressed: _processing
+              OutlinedButton(onPressed: _processing
                     ? null
                     : () {
                         _invert = !(_invert ?? false);
                         _threshold = null; // hitung ulang batas otomatis untuk warna yang dibalik
                         _process();
-                      },
-                icon: const Icon(Icons.invert_colors_rounded),
-                label: const Text('Balik warna'),
-              ),
+                      }, child: const Text('Balik warna'), ),
             if (_logo != null)
-              TextButton.icon(
-                style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-                onPressed: _processing || _saving
+              TextButton(style: TextButton.styleFrom(foregroundColor: AppColors.danger), onPressed: _processing || _saving
                     ? null
                     : () => setState(() {
                           _logo = null;
                           _source = null;
-                        }),
-                icon: const Icon(Icons.delete_outline_rounded),
-                label: const Text('Hapus logo'),
-              ),
+                        }), child: const Text('Hapus logo'), ),
           ],
         ),
         if (_source != null && _threshold != null) ...[
