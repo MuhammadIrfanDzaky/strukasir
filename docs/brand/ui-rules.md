@@ -11,6 +11,8 @@ supaya layar tetap tenang dan profesional — bukan ramai warna & ikon.
 - **Hijau / merah / amber hanya untuk status yang perlu perhatian:** lunas/void, habis, stok minus/menipis,
   kas kurang/lebih, naik/turun di laporan, rugi. Bukan untuk diskon/promo biasa atau dekorasi.
 - **Grafik kategori** (metode bayar) boleh memakai palet grafik (`ChartColors`) — selalu dengan label & nilai.
+- **Satu pengecualian amber (`accent`):** CTA paket di sidebar (di atas Keluar), supaya paket & ajakan upgrade
+  terlihat. Merah (`danger`) bila paket sudah habis. Jangan dipakai di tempat lain.
 - Tidak ada kotak ikon berlatar warna, garis warna di judul bagian, atau warna berbeda per kelompok.
 
 ## Ikon

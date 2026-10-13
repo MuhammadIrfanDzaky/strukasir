@@ -130,7 +130,7 @@ class Subscription {
   String get shortStatus => switch (status) {
         'expired' => plan.free ? 'Masa coba habis' : 'Paket habis',
         'trial' => daysLeft == 0 ? 'Coba: hari terakhir' : 'Coba: $daysLeft hari lagi',
-        'awaiting_payment' => 'Belum dibayar',
+        'awaiting_payment' => 'Belum dibayar · $daysLeft hari',
         _ => daysLeft == null ? 'Aktif' : 'Aktif $daysLeft hari lagi',
       };
 }
@@ -183,7 +183,7 @@ class PlanPicker extends StatelessWidget {
         ),
         const SizedBox(height: AppSpace.s3),
         LayoutBuilder(builder: (context, c) {
-          final columns = c.maxWidth >= 960 ? 4 : (c.maxWidth >= 560 ? 2 : 1);
+          final columns = (c.maxWidth >= 960 ? 4 : (c.maxWidth >= 560 ? 2 : 1)).clamp(1, plans.isEmpty ? 1 : plans.length);
           final cards = [
             for (final p in plans)
               _PlanCard(
@@ -461,7 +461,7 @@ class _CurrentPlan extends StatelessWidget {
               AppBadge(switch (sub.status) {
                 'expired' => 'Habis',
                 'trial' => 'Masa coba',
-                'awaiting_payment' => 'Belum dibayar',
+                'awaiting_payment' => 'Belum dibayar · $daysLeft hari',
                 _ => 'Aktif',
               }, tone: tone),
             ],

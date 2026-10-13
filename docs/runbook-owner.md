@@ -298,6 +298,18 @@ Saat daftar, fitur & kategori awal disiapkan otomatis (bisa diubah kapan saja):
   *Favorit*. Produk dengan kode/nama yang sama diperbarui, sisanya ditambahkan, dan kategori baru dibuat
   otomatis. Ringkasan tampil dulu sebelum disimpan; bila ada baris yang salah, tidak ada yang tersimpan.
 
+## Paket & upgrade (owner)
+
+- Saat daftar, usaha memilih **Gratis** (coba 7 hari) atau paket berbayar (**Mulai**, **Tumbuh**, **Juragan**;
+  bulanan atau tahunan). Paket berbayar langsung bisa dipakai 7 hari sambil menunggu pembayaran.
+- Kotak kuning di sidebar (di atas tombol Keluar) menampilkan paket & sisa hari. Ketuk → halaman **Upgrade paket**:
+  pemakaian (outlet, tablet, pengguna) dan pilihan paket. Owner memilih paket → permintaan tercatat.
+- Setelah masa coba / langganan habis, kasir tidak bisa membuat order atau membuka shift. Data, laporan,
+  dan pengaturan tetap bisa dibuka.
+- **Tim Strukasir (admin):** setelah pembayaran diterima, aktifkan paket:
+  `php artisan pos:activate-plan <kode-usaha> <mulai|tumbuh|juragan> --period=month|year`.
+  Perpanjangan saat masih aktif dihitung dari akhir periode berjalan.
+
 ## Kontak
 
 - Developer / support: ____________________ (WA) — jam layanan: ____________
