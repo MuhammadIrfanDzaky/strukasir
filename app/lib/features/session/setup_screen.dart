@@ -104,6 +104,9 @@ class ServerUrlField extends StatelessWidget {
 
   static bool get needed => kApiUrl.isEmpty;
 
+  /// API lokal dilihat dari emulator Android; tinggal diganti bila memakai tablet/ngrok.
+  static const devDefault = 'http://10.0.2.2:8000';
+
   @override
   Widget build(BuildContext context) {
     return TextFormField(
@@ -130,7 +133,7 @@ class _OwnerSignIn extends ConsumerStatefulWidget {
 
 class _OwnerSignInState extends ConsumerState<_OwnerSignIn> {
   final _form = GlobalKey<FormState>();
-  final _server = TextEditingController();
+  final _server = TextEditingController(text: ServerUrlField.devDefault);
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _otp = TextEditingController();

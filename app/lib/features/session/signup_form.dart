@@ -45,7 +45,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   final _phone = TextEditingController();
   final _address = TextEditingController();
   final _sectorOther = TextEditingController();
-  final _server = TextEditingController();
+  final _server = TextEditingController(text: ServerUrlField.devDefault);
   final _ownerName = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
