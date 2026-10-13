@@ -61,7 +61,6 @@ class SignupController extends Controller
                     'sales_mode' => $request->sector()->asksSalesMode() ? $data['sales_mode'] : null,
                     'province_code' => $data['province_code'],
                     'regency_code' => $data['regency_code'],
-                    'outlet_count' => (int) $data['outlet_count'],
                     'phone' => isset($data['phone']) ? preg_replace('/[ \-]/', '', $data['phone']) : null,
                     'terms_accepted_at' => now(),
                 ],
@@ -78,7 +77,7 @@ class SignupController extends Controller
                 $template->apply($tenant->id, $tenant->plan_id);
 
                 Audit::record('tenant.signup', $tenant, after: [
-                    'sector' => $data['sector'], 'sales_mode' => $tenant->sales_mode?->value, 'outlet_count' => (int) $data['outlet_count'],
+                    'sector' => $data['sector'], 'sales_mode' => $tenant->sales_mode?->value,
                     'template' => ['features' => $template->features, 'categories' => $template->categories],
                 ], user: $owner, device: $device);
                 Audit::record('device.registered', $device, after: ['code' => $device->code, 'name' => $device->name],

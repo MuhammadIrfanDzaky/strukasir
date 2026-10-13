@@ -53,7 +53,6 @@ class SignupRequest extends FormRequest
                     $fail('Pilih kota/kabupaten di provinsi tersebut.');
                 }
             }],
-            'outlet_count' => ['required', 'integer', 'between:1,999'],
             'phone' => ['nullable', 'string', 'regex:/^\+?[0-9 \-]{8,20}$/'],
             'address' => ['nullable', 'string', 'max:300'],
             'terms' => ['accepted'],

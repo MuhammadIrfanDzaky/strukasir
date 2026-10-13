@@ -90,7 +90,6 @@ final bigMenu = Menu.fromJson({
   'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true, 'member_tiers': true, 'customer_credit': true, 'customer_messaging': true, 'promotions': true, 'inventory': true},
   'promotions': promotionsJson,
   'outlet': {'id': 'o1', 'code': 'O1', 'name': 'BerryBrew Sudirman', 'address': 'Jl. Sudirman 1'},
-  'outlet_count': 2,
   'member_tiers': tiersJson,
   'loyalty': loyaltyJson,
   'categories': [

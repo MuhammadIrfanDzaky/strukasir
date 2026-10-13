@@ -77,7 +77,6 @@ class SignupData {
     this.salesMode,
     required this.provinceCode,
     required this.regencyCode,
-    required this.outletCount,
     required this.ownerName,
     required this.email,
     required this.password,
@@ -97,7 +96,6 @@ class SignupData {
   final String? salesMode;
   final String provinceCode;
   final String regencyCode;
-  final int outletCount;
   final String ownerName;
   final String email;
   final String password;
@@ -115,7 +113,6 @@ class SignupData {
         if (salesMode != null) 'sales_mode': salesMode,
         'province_code': provinceCode,
         'regency_code': regencyCode,
-        'outlet_count': outletCount,
         'owner_name': ownerName.trim(),
         'email': email.trim(),
         'password': password,

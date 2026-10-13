@@ -18,7 +18,7 @@ const _salesModeIcons = {
 
 /// Field server yang ada di langkah 1 (usaha); sisanya di langkah 2 (akun owner).
 const _businessFields = {
-  'business_name', 'sector', 'sector_other', 'sales_mode', 'province_code', 'regency_code', 'outlet_count', 'phone',
+  'business_name', 'sector', 'sector_other', 'sales_mode', 'province_code', 'regency_code', 'phone',
   'address',
 };
 
@@ -65,7 +65,6 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   /// Pilihan jenis usaha & wilayah dari server (dimuat saat pertama dibutuhkan).
   SignupOptions? _options;
   bool _loadingOptions = false;
-  int _outlets = 1;
   bool _terms = false;
   bool _showPassword = false;
   bool _busy = false;
@@ -235,7 +234,6 @@ class _SignupFormState extends ConsumerState<SignupForm> {
               salesMode: _asksSalesMode ? _salesMode : null,
               provinceCode: _province!,
               regencyCode: _regency!,
-              outletCount: _outlets,
               phone: _phone.text,
               address: _address.text,
               ownerName: _ownerName.text,
@@ -352,23 +350,6 @@ class _SignupFormState extends ConsumerState<SignupForm> {
                 style: AppType.caption.copyWith(color: AppColors.inkMuted),
               ),
             ),
-          const SizedBox(height: AppSpace.s4),
-          Row(
-            children: [
-              Expanded(child: Text('Jumlah outlet / cabang', style: AppType.bodyStrong)),
-              IconButton.outlined(
-                tooltip: 'Kurangi',
-                onPressed: _outlets <= 1 ? null : () => setState(() => _outlets--),
-                icon: const Icon(Icons.remove_rounded),
-              ),
-              SizedBox(width: 48, child: Text('$_outlets', textAlign: TextAlign.center, style: AppType.title)),
-              IconButton.outlined(
-                tooltip: 'Tambah',
-                onPressed: _outlets >= 999 ? null : () => setState(() => _outlets++),
-                icon: const Icon(Icons.add_rounded),
-              ),
-            ],
-          ),
           const SizedBox(height: AppSpace.s4),
           PickerField(
             label: 'Provinsi',

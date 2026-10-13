@@ -40,7 +40,6 @@ class SignupTest extends TestCase
             'business_name' => 'Kopi Senja',
             'sector' => 'coffee_shop',
             'sales_mode' => 'dine_in',
-            'outlet_count' => 2,
             'province_code' => '12',
             'regency_code' => '12.71',
             'phone' => '0812-3456-7890',
@@ -82,7 +81,7 @@ class SignupTest extends TestCase
         $this->assertStringStartsWith('kopi-senja-', $tenant->code);
         $this->assertSame(BusinessSector::CoffeeShop, $tenant->sector);
         $this->assertSame(SalesMode::DineIn, $tenant->sales_mode);
-        $this->assertSame([2, '081234567890'], [$tenant->outlet_count, $tenant->phone]);
+        $this->assertSame([null, '081234567890'], [$tenant->outlet_count, $tenant->phone]);
         $this->assertSame(['12', '12.71', null], [$tenant->province_code, $tenant->regency_code, $tenant->sector_other]);
         $this->assertNotNull($tenant->terms_accepted_at);
         $this->assertSame('standard', $tenant->plan->code);
@@ -127,10 +126,9 @@ class SignupTest extends TestCase
             'terms' => false,
             'sector' => 'pabrik',
             'sales_mode' => 'drive_thru',
-            'outlet_count' => 0,
             'phone' => 'bukan nomor',
         ])->assertUnprocessable()->assertJsonValidationErrors(
-            ['password', 'pin', 'terms', 'sector', 'sales_mode', 'outlet_count', 'phone']);
+            ['password', 'pin', 'terms', 'sector', 'sales_mode', 'phone']);
 
         $this->signup(['password' => 'hanyahuruf'])->assertJsonValidationErrors('password');
         $this->assertSame(0, Tenant::count());
