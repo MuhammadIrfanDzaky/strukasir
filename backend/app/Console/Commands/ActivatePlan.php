@@ -25,7 +25,9 @@ class ActivatePlan extends Command
             return self::FAILURE;
         }
 
-        $subscriptions->activate($tenant, $plan, $period);
+        $quote = $subscriptions->activate($tenant, $plan, $period);
+        $note = $quote['percent'] > 0 ? " (harga normal Rp{$quote['base']}, diskon {$quote['percent']}% {$quote['reason']})" : '';
+        $this->info("Tagihan: Rp{$quote['amount']}{$note}");
         $this->info("{$tenant->name}: paket {$plan->name} aktif sampai {$tenant->plan_ends_at->timezone('Asia/Jakarta')->format('d M Y H:i')} WIB.");
 
         return self::SUCCESS;

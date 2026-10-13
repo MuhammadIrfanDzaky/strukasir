@@ -8,6 +8,7 @@ use App\Http\Requests\SignupRequest;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\DeviceRegistrar;
+use App\Services\ReferralService;
 use App\Services\SignupCodes;
 use App\Services\SubscriptionService;
 use App\Services\TenantProvisioner;
@@ -75,6 +76,10 @@ class SignupController extends Controller
                 receiptHeader: isset($data['address']) ? trim($data['address']) ?: null : null,
             );
 
+            $referrer = app(ReferralService::class)->findReferrer($data['referral_code'] ?? null);
+            if ($referrer !== null && $referrer->id !== $tenant->id) {
+                $tenant->referred_by = $referrer->id;
+            }
             $subscriptions->start($tenant, $plan, $period);
 
             return $context->run($tenant->id, function () use ($tenant, $data, $registrar, $plan) {

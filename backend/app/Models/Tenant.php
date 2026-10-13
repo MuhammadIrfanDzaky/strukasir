@@ -28,6 +28,14 @@ class Tenant extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Kode referral untuk dibagikan owner (lihat ReferralService).
+        static::creating(function (Tenant $tenant) {
+            $tenant->referral_code ??= \App\Services\ReferralService::newCode();
+        });
+    }
+
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);

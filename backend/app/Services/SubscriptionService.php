@@ -29,10 +29,12 @@ class SubscriptionService
     public function start(Tenant $tenant, Plan $plan, string $period): void
     {
         $free = $plan->code === PlanCatalog::FREE;
+        // Diajak lewat kode referral: masa coba / batas bayar 14 hari.
+        $days = $tenant->referred_by !== null ? ReferralService::REFERRED_TRIAL_DAYS : PlanCatalog::TRIAL_DAYS;
         $tenant->plan_id = $plan->id;
         $tenant->plan_status = $free ? 'trial' : 'awaiting_payment';
         $tenant->plan_period = $free ? null : $period;
-        $tenant->plan_ends_at = now()->addDays(PlanCatalog::TRIAL_DAYS);
+        $tenant->plan_ends_at = now()->addDays($days);
         if (! $free) {
             $tenant->requested_plan_id = $plan->id;
             $tenant->requested_period = $period;
@@ -55,9 +57,21 @@ class SubscriptionService
         Audit::record('plan.requested', $tenant, before: $before, after: ['plan' => $plan->code, 'period' => $period]);
     }
 
-    /** Admin: pembayaran diterima → paket aktif sampai akhir periode (diperpanjang bila masih berjalan). */
-    public function activate(Tenant $tenant, Plan $plan, string $period): void
+    /**
+     * Admin: pembayaran diterima → paket aktif sampai akhir periode (diperpanjang bila masih berjalan).
+     * Mencatat pembayaran beserta diskon referral; mengembalikan rincian tagihan.
+     *
+     * @return array{base: int, percent: int, reason: ?string, amount: int}
+     */
+    public function activate(Tenant $tenant, Plan $plan, string $period): array
     {
+        return DB::transaction(fn () => $this->doActivate($tenant, $plan, $period));
+    }
+
+    /** @return array{base: int, percent: int, reason: ?string, amount: int} */
+    private function doActivate(Tenant $tenant, Plan $plan, string $period): array
+    {
+        $quote = app(ReferralService::class)->recordPayment($tenant, $plan, $period);
         $from = $tenant->plan_status === 'active' && $tenant->plan_id === $plan->id && $tenant->plan_ends_at?->isFuture()
             ? $tenant->plan_ends_at : now();
         $tenant->plan_id = $plan->id;
@@ -68,6 +82,8 @@ class SubscriptionService
         $tenant->requested_period = null;
         $tenant->requested_at = null;
         $tenant->save();
+
+        return $quote;
     }
 
     /**
@@ -112,6 +128,9 @@ class SubscriptionService
                 'at' => $tenant->requested_at?->toIso8601String(),
             ],
             'usage' => $usage,
+            // Diskon yang berlaku di pembayaran berikutnya (referral), dan kode untuk dibagikan.
+            'discount' => array_intersect_key(app(ReferralService::class)->nextDiscount($tenant), ['percent' => 0, 'reason' => 0]),
+            'referral' => app(ReferralService::class)->present($tenant),
             'plans' => self::publicPlans()->map(fn (Plan $p) => self::presentPlan($p))->values(),
         ];
     }
