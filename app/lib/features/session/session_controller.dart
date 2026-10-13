@@ -84,6 +84,8 @@ class SignupData {
     required this.emailCode,
     this.phone,
     this.address,
+    this.plan,
+    this.period,
   });
 
   final String businessName;
@@ -106,6 +108,10 @@ class SignupData {
   final String? phone;
   final String? address;
 
+  /// Kode paket (gratis/mulai/tumbuh/juragan) & periode bayar (month/year).
+  final String? plan;
+  final String? period;
+
   Map<String, dynamic> toJson() => {
         'business_name': businessName.trim(),
         'sector': sector,
@@ -120,6 +126,8 @@ class SignupData {
         'email_code': emailCode.trim(),
         if (phone != null && phone!.trim().isNotEmpty) 'phone': phone!.trim(),
         if (address != null && address!.trim().isNotEmpty) 'address': address!.trim(),
+        if (plan != null) 'plan': plan,
+        if (period != null) 'period': period,
         'terms': true,
       };
 }

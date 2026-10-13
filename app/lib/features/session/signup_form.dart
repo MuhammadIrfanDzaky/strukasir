@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api_client.dart';
 import '../../core/config.dart';
 import '../../core/theme/tokens.dart';
+import '../subscription/subscription.dart';
 import 'session_controller.dart';
 import 'setup_screen.dart';
 import 'signup_options.dart';
@@ -26,7 +27,7 @@ const _businessFields = {
 bool weakPin(String pin) =>
     pin.split('').toSet().length == 1 || '01234567890'.contains(pin) || '09876543210'.contains(pin);
 
-/// Daftar usaha baru, 2 langkah: (1) usaha, (2) akun owner. Berhasil → tablet ini terdaftar
+/// Daftar usaha baru: (1) usaha, (2) paket, (3) akun owner, (4) kode email. Berhasil → tablet ini terdaftar
 /// dan owner langsung masuk ke Kasir.
 class SignupForm extends ConsumerStatefulWidget {
   const SignupForm({super.key, required this.onBack});
@@ -57,6 +58,10 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   String? _codeInfo;
 
   int _step = 0;
+
+  /// Paket pilihan: Gratis = coba 7 hari; berbayar = menunggu pembayaran.
+  String _plan = 'gratis';
+  String _period = 'month';
   String? _sector;
   String? _salesMode;
   String? _province;
@@ -192,17 +197,17 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           .sendSignupCode(serverUrl: _serverUrl, email: _email.text, ownerName: _ownerName.text);
       setState(() {
         _codeInfo = message;
-        _step = 2;
+        _step = 3;
         _submitted = false;
       });
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
         _serverErrors = {for (final f in e.fieldErrors.keys) f: e.field(f)!};
-        if (_serverErrors.containsKey('email')) _step = 1;
+        if (_serverErrors.containsKey('email')) _step = 2;
         // Kode baru saja dikirim (jeda 1 menit): tetap lanjut ke isian kode.
-        if (e.status == 429 && _step == 1 && !resend) {
-          _step = 2;
+        if (e.status == 429 && _step == 2 && !resend) {
+          _step = 3;
           _codeInfo = 'Kode sudah dikirim ke ${_email.text.trim()}. Periksa juga folder spam.';
         } else if (_serverErrors.isEmpty) {
           _error = e.message;
@@ -241,6 +246,8 @@ class _SignupFormState extends ConsumerState<SignupForm> {
               password: _password.text,
               pin: _pin.text,
               emailCode: _emailCode.text,
+              plan: _plan,
+              period: _period,
             ),
           );
     } on ApiException catch (e) {
@@ -251,8 +258,10 @@ class _SignupFormState extends ConsumerState<SignupForm> {
         // Kembali ke langkah tempat kesalahan berada supaya terlihat.
         if (errors.keys.any(_businessFields.contains)) {
           _step = 0;
-        } else if (errors.keys.any((f) => f != 'email_code')) {
+        } else if (errors.containsKey('plan') || errors.containsKey('period')) {
           _step = 1;
+        } else if (errors.keys.any((f) => f != 'email_code')) {
+          _step = 2;
         }
         _error = errors.isEmpty ? e.message : 'Periksa kembali isian yang ditandai.';
       });
@@ -267,7 +276,8 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   Widget build(BuildContext context) {
     return switch (_step) {
       0 => _businessStep(),
-      1 => _ownerStep(),
+      1 => _planStep(),
+      2 => _ownerStep(),
       _ => _verifyStep(),
     };
   }
@@ -289,7 +299,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           FormHeader(
-            step: 'Langkah 1 dari 3',
+            step: 'Langkah 1 dari 4',
             title: 'Tentang usaha Anda',
             subtitle: 'Dipakai untuk struk dan menyesuaikan aplikasi dengan cara Anda berjualan.',
             onBack: widget.onBack,
@@ -404,6 +414,51 @@ class _SignupFormState extends ConsumerState<SignupForm> {
     );
   }
 
+  /// Langkah 2: Gratis (coba 7 hari) atau langsung paket berbayar.
+  Widget _planStep() {
+    final plans = _options?.plans ?? const <PlanInfo>[];
+    final chosen = plans.where((p) => p.code == _plan).firstOrNull;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FormHeader(
+          step: 'Langkah 2 dari 4',
+          title: 'Pilih paket',
+          subtitle: 'Mulai gratis 7 hari, atau langsung pilih paket berbayar. Paket bisa diganti kapan saja.',
+          onBack: () => setState(() {
+            _step = 0;
+            _error = null;
+          }),
+        ),
+        const SizedBox(height: AppSpace.s5),
+        PlanPicker(
+          plans: plans,
+          selected: _plan,
+          period: _period,
+          onSelected: (c) => setState(() => _plan = c),
+          onPeriod: (p) => setState(() => _period = p),
+        ),
+        if (_serverError('plan') != null) _choiceError(_serverError('plan')!),
+        const SizedBox(height: AppSpace.s2),
+        Text(
+          chosen == null || chosen.free
+              ? 'Tanpa kartu kredit. Setelah 7 hari, pilih paket berbayar untuk lanjut berjualan; data tetap tersimpan.'
+              : 'Paket ${chosen.name} langsung aktif selama 7 hari sambil menunggu pembayaran (transfer / QRIS). '
+                  'Tim Strukasir menghubungi Anda lewat email setelah pendaftaran.',
+          style: AppType.caption.copyWith(color: AppColors.inkMuted),
+        ),
+        const SizedBox(height: AppSpace.s4),
+        FilledButton(
+          onPressed: () => setState(() {
+            _step = 2;
+            _error = null;
+          }),
+          child: Text(chosen == null || chosen.free ? 'Mulai gratis 7 hari' : 'Lanjut dengan ${chosen.name}'),
+        ),
+      ],
+    );
+  }
+
   Widget _ownerStep() {
     return Form(
       key: _ownerForm,
@@ -412,11 +467,11 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             FormHeader(
-              step: 'Langkah 2 dari 3',
+              step: 'Langkah 3 dari 4',
               title: 'Akun owner',
               subtitle: 'Email & password untuk menambah tablet. PIN untuk masuk kasir sehari-hari.',
               onBack: () => setState(() {
-                _step = 0;
+                _step = 1;
                 _error = null;
               }),
             ),
@@ -519,11 +574,11 @@ class _SignupFormState extends ConsumerState<SignupForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FormHeader(
-          step: 'Langkah 3 dari 3',
+          step: 'Langkah 4 dari 4',
           title: 'Verifikasi email',
           subtitle: _codeInfo ?? 'Masukkan kode 6 digit yang kami kirim ke ${_email.text.trim()}.',
           onBack: () => setState(() {
-            _step = 1;
+            _step = 2;
             _error = null;
           }),
         ),
@@ -544,7 +599,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           spacing: AppSpace.s2,
           children: [
             TextButton(onPressed: _busy ? null : () => _sendCode(resend: true), child: const Text('Kirim ulang kode'), ),
-            TextButton(onPressed: _busy ? null : () => setState(() => _step = 1), child: const Text('Ubah email'), ),
+            TextButton(onPressed: _busy ? null : () => setState(() => _step = 2), child: const Text('Ubah email'), ),
           ],
         ),
         Text(

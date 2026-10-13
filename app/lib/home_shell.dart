@@ -14,6 +14,7 @@ import 'features/reports/reports_screen.dart';
 import 'features/session/account_dialogs.dart';
 import 'features/session/session_controller.dart';
 import 'features/shift/shift_chip.dart';
+import 'features/subscription/subscription.dart';
 
 /// Kerangka setelah login. Item navigasi mengikuti izin user; server tetap memeriksa ulang.
 ///
@@ -70,7 +71,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // Rail tanpa logo/label/tombol keluar bila tinggi tersisa tidak cukup untuk semua item
     // (HP landscape, atau tablet saat keyboard muncul). Keluar tetap lewat menu akun.
     final railHeight = MediaQuery.sizeOf(context).height - MediaQuery.viewInsetsOf(context).bottom;
-    final tightRail = short || railHeight < 120 + destinations.length * 76;
+    // + CTA paket (~100) di atas tombol Keluar.
+    final tightRail = short || railHeight < 220 + destinations.length * 76;
 
     final needsVerify = user.email != null && !user.emailVerified;
     void verifyEmail() => showDialog<bool>(context: context, builder: (_) => VerifyEmailDialog(email: user.email!));
@@ -82,7 +84,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       role: user.role,
       deviceCode: widget.session.device.code,
       outlet: (ref.watch(menuProvider).value?.menu.multiOutlet ?? false) ? ref.watch(menuProvider).value?.menu.outlet?.name : null,
-      onRefresh: () => ref.read(menuProvider.notifier).refresh(),
+      onRefresh: () {
+        ref.read(menuProvider.notifier).refresh();
+        ref.invalidate(subscriptionProvider);
+      },
+      onUpgrade: () => openUpgrade(context),
       onLogout: _logout,
       onSettings: settingsInMenu
           ? () => Navigator.of(context).push(MaterialPageRoute<void>(
@@ -156,11 +162,19 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                       alignment: Alignment.bottomCenter,
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: AppSpace.s4),
-                        child: IconButton(
-                          tooltip: 'Keluar',
-                          color: AppColors.onInkMuted,
-                          onPressed: _logout,
-                          icon: const Icon(Icons.logout_rounded),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Paket sekarang + ajakan upgrade, tepat di atas Keluar.
+                            PlanCta(width: (context.widthClass == WidthClass.expanded && !short ? AppSize.rail : 80) - AppSpace.s3),
+                            const SizedBox(height: AppSpace.s3),
+                            IconButton(
+                              tooltip: 'Keluar',
+                              color: AppColors.onInkMuted,
+                              onPressed: _logout,
+                              icon: const Icon(Icons.logout_rounded),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -230,7 +244,11 @@ class _TopBar extends StatelessWidget {
     required this.onLogout,
     this.onVerifyEmail,
     this.onSettings,
+    required this.onUpgrade,
   });
+
+  /// Halaman Upgrade paket (juga lewat CTA di sidebar).
+  final VoidCallback onUpgrade;
 
   /// HP dengan banyak tab: Pengaturan dibuka dari menu akun.
   final VoidCallback? onSettings;
@@ -282,6 +300,7 @@ class _TopBar extends StatelessWidget {
               'refresh' => onRefresh(),
               'verify' => onVerifyEmail?.call(),
               'settings' => onSettings?.call(),
+              'upgrade' => onUpgrade(),
               _ => onLogout(),
             },
             itemBuilder: (_) => [
@@ -306,6 +325,10 @@ class _TopBar extends StatelessWidget {
                   value: 'settings',
                   child: ListTile(title: Text('Pengaturan')),
                 ),
+              const PopupMenuItem(
+                value: 'upgrade',
+                child: ListTile(title: Text('Paket & upgrade')),
+              ),
               const PopupMenuItem(
                 value: 'refresh',
                 child: ListTile(title: Text('Muat ulang menu')),

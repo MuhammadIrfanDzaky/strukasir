@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api_client.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/responsive.dart';
+import '../subscription/subscription.dart';
 
 /// Satu jenis usaha (kode = enum `BusinessSector` di server).
 class SectorOption {
@@ -31,7 +32,7 @@ class RegionOption {
 
 /// Pilihan form "Daftar usaha baru" dari GET /signup/options.
 class SignupOptions {
-  const SignupOptions({required this.sectors, required this.salesModes, required this.provinces});
+  const SignupOptions({required this.sectors, required this.salesModes, required this.provinces, this.plans = const []});
 
   factory SignupOptions.fromJson(Map<String, dynamic> j) => SignupOptions(
         sectors: [
@@ -44,6 +45,7 @@ class SignupOptions {
           for (final m in (j['sales_modes'] as List).cast<Map<String, dynamic>>())
             (m['code'] as String, m['label'] as String),
         ],
+        plans: [for (final p in (j['plans'] as List? ?? const []).cast<Map<String, dynamic>>()) PlanInfo.fromJson(p)],
         provinces: [
           for (final p in (j['regions'] as List).cast<Map<String, dynamic>>())
             RegionOption(p['code'] as String, p['name'] as String, [
@@ -56,6 +58,9 @@ class SignupOptions {
   final List<SectorOption> sectors;
   final List<(String code, String label)> salesModes;
   final List<RegionOption> provinces;
+
+  /// Paket yang ditawarkan saat daftar (Gratis dulu).
+  final List<PlanInfo> plans;
 
   SectorOption? sector(String? code) => sectors.where((s) => s.code == code).firstOrNull;
   RegionOption? province(String? code) => provinces.where((p) => p.code == code).firstOrNull;
