@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_client.dart';
 import '../../core/money.dart';
@@ -59,6 +61,16 @@ class PlanInfo {
           ? 'Rp${rupiah(priceYear)}/tahun'
           : 'Rp${rupiah(priceMonth)}/bulan';
 
+  int base(String period) => period == 'year' ? priceYear : priceMonth;
+
+  /// Harga setelah diskon referral, dibulatkan ke ratusan (sama dengan server).
+  int discounted(String period, int percent) => ((base(period) * (100 - percent) / 100) / 100).round() * 100;
+
+  /// Harga yang ditampilkan di tombol/dialog, sudah termasuk diskon.
+  String priceWith(String period, int percent) => percent == 0 || free
+      ? price(period)
+      : 'Rp${rupiah(discounted(period, percent))}/${period == 'year' ? 'tahun' : 'bulan'} (diskon $percent%)';
+
   String get limits => [
         _limit(maxOutlets, 'outlet'),
         _limit(maxDevices, 'tablet'),
@@ -92,6 +104,9 @@ class Subscription {
     this.requestedPeriod,
     required this.usage,
     required this.plans,
+    this.discountPercent = 0,
+    this.discountReason,
+    this.referral,
   });
 
   factory Subscription.fromJson(Map<String, dynamic> j) {
@@ -106,8 +121,18 @@ class Subscription {
       requestedPeriod: requested?['period'] as String?,
       usage: (j['usage'] as Map<String, dynamic>).map((k, v) => MapEntry(k, v as int)),
       plans: (j['plans'] as List).cast<Map<String, dynamic>>().map(PlanInfo.fromJson).toList(),
+      discountPercent: (j['discount'] as Map<String, dynamic>?)?['percent'] as int? ?? 0,
+      discountReason: (j['discount'] as Map<String, dynamic>?)?['reason'] as String?,
+      referral: j['referral'] == null ? null : ReferralInfo.fromJson(j['referral'] as Map<String, dynamic>),
     );
   }
+
+  /// Diskon di pembayaran berikutnya: 25% (diajak, sekali) atau 50% (kupon pengajak).
+  final int discountPercent;
+
+  /// referred | referral_reward
+  final String? discountReason;
+  final ReferralInfo? referral;
 
   final PlanInfo plan;
 
@@ -153,7 +178,11 @@ class PlanPicker extends StatelessWidget {
     required this.onSelected,
     required this.onPeriod,
     this.current,
+    this.discountPercent = 0,
   });
+
+  /// Diskon referral yang berlaku (harga normal dicoret).
+  final int discountPercent;
 
   final List<PlanInfo> plans;
   final String? selected;
@@ -191,6 +220,7 @@ class PlanPicker extends StatelessWidget {
                 period: period,
                 selected: p.code == selected,
                 current: p.code == current,
+                discountPercent: discountPercent,
                 onTap: p.code == current ? null : () => onSelected(p.code),
               ),
           ];
@@ -223,7 +253,16 @@ class PlanPicker extends StatelessWidget {
 }
 
 class _PlanCard extends StatelessWidget {
-  const _PlanCard({required this.plan, required this.period, required this.selected, required this.current, this.onTap});
+  const _PlanCard({
+    required this.plan,
+    required this.period,
+    required this.selected,
+    required this.current,
+    this.discountPercent = 0,
+    this.onTap,
+  });
+
+  final int discountPercent;
 
   final PlanInfo plan;
   final String period;
@@ -255,7 +294,14 @@ class _PlanCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: AppSpace.s1),
-              Text(plan.price(period), style: AppType.bodyStrong.copyWith(color: AppColors.ink)),
+              if (discountPercent > 0 && !plan.free) ...[
+                Text(plan.price(period), style: muted.copyWith(decoration: TextDecoration.lineThrough)),
+                Text(
+                  'Rp${rupiah(plan.discounted(period, discountPercent))}/${period == 'year' ? 'tahun' : 'bulan'} · diskon $discountPercent%',
+                  style: AppType.bodyStrong.copyWith(color: AppColors.ink),
+                ),
+              ] else
+                Text(plan.price(period), style: AppType.bodyStrong.copyWith(color: AppColors.ink)),
               if (!plan.free && period == 'year')
                 Text('setara Rp${rupiah((plan.priceYear / 12).round())}/bulan', style: muted),
               if (plan.tagline != null) ...[
@@ -329,7 +375,7 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
   String _period = 'month';
   bool _busy = false;
 
-  Future<void> _request(PlanInfo plan) async {
+  Future<void> _request(PlanInfo plan, int discount) async {
     setState(() => _busy = true);
     try {
       await ref.read(sessionProvider.notifier).authed((api, token) =>
@@ -341,7 +387,7 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
         builder: (_) => AlertDialog(
           title: Text('Permintaan paket ${plan.name} tercatat'),
           content: Text(
-            'Total ${plan.price(_period)}. Tim Strukasir akan menghubungi Anda lewat email / WhatsApp untuk '
+            'Total ${plan.priceWith(_period, discount)}. Tim Strukasir akan menghubungi Anda lewat email / WhatsApp untuk '
             'pembayaran (transfer atau QRIS). Paket aktif begitu pembayaran diterima.',
           ),
           actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Mengerti'))],
@@ -387,6 +433,7 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                         selected: _selected,
                         period: _period,
                         current: sub.status == 'active' ? sub.plan.code : null,
+                        discountPercent: sub.discountPercent,
                         onSelected: (c) => setState(() => _selected = c),
                         onPeriod: (p) => setState(() => _period = p),
                       ),
@@ -395,8 +442,10 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: FilledButton(
-                            onPressed: chosen == null || _busy ? null : () => _request(chosen),
-                            child: Text(chosen == null ? 'Pilih salah satu paket' : 'Pilih ${chosen.name} · ${chosen.price(_period)}'),
+                            onPressed: chosen == null || _busy ? null : () => _request(chosen, sub.discountPercent),
+                            child: Text(chosen == null
+                                ? 'Pilih salah satu paket'
+                                : 'Pilih ${chosen.name} · ${chosen.priceWith(_period, sub.discountPercent)}'),
                           ),
                         )
                       else
@@ -407,6 +456,12 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                         'paket aktif begitu pembayaran diterima. Data tidak hilang saat paket habis.',
                         style: AppType.caption.copyWith(color: AppColors.inkMuted),
                       ),
+                      if (sub.referral != null) ...[
+                        const SizedBox(height: AppSpace.s6),
+                        const AppOverline('AJAK USAHA LAIN'),
+                        const SizedBox(height: AppSpace.s2),
+                        _ReferralCard(info: sub.referral!),
+                      ],
                     ],
                   ),
                 ),
@@ -480,6 +535,103 @@ class _CurrentPlan extends StatelessWidget {
               style: muted,
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Kode referral usaha ini & hasilnya (GET /subscription → `referral`).
+class ReferralInfo {
+  const ReferralInfo({
+    required this.code,
+    required this.invited,
+    required this.paid,
+    required this.rewardsAvailable,
+    required this.referredPercent,
+    required this.rewardPercent,
+    required this.trialDays,
+  });
+
+  factory ReferralInfo.fromJson(Map<String, dynamic> j) => ReferralInfo(
+        code: j['code'] as String? ?? '',
+        invited: j['invited'] as int,
+        paid: j['paid'] as int,
+        rewardsAvailable: j['rewards_available'] as int,
+        referredPercent: j['referred_percent'] as int,
+        rewardPercent: j['reward_percent'] as int,
+        trialDays: j['trial_days'] as int,
+      );
+
+  final String code;
+
+  /// Usaha yang daftar dengan kode ini / yang sudah membayar paket.
+  final int invited;
+  final int paid;
+
+  /// Kupon diskon pengajak yang belum dipakai.
+  final int rewardsAvailable;
+  final int referredPercent;
+  final int rewardPercent;
+  final int trialDays;
+}
+
+class _ReferralCard extends StatelessWidget {
+  const _ReferralCard({required this.info});
+
+  final ReferralInfo info;
+
+  String get _message => 'Saya pakai Strukasir untuk kasir & laporan usaha. Daftar pakai kode ${info.code} '
+      'supaya dapat coba gratis ${info.trialDays} hari dan diskon ${info.referredPercent}% saat berlangganan.';
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = AppType.body.copyWith(color: AppColors.inkMuted);
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.s5),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Kode referral Anda', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+          SelectableText(info.code, style: AppType.headline.copyWith(letterSpacing: 4)),
+          const SizedBox(height: AppSpace.s2),
+          Text(
+            'Usaha yang daftar dengan kode ini dapat coba gratis ${info.trialDays} hari dan diskon ${info.referredPercent}% '
+            'di pembayaran pertama. Anda dapat diskon ${info.rewardPercent}% untuk satu pembayaran setiap ada usaha ajakan '
+            'yang mulai berlangganan.',
+            style: muted,
+          ),
+          const SizedBox(height: AppSpace.s3),
+          Text(
+            'Diajak ${info.invited}   ·   Sudah berlangganan ${info.paid}   ·   Kupon ${info.rewardPercent}% tersedia ${info.rewardsAvailable}',
+            style: AppType.label.copyWith(color: AppColors.ink),
+          ),
+          const SizedBox(height: AppSpace.s4),
+          Wrap(
+            spacing: AppSpace.s2,
+            runSpacing: AppSpace.s2,
+            children: [
+              FilledButton(
+                onPressed: () => launchUrl(
+                  Uri.parse('https://wa.me/?text=${Uri.encodeComponent(_message)}'),
+                  mode: LaunchMode.externalApplication,
+                ),
+                child: const Text('Bagikan lewat WhatsApp'),
+              ),
+              OutlinedButton(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: info.code));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kode referral disalin')));
+                },
+                child: const Text('Salin kode'),
+              ),
+            ],
+          ),
         ],
       ),
     );

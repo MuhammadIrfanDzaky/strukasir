@@ -86,6 +86,7 @@ class SignupData {
     this.address,
     this.plan,
     this.period,
+    this.referralCode,
   });
 
   final String businessName;
@@ -112,6 +113,9 @@ class SignupData {
   final String? plan;
   final String? period;
 
+  /// Kode referral usaha pengajak (opsional).
+  final String? referralCode;
+
   Map<String, dynamic> toJson() => {
         'business_name': businessName.trim(),
         'sector': sector,
@@ -128,6 +132,7 @@ class SignupData {
         if (address != null && address!.trim().isNotEmpty) 'address': address!.trim(),
         if (plan != null) 'plan': plan,
         if (period != null) 'period': period,
+        if (referralCode != null && referralCode!.trim().isNotEmpty) 'referral_code': referralCode!.trim(),
         'terms': true,
       };
 }

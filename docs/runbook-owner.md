@@ -306,8 +306,12 @@ Saat daftar, fitur & kategori awal disiapkan otomatis (bisa diubah kapan saja):
   pemakaian (outlet, tablet, pengguna) dan pilihan paket. Owner memilih paket → permintaan tercatat.
 - Setelah masa coba / langganan habis, kasir tidak bisa membuat order atau membuka shift. Data, laporan,
   dan pengaturan tetap bisa dibuka.
+- **Referral:** halaman Upgrade menampilkan kode referral usaha (bagikan lewat WhatsApp / salin). Usaha yang daftar
+  dengan kode itu dapat coba gratis 14 hari + diskon 25% di pembayaran pertama. Pengajak dapat satu kupon diskon 50%
+  untuk setiap usaha ajakan yang mulai berlangganan; satu kupon untuk satu pembayaran (tidak ditumpuk).
 - **Tim Strukasir (admin):** setelah pembayaran diterima, aktifkan paket:
   `php artisan pos:activate-plan <kode-usaha> <mulai|tumbuh|juragan> --period=month|year`.
+  Perintah ini menampilkan **jumlah yang harus ditagih** (sudah termasuk diskon referral) dan mencatat pembayarannya.
   Perpanjangan saat masih aktif dihitung dari akhir periode berjalan.
 
 ## Kontak

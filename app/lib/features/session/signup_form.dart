@@ -54,6 +54,9 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   final _pin2 = TextEditingController();
   final _emailCode = TextEditingController();
 
+  /// Kode referral dari usaha pengajak (opsional).
+  final _referral = TextEditingController();
+
   /// Pesan setelah kode dikirim, mis. "Kode dikirim ke ...".
   String? _codeInfo;
 
@@ -79,7 +82,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
 
   @override
   void dispose() {
-    for (final c in [_businessName, _phone, _address, _sectorOther, _server, _ownerName, _email, _password, _pin, _pin2, _emailCode]) {
+    for (final c in [_businessName, _phone, _address, _sectorOther, _server, _ownerName, _email, _password, _pin, _pin2, _emailCode, _referral]) {
       c.dispose();
     }
     super.dispose();
@@ -248,6 +251,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
               emailCode: _emailCode.text,
               plan: _plan,
               period: _period,
+              referralCode: _referral.text,
             ),
           );
     } on ApiException catch (e) {
@@ -258,7 +262,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
         // Kembali ke langkah tempat kesalahan berada supaya terlihat.
         if (errors.keys.any(_businessFields.contains)) {
           _step = 0;
-        } else if (errors.containsKey('plan') || errors.containsKey('period')) {
+        } else if (errors.containsKey('plan') || errors.containsKey('period') || errors.containsKey('referral_code')) {
           _step = 1;
         } else if (errors.keys.any((f) => f != 'email_code')) {
           _step = 2;
@@ -439,11 +443,24 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           onPeriod: (p) => setState(() => _period = p),
         ),
         if (_serverError('plan') != null) _choiceError(_serverError('plan')!),
+        const SizedBox(height: AppSpace.s3),
+        TextField(
+          controller: _referral,
+          textCapitalization: TextCapitalization.characters,
+          maxLength: 12,
+          decoration: InputDecoration(
+            labelText: 'Kode referral (opsional)',
+            helperText: 'Diajak usaha lain? Coba gratis 14 hari & diskon 25% saat berlangganan.',
+            counterText: '',
+            errorText: _serverError('referral_code'),
+          ),
+          onChanged: (_) => setState(() => _serverErrors.remove('referral_code')),
+        ),
         const SizedBox(height: AppSpace.s2),
         Text(
           chosen == null || chosen.free
-              ? 'Tanpa kartu kredit. Setelah 7 hari, pilih paket berbayar untuk lanjut berjualan; data tetap tersimpan.'
-              : 'Paket ${chosen.name} langsung aktif selama 7 hari sambil menunggu pembayaran (transfer / QRIS). '
+              ? 'Tanpa kartu kredit. Setelah masa coba, pilih paket berbayar untuk lanjut berjualan; data tetap tersimpan.'
+              : 'Paket ${chosen.name} langsung aktif selama masa coba sambil menunggu pembayaran (transfer / QRIS). '
                   'Tim Strukasir menghubungi Anda lewat email setelah pendaftaran.',
           style: AppType.caption.copyWith(color: AppColors.inkMuted),
         ),
@@ -453,7 +470,9 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             _step = 2;
             _error = null;
           }),
-          child: Text(chosen == null || chosen.free ? 'Mulai gratis 7 hari' : 'Lanjut dengan ${chosen.name}'),
+          child: Text(chosen == null || chosen.free
+              ? 'Mulai gratis ${_referral.text.trim().isEmpty ? 7 : 14} hari'
+              : 'Lanjut dengan ${chosen.name}'),
         ),
       ],
     );
