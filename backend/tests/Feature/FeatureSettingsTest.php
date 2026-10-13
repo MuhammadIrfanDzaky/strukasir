@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\Feature;
 use App\Models\AuditLog;
 use App\Models\Plan;
+use App\Models\Tenant;
 use App\Models\TenantSetting;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -94,7 +95,7 @@ class FeatureSettingsTest extends TestCase
 
     public function test_cannot_enable_feature_outside_plan(): void
     {
-        $plan = Plan::query()->firstOrFail();
+        $plan = Tenant::query()->firstOrFail()->plan;
         DB::table('plan_features')->where('plan_id', $plan->id)->where('feature_key', Feature::SplitPayment->value)->delete();
 
         $this->save(['features' => ['split_payment' => true]])

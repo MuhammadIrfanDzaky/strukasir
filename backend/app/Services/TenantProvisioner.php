@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\Role;
+use App\Models\Outlet;
 use App\Models\Plan;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
@@ -41,7 +42,16 @@ class TenantProvisioner
             }
             $tenant->save();
 
-            $this->context->run($tenant->id, function () use ($name, $ownerName, $ownerEmail, $ownerPassword, $ownerPin, $receiptHeader) {
+            $this->context->run($tenant->id, function () use ($tenant, $name, $ownerName, $ownerEmail, $ownerPassword, $ownerPin, $receiptHeader) {
+                // Outlet utama (O1) membawa alamat & no HP dari form daftar (tampil di Pengaturan → Outlet).
+                $outlet = new Outlet([
+                    'name' => mb_substr($name, 0, 60),
+                    'address' => $receiptHeader !== null ? mb_substr($receiptHeader, 0, 160) : null,
+                    'phone' => $tenant->phone,
+                ]);
+                $outlet->code = 'O1';
+                $outlet->save();
+
                 (new TenantSetting([
                     'receipt_name' => mb_substr($name, 0, 40),
                     'receipt_header' => $receiptHeader,

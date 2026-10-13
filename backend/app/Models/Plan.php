@@ -13,6 +13,14 @@ class Plan extends Model
 
     protected $fillable = ['code', 'name'];
 
+    protected function casts(): array
+    {
+        return [
+            'price_month' => 'integer', 'price_year' => 'integer', 'max_outlets' => 'integer',
+            'max_devices' => 'integer', 'max_staff' => 'integer', 'sort' => 'integer', 'public' => 'boolean',
+        ];
+    }
+
     public function tenants(): HasMany
     {
         return $this->hasMany(Tenant::class);

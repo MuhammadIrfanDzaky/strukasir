@@ -9,9 +9,11 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Services\DeviceRegistrar;
 use App\Services\SignupCodes;
+use App\Services\SubscriptionService;
 use App\Services\TenantProvisioner;
 use App\Support\Audit;
 use App\Support\BusinessTemplate;
+use App\Support\PlanCatalog;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -29,16 +31,21 @@ class SignupController extends Controller
         DeviceRegistrar $registrar,
         TenantContext $context,
         SignupCodes $signupCodes,
+        SubscriptionService $subscriptions,
     ): JsonResponse {
-        if (! Plan::where('code', 'standard')->exists()) {
-            report(new \RuntimeException('Paket "standard" belum ada: jalankan FeatureSeeder.'));
+        if (! Plan::where('code', PlanCatalog::FREE)->exists()) {
+            report(new \RuntimeException('Paket belum ada: jalankan FeatureSeeder.'));
 
             return response()->json(['message' => 'Pendaftaran sedang tidak tersedia. Coba lagi nanti.'], 503);
         }
 
         $data = $request->validated();
 
-        return DB::transaction(function () use ($data, $request, $provisioner, $registrar, $context, $signupCodes) {
+        // Paket dipilih di form daftar; tanpa pilihan (app lama) = Gratis 7 hari.
+        $plan = Plan::query()->where('code', $data['plan'] ?? PlanCatalog::FREE)->firstOrFail();
+        $period = $data['period'] ?? 'month';
+
+        return DB::transaction(function () use ($data, $request, $provisioner, $registrar, $context, $signupCodes, $subscriptions, $plan, $period) {
             // Email harus terbukti milik pendaftar sebelum usaha dibuat.
             if (! $signupCodes->consume($data['email'], trim($data['email_code']))) {
                 return response()->json([
@@ -54,6 +61,7 @@ class SignupController extends Controller
                 ownerEmail: $data['email'],
                 ownerPassword: $data['password'],
                 ownerPin: $data['pin'],
+                planCode: $plan->code,
                 profile: [
                     'sector' => $data['sector'],
                     'sector_other' => $data['sector'] === 'other' ? trim($data['sector_other']) : null,
@@ -67,7 +75,9 @@ class SignupController extends Controller
                 receiptHeader: isset($data['address']) ? trim($data['address']) ?: null : null,
             );
 
-            return $context->run($tenant->id, function () use ($tenant, $data, $registrar) {
+            $subscriptions->start($tenant, $plan, $period);
+
+            return $context->run($tenant->id, function () use ($tenant, $data, $registrar, $plan) {
                 $owner = User::query()->where('role', Role::Owner)->firstOrFail();
                 $owner->forceFill(['email_verified_at' => now()])->save();
                 [$device, $token] = $registrar->register($tenant, $data['device_id'] ?? null, $data['device_name'] ?? null);
@@ -77,7 +87,7 @@ class SignupController extends Controller
                 $template->apply($tenant->id, $tenant->plan_id);
 
                 Audit::record('tenant.signup', $tenant, after: [
-                    'sector' => $data['sector'], 'sales_mode' => $tenant->sales_mode?->value,
+                    'sector' => $data['sector'], 'sales_mode' => $tenant->sales_mode?->value, 'plan' => $plan->code, 'plan_status' => $tenant->plan_status,
                     'template' => ['features' => $template->features, 'categories' => $template->categories],
                 ], user: $owner, device: $device);
                 Audit::record('device.registered', $device, after: ['code' => $device->code, 'name' => $device->name],

@@ -60,8 +60,9 @@ class FeatureGate
             ->pluck('enabled', 'feature_key')
             ->all());
 
+        // Override owner hanya bisa mematikan fitur paket; fitur di luar paket (mis. setelah turun paket) tetap mati.
         foreach ($overrides as $key => $enabled) {
-            $features[$key] = (bool) $enabled;
+            $features[$key] = (bool) $enabled && isset($features[$key]);
         }
 
         return $features;

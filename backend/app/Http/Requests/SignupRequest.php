@@ -57,6 +57,10 @@ class SignupRequest extends FormRequest
             'address' => ['nullable', 'string', 'max:300'],
             'terms' => ['accepted'],
 
+            // Paket: Gratis (coba 7 hari) atau paket berbayar (menunggu pembayaran). Kosong = Gratis.
+            'plan' => ['nullable', 'string', Rule::exists('plans', 'code')->where('public', true)],
+            'period' => ['nullable', Rule::in(['month', 'year'])],
+
             // Tablet pertama (sama seperti /devices/register)
             'device_id' => ['nullable', 'uuid'],
             'device_name' => ['nullable', 'string', 'max:60'],
@@ -76,6 +80,7 @@ class SignupRequest extends FormRequest
             'email.unique' => 'Email ini sudah terdaftar. Pilih "Masuk" untuk mendaftarkan tablet ke usaha yang sudah ada.',
             'terms.accepted' => 'Setujui syarat & ketentuan untuk melanjutkan.',
             'phone.regex' => 'Nomor HP tidak valid.',
+            'plan.exists' => 'Pilih paket dari daftar.',
         ];
     }
 

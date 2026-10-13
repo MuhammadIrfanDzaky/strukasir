@@ -8,6 +8,7 @@ use App\Http\Requests\SignupRequest;
 use App\Mail\EmailCodeMail;
 use App\Models\AuditLog;
 use App\Models\Device;
+use App\Models\Outlet;
 use App\Models\Plan;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
@@ -84,11 +85,17 @@ class SignupTest extends TestCase
         $this->assertSame([null, '081234567890'], [$tenant->outlet_count, $tenant->phone]);
         $this->assertSame(['12', '12.71', null], [$tenant->province_code, $tenant->regency_code, $tenant->sector_other]);
         $this->assertNotNull($tenant->terms_accepted_at);
-        $this->assertSame('standard', $tenant->plan->code);
+        // Tanpa pilihan paket = Gratis, masa coba 7 hari.
+        $this->assertSame(['gratis', 'trial', null], [$tenant->plan->code, $tenant->plan_status, $tenant->plan_period]);
+        $this->assertEqualsWithDelta(now()->addDays(7)->timestamp, $tenant->plan_ends_at->timestamp, 5);
 
         $this->tenancy()->run($tenant->id, function () use ($res) {
             $owner = User::query()->sole();
             $this->assertSame(['wahyu@contoh.id', 'owner', $owner->id], [$owner->email, $owner->role->value, $res->json('owner_id')]);
+            // Alamat & no HP dari form daftar tersalin ke outlet utama.
+            $outlet = Outlet::query()->sole();
+            $this->assertSame(['O1', 'Kopi Senja', "Jl. Mawar No. 1\nMedan", '081234567890'],
+                [$outlet->code, $outlet->name, $outlet->address, $outlet->phone]);
             $settings = TenantSetting::query()->sole();
             $this->assertSame(['Kopi Senja', "Jl. Mawar No. 1\nMedan"], [$settings->receipt_name, $settings->receipt_header]);
             $this->assertSame(['tenant.signup', 'device.registered'], AuditLog::query()->orderBy('created_at')->pluck('action')->all());
@@ -102,11 +109,40 @@ class SignupTest extends TestCase
 
     public function test_owner_can_register_second_tablet_with_auto_name(): void
     {
-        $this->signup()->assertCreated();
+        $this->signup(['plan' => 'mulai'])->assertCreated();
 
         $this->api('POST', '/api/v1/devices/register', null, [
             'email' => 'wahyu@contoh.id', 'password' => 'rahasia123', 'device_id' => (string) Str::uuid(),
         ])->assertCreated()->assertJsonPath('device.code', 'T2')->assertJsonPath('device.name', 'Tablet 2');
+    }
+
+    public function test_free_plan_allows_one_tablet_only(): void
+    {
+        $this->signup()->assertCreated();
+
+        $this->api('POST', '/api/v1/devices/register', null, [
+            'email' => 'wahyu@contoh.id', 'password' => 'rahasia123', 'device_id' => (string) Str::uuid(),
+        ])->assertUnprocessable()->assertJsonValidationErrors('device');
+    }
+
+    public function test_paid_plan_chosen_at_signup_awaits_payment(): void
+    {
+        $res = $this->signup(['plan' => 'tumbuh', 'period' => 'year'])->assertCreated();
+
+        $tenant = Tenant::findOrFail($res->json('tenant.id'));
+        $this->assertSame(['tumbuh', 'awaiting_payment', 'year', 'tumbuh'],
+            [$tenant->plan->code, $tenant->plan_status, $tenant->plan_period, $tenant->requestedPlan->code]);
+        $this->assertTrue($tenant->plan_ends_at->isFuture());
+
+        $this->signup(['plan' => 'standard', 'email' => 'lain@contoh.id'])->assertJsonValidationErrors('plan');
+    }
+
+    public function test_options_list_public_plans(): void
+    {
+        $this->getJson('/api/v1/signup/options')->assertOk()
+            ->assertJsonPath('plans.*.code', ['gratis', 'mulai', 'tumbuh', 'juragan'])
+            ->assertJsonPath('plans.0.trial_days', 7)
+            ->assertJsonPath('plans.1.price_month', 9900);
     }
 
     public function test_email_already_used_is_rejected(): void
@@ -222,7 +258,7 @@ class SignupTest extends TestCase
 
     public function test_retail_has_no_variants_and_template_never_exceeds_plan(): void
     {
-        $plan = Plan::where('code', 'standard')->firstOrFail();
+        $plan = Plan::where('code', 'gratis')->firstOrFail();
         DB::table('plan_features')->where('plan_id', $plan->id)->where('feature_key', 'split_payment')->delete();
 
         $menu = $this->menuAfterSignup(['sector' => 'retail', 'sales_mode' => 'mixed']);

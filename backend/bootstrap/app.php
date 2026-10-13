@@ -18,7 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias(['tenant' => ResolveTenant::class]);
+        $middleware->alias(['tenant' => ResolveTenant::class, 'plan.active' => \App\Http\Middleware\EnsurePlanActive::class]);
         // Tenant harus diketahui SEBELUM route model binding, supaya {product} milik kedai lain = 404.
         $middleware->prependToPriorityList(SubstituteBindings::class, ResolveTenant::class);
         // Global (paling luar) agar respons error seperti 401/429 juga membawa header keamanan.

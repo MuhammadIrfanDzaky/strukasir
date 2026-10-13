@@ -23,12 +23,25 @@ class Tenant extends Model
             'sales_mode' => SalesMode::class,
             'outlet_count' => 'integer',
             'terms_accepted_at' => 'datetime',
+            'plan_ends_at' => 'datetime',
+            'requested_at' => 'datetime',
         ];
     }
 
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    public function requestedPlan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class, 'requested_plan_id');
+    }
+
+    /** Masa coba / batas bayar / masa langganan sudah lewat: kasir tidak bisa transaksi baru. */
+    public function planExpired(): bool
+    {
+        return $this->plan_ends_at !== null && $this->plan_ends_at->isPast();
     }
 
     public function settings(): HasOne

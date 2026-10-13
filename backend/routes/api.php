@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\V1\SignupController;
 use App\Http\Controllers\Api\V1\SignupEmailCodeController;
 use App\Http\Controllers\Api\V1\SignupOptionsController;
 use App\Http\Controllers\Api\V1\StaffController;
+use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\TierController;
 use Illuminate\Support\Facades\Route;
 
@@ -63,12 +64,15 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/email/verify', [EmailVerificationController::class, 'verify'])->middleware('throttle:auth');
 
         Route::get('menu', [MenuController::class, 'show']);
+        Route::get('subscription', [SubscriptionController::class, 'show']);
+        Route::post('subscription/request', [SubscriptionController::class, 'request'])
+            ->middleware('can:'.Permission::UsersManage->value);
 
         Route::middleware('can:'.Permission::OrderCreate->value)->group(function () {
             Route::get('orders', [OrderController::class, 'index']);
             Route::get('orders/{order}', [OrderController::class, 'show']);
-            Route::put('orders/{order}', [OrderController::class, 'upsert']); // ID = UUID dari tablet
-            Route::post('orders/{order}/pay', [OrderController::class, 'pay']);
+            Route::put('orders/{order}', [OrderController::class, 'upsert'])->middleware('plan.active'); // ID = UUID dari tablet
+            Route::post('orders/{order}/pay', [OrderController::class, 'pay'])->middleware('plan.active');
             // Kasir boleh memanggil; tanpa izin order.void wajib menyertakan persetujuan PIN owner.
             Route::post('orders/{order}/void', [OrderController::class, 'void']);
             Route::get('vouchers/check', [PromotionController::class, 'check'])->middleware('throttle:30,1');
@@ -99,7 +103,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('can:'.Permission::ShiftOperate->value)->group(function () {
             Route::get('shifts/current', [ShiftController::class, 'current']);
-            Route::post('shifts/open', [ShiftController::class, 'open']);
+            Route::post('shifts/open', [ShiftController::class, 'open'])->middleware('plan.active');
             Route::post('shifts/close', [ShiftController::class, 'close']);
             // Kas keluar / masuk di luar penjualan (pembatalan: kasir butuh PIN owner).
             Route::get('shifts/current/cash-movements', [ShiftController::class, 'cashMovements']);

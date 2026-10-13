@@ -35,6 +35,9 @@ class OutletService
             if ($active && $others > 0 && ! $this->enabled()) {
                 throw ValidationException::withMessages(['name' => 'Fitur multi-outlet tidak aktif untuk paket ini.']);
             }
+            if ($active && ! ($outlet?->exists && $outlet->active)) {
+                app(SubscriptionService::class)->assertLimit('outlets', $others);
+            }
             if ($outlet?->exists && ! $active && $outlet->active) {
                 if ($others === 0) {
                     throw ValidationException::withMessages(['active' => 'Minimal satu outlet harus aktif.']);

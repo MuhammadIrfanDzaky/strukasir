@@ -33,6 +33,7 @@ class DeviceRegistrar
                     app(OutletService::class)->moveDevice($device, $outletId);
                 }
             } else {
+                app(SubscriptionService::class)->assertLimit('devices', Device::query()->whereNull('revoked_at')->count());
                 $number = Device::query()->count() + 1;
                 // Nama opsional: tanpa isian → "Tablet 2" dst. (bisa diganti owner nanti).
                 $device = new Device(['name' => trim((string) $name) !== '' ? trim((string) $name) : "Tablet {$number}"]);

@@ -6,6 +6,7 @@ use App\Enums\BusinessGroup;
 use App\Enums\BusinessSector;
 use App\Enums\SalesMode;
 use App\Http\Controllers\Controller;
+use App\Services\SubscriptionService;
 use App\Support\Regions;
 use Illuminate\Http\JsonResponse;
 
@@ -30,6 +31,7 @@ class SignupOptionsController extends Controller
             'sectors' => $sectors,
             'sales_modes' => collect(SalesMode::cases())->map(fn (SalesMode $m) => ['code' => $m->value, 'label' => $m->label()]),
             'regions' => Regions::all(),
+            'plans' => SubscriptionService::publicPlans()->map(fn ($p) => SubscriptionService::presentPlan($p))->values(),
         ])->header('Cache-Control', 'public, max-age=86400');
     }
 }

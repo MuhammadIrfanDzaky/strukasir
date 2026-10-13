@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SignupRequest;
+use App\Models\Tenant;
 use App\Models\User;
+use App\Services\SubscriptionService;
 use App\Support\Audit;
+use App\Support\Tenancy\TenantContext;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,6 +34,8 @@ class StaffController extends Controller
         $data = $request->validate([...$this->nameRule($request), 'pin' => self::pinRule()]);
 
         $user = DB::transaction(function () use ($data) {
+            Tenant::query()->whereKey(app(TenantContext::class)->id())->lockForUpdate()->first();
+            app(SubscriptionService::class)->assertLimit('staff', User::query()->where('active', true)->count());
             $user = new User(['name' => $data['name']]);
             $user->role = Role::Cashier;
             $user->setPin($data['pin']);
@@ -51,6 +56,9 @@ class StaffController extends Controller
         $before = self::present($staff);
         $staff->name = $data['name'];
         if (array_key_exists('active', $data)) {
+            if ($data['active'] && ! $staff->active) {
+                app(SubscriptionService::class)->assertLimit('staff', User::query()->where('active', true)->count());
+            }
             $staff->active = $data['active'];
         }
         $staff->save();
