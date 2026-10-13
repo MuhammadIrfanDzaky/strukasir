@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Plan;
 use App\Models\Tenant;
 use App\Services\SubscriptionService;
+use App\Support\PlanCatalog;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class SubscriptionController extends Controller
     {
         $data = $request->validate([
             'plan' => ['required', 'string', Rule::exists('plans', 'code')->where('public', true)],
-            'period' => ['required', Rule::in(['month', 'year'])],
+            'period' => ['required', Rule::in(array_keys(PlanCatalog::PERIODS))],
         ]);
         $tenant = Tenant::query()->findOrFail($context->id());
         $this->subscriptions->request($tenant, Plan::query()->where('code', $data['plan'])->firstOrFail(), $data['period']);

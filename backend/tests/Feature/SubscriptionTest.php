@@ -96,6 +96,22 @@ class SubscriptionTest extends TestCase
         $this->assertEqualsWithDelta(now()->addMonths(2)->timestamp, $tenant->refresh()->plan_ends_at->timestamp, 5);
     }
 
+    public function test_periode_3_6_12_bulan_dengan_diskon_dan_perpanjang_paket_sama(): void
+    {
+        $this->onPlan('tumbuh', 'active', '+5 days');
+        $res = $this->api('GET', '/api/v1/subscription', $this->owner)->assertOk();
+        // Tumbuh Rp24.900: 3 bln −10%, 6 bln −15%, 12 bln −20% (dibulatkan ke ratusan).
+        $this->assertSame(['month' => 24900, 'quarter' => 67200, 'half' => 127000, 'year' => 239000], $res->json('data.plans.2.prices'));
+
+        // Perpanjang paket yang sedang aktif.
+        $this->api('POST', '/api/v1/subscription/request', $this->owner, ['plan' => 'tumbuh', 'period' => 'half'])->assertOk()
+            ->assertJsonPath('data.requested.plan.code', 'tumbuh')->assertJsonPath('data.requested.period', 'half');
+
+        $this->artisan('pos:activate-plan', ['tenant' => $this->shop->tenant->code, 'plan' => 'tumbuh', '--period' => 'half'])
+            ->expectsOutputToContain('Tagihan: Rp127000')->assertSuccessful();
+        $this->assertEqualsWithDelta(now()->addDays(5)->addMonths(6)->timestamp, $this->shop->tenant->refresh()->plan_ends_at->timestamp, 5);
+    }
+
     public function test_batas_pegawai_outlet_dan_tablet_sesuai_paket(): void
     {
         $this->onPlan('gratis'); // owner + 1 pegawai, 1 outlet, 1 tablet

@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Enums\BusinessSector;
 use App\Enums\SalesMode;
 use App\Services\ReferralService;
+use App\Support\PlanCatalog;
 use App\Support\Regions;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -60,7 +61,7 @@ class SignupRequest extends FormRequest
 
             // Paket: Gratis (coba 7 hari) atau paket berbayar (menunggu pembayaran). Kosong = Gratis.
             'plan' => ['nullable', 'string', Rule::exists('plans', 'code')->where('public', true)],
-            'period' => ['nullable', Rule::in(['month', 'year'])],
+            'period' => ['nullable', Rule::in(array_keys(PlanCatalog::PERIODS))],
             // Kode referral usaha pengajak (opsional): coba 14 hari + diskon 25% pembayaran pertama.
             'referral_code' => ['nullable', 'string', 'max:12', function (string $attribute, mixed $value, Closure $fail) {
                 if (app(ReferralService::class)->findReferrer(is_string($value) ? $value : null) === null) {

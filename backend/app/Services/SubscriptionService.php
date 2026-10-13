@@ -77,7 +77,7 @@ class SubscriptionService
         $tenant->plan_id = $plan->id;
         $tenant->plan_status = 'active';
         $tenant->plan_period = $period;
-        $tenant->plan_ends_at = $period === 'year' ? $from->copy()->addYear() : $from->copy()->addMonth();
+        $tenant->plan_ends_at = $from->copy()->addMonths(PlanCatalog::months($period));
         $tenant->requested_plan_id = null;
         $tenant->requested_period = null;
         $tenant->requested_at = null;
@@ -143,6 +143,9 @@ class SubscriptionService
         return [
             'code' => $plan->code, 'name' => $plan->name, 'tagline' => $plan->tagline,
             'price_month' => $plan->price_month, 'price_year' => $plan->price_year,
+            // Harga tiap periode bayar (sudah termasuk diskon periode) + diskonnya.
+            'prices' => collect(PlanCatalog::PERIODS)->map(fn ($p, $period) => PlanCatalog::price($plan->price_month, $period)),
+            'period_discounts' => collect(PlanCatalog::PERIODS)->map(fn ($p) => $p[1]),
             'max_outlets' => $plan->max_outlets, 'max_devices' => $plan->max_devices, 'max_staff' => $plan->max_staff,
             'trial_days' => $plan->code === PlanCatalog::FREE ? PlanCatalog::TRIAL_DAYS : null,
             'features' => $features,

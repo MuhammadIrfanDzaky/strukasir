@@ -5,12 +5,13 @@ namespace App\Console\Commands;
 use App\Models\Plan;
 use App\Models\Tenant;
 use App\Services\SubscriptionService;
+use App\Support\PlanCatalog;
 use Illuminate\Console\Command;
 
 /** Pembayaran paket diterima (transfer/QRIS manual) → aktifkan paket usaha sampai akhir periode. */
 class ActivatePlan extends Command
 {
-    protected $signature = 'pos:activate-plan {tenant : Kode usaha} {plan : gratis|mulai|tumbuh|juragan} {--period=month : month|year}';
+    protected $signature = 'pos:activate-plan {tenant : Kode usaha} {plan : gratis|mulai|tumbuh|juragan} {--period=month : month|quarter|half|year (1/3/6/12 bulan)}';
 
     protected $description = 'Aktifkan paket berbayar usaha setelah pembayaran diterima';
 
@@ -19,7 +20,7 @@ class ActivatePlan extends Command
         $tenant = Tenant::query()->where('code', $this->argument('tenant'))->first();
         $plan = Plan::query()->where('code', $this->argument('plan'))->first();
         $period = (string) $this->option('period');
-        if ($tenant === null || $plan === null || ! in_array($period, ['month', 'year'], true)) {
+        if ($tenant === null || $plan === null || ! array_key_exists($period, PlanCatalog::PERIODS)) {
             $this->error('Usaha, paket, atau periode tidak dikenal.');
 
             return self::FAILURE;

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Plan;
 use App\Models\Tenant;
+use App\Support\PlanCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -74,7 +75,7 @@ class ReferralService
 
     public static function price(Plan $plan, string $period): int
     {
-        return $period === 'year' ? $plan->price_year : $plan->price_month;
+        return PlanCatalog::price($plan->price_month, $period);
     }
 
     /** @return array{base: int, percent: int, reason: ?string, amount: int} */
