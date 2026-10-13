@@ -461,7 +461,7 @@ class _CurrentPlan extends StatelessWidget {
               AppBadge(switch (sub.status) {
                 'expired' => 'Habis',
                 'trial' => 'Masa coba',
-                'awaiting_payment' => 'Belum dibayar · $daysLeft hari',
+                'awaiting_payment' => 'Belum dibayar',
                 _ => 'Aktif',
               }, tone: tone),
             ],
