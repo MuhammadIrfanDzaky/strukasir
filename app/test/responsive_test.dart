@@ -609,6 +609,8 @@ final scenarios = <Scenario>[
       await t.ensureVisible(find.text('Lanjut'));
       await t.tap(find.text('Lanjut'));
       await settle(t);
+      await t.ensureVisible(find.text('Tumbuh'));
+      await settle(t);
       await t.tap(find.text('Tumbuh'));
       await settle(t);
       expect(find.text('Lanjut dengan Tumbuh'), findsOneWidget);

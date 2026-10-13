@@ -450,7 +450,8 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           maxLength: 12,
           decoration: InputDecoration(
             labelText: 'Kode referral (opsional)',
-            helperText: 'Diajak usaha lain? Coba gratis 14 hari & diskon 25% saat berlangganan.',
+            helperText: 'Diajak usaha lain? Coba gratis 14 hari & diskon 25% untuk pembayaran paket pertama.',
+            helperMaxLines: 2,
             counterText: '',
             errorText: _serverError('referral_code'),
           ),

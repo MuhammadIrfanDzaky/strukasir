@@ -23,6 +23,7 @@ class PlanInfo {
     this.maxStaff,
     this.trialDays,
     this.features = const [],
+    this.prices = const {},
   });
 
   factory PlanInfo.fromJson(Map<String, dynamic> j) => PlanInfo(
@@ -36,6 +37,7 @@ class PlanInfo {
         maxStaff: j['max_staff'] as int?,
         trialDays: j['trial_days'] as int?,
         features: (j['features'] as List? ?? const []).cast<String>(),
+        prices: (j['prices'] as Map<String, dynamic>? ?? const {}).map((k, v) => MapEntry(k, v as int)),
       );
 
   final String code;
@@ -53,15 +55,16 @@ class PlanInfo {
   final int? trialDays;
   final List<String> features;
 
+  /// Harga per periode dari server (sudah termasuk diskon periode): month, quarter, half, year.
+  final Map<String, int> prices;
+
   bool get free => priceMonth == 0;
 
-  String price(String period) => free
-      ? 'Gratis ${trialDays ?? 7} hari'
-      : period == 'year'
-          ? 'Rp${rupiah(priceYear)}/tahun'
-          : 'Rp${rupiah(priceMonth)}/bulan';
+  /// Harga satu periode; tanpa data server dihitung dengan aturan yang sama (dibulatkan ke ratusan).
+  int base(String period) =>
+      prices[period] ?? ((priceMonth * periodMonths(period) * (100 - periodDiscount(period)) / 100) / 100).round() * 100;
 
-  int base(String period) => period == 'year' ? priceYear : priceMonth;
+  String price(String period) => free ? 'Gratis ${trialDays ?? 7} hari' : 'Rp${rupiah(base(period))}/${periodLabel(period)}';
 
   /// Harga setelah diskon referral, dibulatkan ke ratusan (sama dengan server).
   int discounted(String period, int percent) => ((base(period) * (100 - percent) / 100) / 100).round() * 100;
@@ -69,7 +72,7 @@ class PlanInfo {
   /// Harga yang ditampilkan di tombol/dialog, sudah termasuk diskon.
   String priceWith(String period, int percent) => percent == 0 || free
       ? price(period)
-      : 'Rp${rupiah(discounted(period, percent))}/${period == 'year' ? 'tahun' : 'bulan'} (diskon $percent%)';
+      : 'Rp${rupiah(discounted(period, percent))}/${periodLabel(period)} (diskon $percent%)';
 
   String get limits => [
         _limit(maxOutlets, 'outlet'),
@@ -91,6 +94,15 @@ class PlanInfo {
         if (features.contains('multi_outlet')) 'Multi-outlet',
       ];
 }
+
+/// Periode bayar (sama dengan `PlanCatalog::PERIODS` di server).
+const periods = ['month', 'quarter', 'half', 'year'];
+
+int periodMonths(String period) => switch (period) { 'quarter' => 3, 'half' => 6, 'year' => 12, _ => 1 };
+
+int periodDiscount(String period) => switch (period) { 'quarter' => 10, 'half' => 15, 'year' => 20, _ => 0 };
+
+String periodLabel(String period) => switch (period) { 'quarter' => '3 bulan', 'half' => '6 bulan', 'year' => '12 bulan', _ => 'bulan' };
 
 /// Status paket usaha (GET /subscription).
 class Subscription {
@@ -198,17 +210,19 @@ class PlanPicker extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: SegmentedButton<String>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: 'month', label: Text('Bulanan')),
-              ButtonSegment(value: 'year', label: Text('Tahunan · hemat 2 bulan')),
-            ],
-            selected: {period},
-            onSelectionChanged: (s) => onPeriod(s.first),
-          ),
+        // Chip (bukan segmented) supaya tetap rapi di HP & huruf besar: baris turun bila tidak muat.
+        Wrap(
+          spacing: AppSpace.s2,
+          runSpacing: AppSpace.s2,
+          children: [
+            for (final p in periods)
+              ChoiceChip(
+                showCheckmark: false,
+                label: Text(periodDiscount(p) == 0 ? '1 bulan' : '${periodMonths(p)} bulan · hemat ${periodDiscount(p)}%'),
+                selected: period == p,
+                onSelected: (_) => onPeriod(p),
+              ),
+          ],
         ),
         const SizedBox(height: AppSpace.s3),
         LayoutBuilder(builder: (context, c) {
@@ -221,7 +235,7 @@ class PlanPicker extends StatelessWidget {
                 selected: p.code == selected,
                 current: p.code == current,
                 discountPercent: discountPercent,
-                onTap: p.code == current ? null : () => onSelected(p.code),
+                onTap: () => onSelected(p.code),
               ),
           ];
           if (columns == 1) {
@@ -297,13 +311,16 @@ class _PlanCard extends StatelessWidget {
               if (discountPercent > 0 && !plan.free) ...[
                 Text(plan.price(period), style: muted.copyWith(decoration: TextDecoration.lineThrough)),
                 Text(
-                  'Rp${rupiah(plan.discounted(period, discountPercent))}/${period == 'year' ? 'tahun' : 'bulan'} · diskon $discountPercent%',
+                  'Rp${rupiah(plan.discounted(period, discountPercent))}/${periodLabel(period)} · diskon $discountPercent%',
                   style: AppType.bodyStrong.copyWith(color: AppColors.ink),
                 ),
               ] else
                 Text(plan.price(period), style: AppType.bodyStrong.copyWith(color: AppColors.ink)),
-              if (!plan.free && period == 'year')
-                Text('setara Rp${rupiah((plan.priceYear / 12).round())}/bulan', style: muted),
+              if (!plan.free && periodMonths(period) > 1)
+                Text(
+                  'setara Rp${rupiah((plan.discounted(period, discountPercent) / periodMonths(period)).round())}/bulan',
+                  style: muted,
+                ),
               if (plan.tagline != null) ...[
                 const SizedBox(height: AppSpace.s2),
                 Text(plan.tagline!, style: AppType.body.copyWith(color: AppColors.inkMuted)),
@@ -432,7 +449,8 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                         plans: paid,
                         selected: _selected,
                         period: _period,
-                        current: sub.status == 'active' ? sub.plan.code : null,
+                        // Paket berbayar sekarang bisa dipilih lagi untuk diperpanjang.
+                        current: sub.plan.free ? null : sub.plan.code,
                         discountPercent: sub.discountPercent,
                         onSelected: (c) => setState(() => _selected = c),
                         onPeriod: (p) => setState(() => _period = p),
@@ -445,7 +463,8 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                             onPressed: chosen == null || _busy ? null : () => _request(chosen, sub.discountPercent),
                             child: Text(chosen == null
                                 ? 'Pilih salah satu paket'
-                                : 'Pilih ${chosen.name} · ${chosen.priceWith(_period, sub.discountPercent)}'),
+                                : '${chosen.code == sub.plan.code ? 'Perpanjang' : 'Pilih'} ${chosen.name} · '
+                                    '${chosen.priceWith(_period, sub.discountPercent)}'),
                           ),
                         )
                       else
@@ -530,7 +549,7 @@ class _CurrentPlan extends StatelessWidget {
             const Divider(height: 1),
             const SizedBox(height: AppSpace.s3),
             Text(
-              'Permintaan paket ${sub.requestedPlan!.name} (${sub.requestedPeriod == 'year' ? 'tahunan' : 'bulanan'}) '
+              'Permintaan paket ${sub.requestedPlan!.name} (${periodMonths(sub.requestedPeriod ?? 'month')} bulan) '
               'menunggu pembayaran. Tim Strukasir akan menghubungi Anda.',
               style: muted,
             ),
