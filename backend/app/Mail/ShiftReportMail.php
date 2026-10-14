@@ -2,25 +2,22 @@
 
 namespace App\Mail;
 
-use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
-
-/** Laporan tutup shift ke owner (teks biasa, sama dengan versi WhatsApp). */
-class ShiftReportMail extends Mailable
+/** Laporan tutup shift ke owner (isi sama dengan versi WhatsApp, tanda * dihapus). */
+class ShiftReportMail extends BrandedMail
 {
     public function __construct(
         public readonly string $subjectLine,
         public readonly string $body,
     ) {}
 
-    public function envelope(): Envelope
+    protected function message(): array
     {
-        return new Envelope(subject: $this->subjectLine);
-    }
-
-    public function content(): Content
-    {
-        return new Content(text: 'mail.shift-report');
+        return [
+            'subject' => $this->subjectLine,
+            'preheader' => strtok(str_replace('*', '', $this->body), "\n") ?: null,
+            'title' => 'Laporan tutup shift',
+            'text' => str_replace('*', '', $this->body),
+            'reason' => 'Dikirim otomatis saat shift ditutup. Matikan di Pengaturan → Fitur → Laporan harian.',
+        ];
     }
 }

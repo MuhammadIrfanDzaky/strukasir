@@ -3,12 +3,9 @@
 namespace App\Mail;
 
 use App\Services\EmailCodes;
-use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 
-/** Email berisi kode 6 digit (teks biasa: terbaca di semua aplikasi email, tanpa gambar/link). */
-class EmailCodeMail extends Mailable
+/** Kode 6 digit untuk verifikasi email / reset password. Tanpa tautan (mencegah phishing). */
+class EmailCodeMail extends BrandedMail
 {
     public function __construct(
         public readonly string $name,
@@ -16,15 +13,22 @@ class EmailCodeMail extends Mailable
         public readonly string $code,
     ) {}
 
-    public function envelope(): Envelope
+    protected function message(): array
     {
-        return new Envelope(subject: $this->purpose === EmailCodes::RESET_PASSWORD
-            ? "Kode reset password Strukasir: {$this->code}"
-            : "Kode verifikasi email Strukasir: {$this->code}");
-    }
+        $reset = $this->purpose === EmailCodes::RESET_PASSWORD;
 
-    public function content(): Content
-    {
-        return new Content(text: 'mail.email-code', with: ['minutes' => EmailCodes::TTL_MINUTES]);
+        return [
+            'subject' => $reset ? "Kode reset password Strukasir: {$this->code}" : "Kode verifikasi email Strukasir: {$this->code}",
+            'preheader' => "Kode Anda {$this->code}, berlaku ".EmailCodes::TTL_MINUTES.' menit.',
+            'title' => $reset ? 'Reset password' : 'Verifikasi email Anda',
+            'greeting' => "Halo {$this->name},",
+            'intro' => [$reset
+                ? 'Ada permintaan reset password akun owner Strukasir Anda. Masukkan kode ini di aplikasi:'
+                : 'Masukkan kode ini di aplikasi Strukasir untuk memverifikasi email Anda:'],
+            'code' => $this->code,
+            'outro' => ['Kode berlaku '.EmailCodes::TTL_MINUTES.' menit dan hanya bisa dipakai sekali.'],
+            'note' => 'Jangan berikan kode ini kepada siapa pun, termasuk yang mengaku dari Strukasir. '
+                .'Bila Anda tidak memintanya, abaikan email ini. Akun Anda tetap aman.',
+        ];
     }
 }

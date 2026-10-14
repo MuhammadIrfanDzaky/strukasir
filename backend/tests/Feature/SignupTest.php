@@ -355,7 +355,7 @@ class SignupTest extends TestCase
         $this->tenancy()->run($res->json('tenant.id'), function () {
             $this->assertNotNull(User::query()->sole()->email_verified_at, 'email sudah terbukti saat daftar');
         });
-        Mail::assertSentCount(1); // tidak ada email verifikasi kedua setelah masuk
+        Mail::assertSent(EmailCodeMail::class, 1); // tidak ada email verifikasi kedua setelah masuk (selain email selamat datang)
     }
 
     public function test_signup_rejects_missing_wrong_or_used_code(): void
@@ -386,7 +386,7 @@ class SignupTest extends TestCase
 
         $this->api('POST', '/api/v1/signup/email-code', null, ['email' => 'x@contoh.id'])->assertOk();
         $this->api('POST', '/api/v1/signup/email-code', null, ['email' => 'x@contoh.id'])->assertStatus(429);
-        Mail::assertSentCount(1);
+        Mail::assertSent(EmailCodeMail::class, 1);
     }
 
     public function test_email_code_reports_mail_failure(): void

@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Mail\ReferralRewardMail;
 use App\Models\Plan;
 use App\Models\Tenant;
+use App\Support\OwnerMailer;
 use App\Support\PlanCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -115,10 +117,17 @@ class ReferralService
         }
 
         if ($firstPaid && $quote['base'] > 0 && $tenant->referred_by !== null) {
-            DB::table('referral_rewards')->insertOrIgnore([
+            $added = DB::table('referral_rewards')->insertOrIgnore([
                 'id' => (string) Str::uuid7(), 'referrer_id' => $tenant->referred_by, 'referee_id' => $tenant->id,
                 'percent' => self::REWARD_PERCENT, 'created_at' => now(),
             ]);
+            if ($added > 0) {
+                $referee = $tenant->name;
+                OwnerMailer::send($tenant->referred_by, fn ($owner, $t) => new ReferralRewardMail(
+                    ownerName: $owner->name, refereeName: $referee, percent: self::REWARD_PERCENT,
+                    available: DB::table('referral_rewards')->where('referrer_id', $t->id)->whereNull('used_at')->count(),
+                ));
+            }
         }
 
         return $quote;

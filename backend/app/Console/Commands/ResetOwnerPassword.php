@@ -3,9 +3,11 @@
 namespace App\Console\Commands;
 
 use App\Enums\Role;
+use App\Mail\SecurityAlertMail;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Support\Audit;
+use App\Support\OwnerMailer;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
@@ -40,6 +42,11 @@ class ResetOwnerPassword extends Command
             $owner->failed_attempts = 0;
             $owner->locked_until = null;
             $owner->save();
+            $ownerId = $owner->id;
+            OwnerMailer::send($owner->tenant_id, fn ($o, $t) => $o->id === $ownerId ? new SecurityAlertMail(
+                ownerName: $o->name, businessName: $t->name, kind: SecurityAlertMail::PASSWORD_CHANGED, at: now(),
+                details: ['Diubah oleh' => 'Tim Strukasir (atas permintaan Anda)'],
+            ) : null);
 
             PersonalAccessToken::query()
                 ->where('tokenable_type', $owner->getMorphClass())

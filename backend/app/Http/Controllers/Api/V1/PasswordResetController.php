@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
+use App\Mail\SecurityAlertMail;
 use App\Models\User;
 use App\Services\EmailCodes;
 use App\Support\Audit;
+use App\Support\OwnerMailer;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -70,6 +72,11 @@ class PasswordResetController extends Controller
             $owner->locked_until = null;
             $owner->save();
             Audit::record('auth.password_reset', $owner, user: $owner);
+            $ownerId = $owner->id;
+            $info = ['Alamat IP' => (string) request()->ip()];
+            OwnerMailer::send($owner->tenant_id, fn ($o, $t) => $o->id === $ownerId ? new SecurityAlertMail(
+                ownerName: $o->name, businessName: $t->name, kind: SecurityAlertMail::PASSWORD_CHANGED, at: now(), details: $info,
+            ) : null);
 
             return response()->json(['message' => 'Password diganti. Silakan masuk dengan password baru.']);
         }));

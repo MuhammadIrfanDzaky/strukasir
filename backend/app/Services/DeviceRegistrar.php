@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Mail\SecurityAlertMail;
 use App\Models\Device;
 use App\Models\Outlet;
 use App\Models\Tenant;
+use App\Support\OwnerMailer;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\NewAccessToken;
 
@@ -43,6 +45,14 @@ class DeviceRegistrar
                 $device->code = 'T'.$number;
                 $device->outlet_id = $outletId; // null → outlet utama
                 $device->save();
+
+                // Tablet ke-2 dst. (bukan tablet pendaftaran usaha): beri tahu owner.
+                if ($number > 1) {
+                    $info = ['Tablet' => "{$device->name} ({$device->code})", 'Alamat IP' => (string) request()->ip()];
+                    OwnerMailer::send($tenant->id, fn ($owner, $t) => new SecurityAlertMail(
+                        ownerName: $owner->name, businessName: $t->name, kind: SecurityAlertMail::DEVICE_ADDED, at: now(), details: $info,
+                    ));
+                }
             }
 
             return [$device, $device->createToken('device:'.$device->code, ['device'])];

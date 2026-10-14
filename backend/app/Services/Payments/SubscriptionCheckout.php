@@ -134,7 +134,7 @@ class SubscriptionCheckout
      * Webhook Mayar (tanpa tanda tangan): hanya pemicu untuk mencocokkan ulang ke API Mayar. Tagihan yang
      * cocok dengan `data.productId` dicek dulu; bila tidak ketemu, semua tagihan yang masih menunggu (24 jam).
      *
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function handleWebhook(array $payload): void
     {

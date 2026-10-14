@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Mail\PaymentReceiptMail;
 use App\Models\Device;
 use App\Models\Outlet;
 use App\Models\Plan;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\Audit;
+use App\Support\OwnerMailer;
 use App\Support\PlanCatalog;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -82,6 +84,17 @@ class SubscriptionService
         $tenant->requested_period = null;
         $tenant->requested_at = null;
         $tenant->save();
+
+        if ($quote['base'] > 0) {
+            $payment = DB::table('subscription_payments')->where('tenant_id', $tenant->id)->orderByDesc('created_at')->first();
+            $endsAt = $tenant->plan_ends_at;
+            OwnerMailer::send($tenant->id, fn ($owner, $t) => new PaymentReceiptMail(
+                ownerName: $owner->name, businessName: $t->name, planName: $plan->name, period: $period,
+                baseAmount: $quote['base'], discountPercent: $quote['percent'], discountReason: $quote['reason'],
+                amount: $quote['amount'], activeUntil: $endsAt,
+                receiptNo: 'STK-'.strtoupper(substr(str_replace('-', '', (string) $payment?->id), -10)), paidAt: now(),
+            ));
+        }
 
         return $quote;
     }

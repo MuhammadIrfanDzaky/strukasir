@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SignupRequest;
+use App\Mail\WelcomeMail;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\DeviceRegistrar;
@@ -14,6 +15,7 @@ use App\Services\SubscriptionService;
 use App\Services\TenantProvisioner;
 use App\Support\Audit;
 use App\Support\BusinessTemplate;
+use App\Support\OwnerMailer;
 use App\Support\PlanCatalog;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -90,6 +92,11 @@ class SignupController extends Controller
                 // Titik awal sesuai jenis usaha & cara jualan (fitur + kategori kosong); bisa diubah owner.
                 $template = BusinessTemplate::for($tenant->sector, $tenant->sales_mode);
                 $template->apply($tenant->id, $tenant->plan_id);
+
+                OwnerMailer::send($tenant->id, fn ($o, $t) => new WelcomeMail(
+                    ownerName: $o->name, businessName: $t->name, planName: $plan->name, free: $plan->code === PlanCatalog::FREE,
+                    endsAt: $t->plan_ends_at, referralCode: $t->referral_code,
+                ));
 
                 Audit::record('tenant.signup', $tenant, after: [
                     'sector' => $data['sector'], 'sales_mode' => $tenant->sales_mode?->value, 'plan' => $plan->code, 'plan_status' => $tenant->plan_status,
