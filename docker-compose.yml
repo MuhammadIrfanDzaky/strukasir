@@ -34,5 +34,17 @@ services:
       db:
         condition: service_healthy
 
+  # Tugas terjadwal (cek tagihan paket ke Mayar tiap 5 menit), sama seperti produksi.
+  scheduler:
+    build: ./docker/php
+    working_dir: /app
+    command: php artisan schedule:work
+    stop_grace_period: 2s
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:

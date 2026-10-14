@@ -136,6 +136,17 @@ class MayarCheckoutTest extends TestCase
         $this->assertTrue(\Illuminate\Support\Carbon::parse($inv['expires_at'])->isFuture());
     }
 
+    public function test_cek_otomatis_terjadwal_mengaktifkan_paket_tanpa_webhook(): void
+    {
+        $this->checkout('tumbuh', 'half');
+        $this->gatewayInvoice = ['status' => 'paid', 'amount' => 127000];
+
+        $this->artisan('pos:sync-payments')->expectsOutputToContain('lunas 1')->assertSuccessful();
+        $this->assertSame(['tumbuh', 'active'], [$this->shop->tenant->refresh()->plan->code, $this->shop->tenant->plan_status]);
+        $this->assertTrue(collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())
+            ->contains(fn ($e) => str_contains($e->command, 'pos:sync-payments')));
+    }
+
     public function test_tanpa_kunci_mayar_pembayaran_online_nonaktif(): void
     {
         config(['services.mayar.api_key' => null]);

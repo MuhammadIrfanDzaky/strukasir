@@ -88,6 +88,8 @@ Isi `deploy/.env`:
   (string acak panjang): pembayaran paket via invoice Mayar (QRIS). Di Mayar → Integration → Webhook isi
   `https://<domain>/api/v1/payments/mayar/webhook?token=<MAYAR_WEBHOOK_TOKEN>`. Aktifkan metode QRIS di pengaturan
   pembayaran Mayar (atau kosongkan `MAYAR_PAYMENT_METHOD`). Kunci kosong = aktivasi manual `pos:activate-plan`.
+  Service `scheduler` menjalankan `pos:sync-payments` tiap 5 menit, jadi tagihan lunas tetap mengaktifkan paket walau
+  webhook tidak sampai. Cek: `docker compose logs scheduler`.
 - `MAIL_*`: kredensial SMTP dari langkah 1.7. Uji setelah deploy: di app, **Masuk → Lupa password?**
   dengan email owner, kode harus sampai dalam 1 menit.
 

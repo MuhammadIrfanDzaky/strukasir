@@ -30,6 +30,28 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Tugas terjadwal Laravel (cek tagihan paket ke Mayar tiap 5 menit). Image sama dengan app, tanpa port.
+  scheduler:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: ["php", "artisan", "schedule:work"]
+    env_file: .env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: berrybrew
+      DB_USERNAME: berrybrew_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   db:
     image: postgres:17
     environment:
