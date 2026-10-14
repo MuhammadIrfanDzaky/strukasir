@@ -24,7 +24,7 @@ class SubscriptionController extends Controller
         return response()->json(['data' => $this->subscriptions->present(Tenant::query()->findOrFail($context->id()))]);
     }
 
-    /** Owner: buat tagihan QRIS untuk paket & periode (harga dihitung server). */
+    /** Owner: buat tagihan Mayar (QRIS) untuk paket & periode (harga dihitung server). */
     public function checkout(Request $request, TenantContext $context, SubscriptionCheckout $checkout): JsonResponse
     {
         $data = $request->validate([
@@ -43,13 +43,13 @@ class SubscriptionController extends Controller
         } catch (\RuntimeException $e) {
             report($e);
 
-            return response()->json(['message' => 'Gagal membuat QRIS. Coba lagi sebentar lagi.'], 502);
+            return response()->json(['message' => 'Gagal membuat tagihan. Coba lagi sebentar lagi.'], 502);
         }
 
         return response()->json(['data' => SubscriptionCheckout::present($invoice)], 201);
     }
 
-    /** Status tagihan (app memeriksa berkala); status dicocokkan ke Midtrans selama masih menunggu. */
+    /** Status tagihan (app memeriksa berkala); status dicocokkan ke Mayar selama masih menunggu. */
     public function invoice(string $invoice, TenantContext $context, SubscriptionCheckout $checkout): JsonResponse
     {
         $row = DB::table('subscription_invoices')->where('id', $invoice)->where('tenant_id', $context->id())->first();

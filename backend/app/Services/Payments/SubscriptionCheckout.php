@@ -2,8 +2,10 @@
 
 namespace App\Services\Payments;
 
+use App\Enums\Role;
 use App\Models\Plan;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\ReferralService;
 use App\Services\SubscriptionService;
 use App\Support\Audit;
@@ -14,20 +16,19 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use stdClass;
-use Throwable;
 
 /**
- * Bayar paket lewat QRIS (Midtrans): tagihan dibuat server dengan harga & diskon terkunci, lalu dianggap
- * lunas hanya bila status dari Midtrans (diambil server) = settlement dengan jumlah yang sama.
- * Notifikasi & polling app memakai jalur yang sama (`sync`) dan idempotent per tagihan.
+ * Bayar paket lewat Mayar (invoice, QRIS). Harga & diskon dihitung server dan dikunci di tagihan; tagihan
+ * dianggap lunas hanya bila status dari API Mayar (diambil server) = paid dengan jumlah yang sama.
+ * Webhook & polling app memakai jalur yang sama (`sync`) dan idempotent per tagihan.
  */
 class SubscriptionCheckout
 {
-    public function __construct(private readonly Midtrans $midtrans) {}
+    public function __construct(private readonly Mayar $mayar) {}
 
     public function enabled(): bool
     {
-        return $this->midtrans->enabled();
+        return $this->mayar->enabled();
     }
 
     public function create(Tenant $tenant, Plan $plan, string $period): stdClass
@@ -35,9 +36,9 @@ class SubscriptionCheckout
         if (! $plan->public || $plan->code === PlanCatalog::FREE) {
             throw ValidationException::withMessages(['plan' => 'Pilih paket berbayar.']);
         }
-        // Tagihan QR yang masih berlaku untuk paket & periode sama dipakai ulang (tidak menumpuk QR).
+        // Tagihan yang masih berlaku untuk paket & periode sama dipakai ulang (tidak menumpuk tagihan).
         $open = DB::table('subscription_invoices')->where('tenant_id', $tenant->id)->where('status', 'pending')
-            ->where('plan_id', $plan->id)->where('period', $period)->where('expires_at', '>', now()->addMinute())
+            ->where('plan_id', $plan->id)->where('period', $period)->where('expires_at', '>', now()->addMinutes(2))
             ->orderByDesc('created_at')->first();
         $quote = app(ReferralService::class)->quote($tenant, $plan, $period);
         if ($open !== null && (int) $open->amount === $quote['amount']) {
@@ -46,17 +47,28 @@ class SubscriptionCheckout
 
         $id = (string) Str::uuid7();
         $orderId = 'STK-'.strtoupper(Str::random(6)).'-'.now()->format('ymdHis');
-        $minutes = (int) config('services.midtrans.qris_expiry_minutes', 15);
-        $charge = $this->midtrans->chargeQris($orderId, $quote['amount'], $minutes);
+        $expiresAt = now()->addMinutes((int) config('services.mayar.expiry_minutes', 30));
+        $owner = app(TenantContext::class)->run($tenant->id, fn () => User::query()->where('role', Role::Owner)->orderBy('created_at')->first());
+        $months = PlanCatalog::months($period);
+        $invoice = $this->mayar->createInvoice(
+            customer: [
+                'name' => $owner?->name ?? $tenant->name,
+                'email' => $owner?->email ?? 'owner@strukasir.id',
+                // Wajib di Mayar; usaha tanpa no HP memakai nomor kosong (tidak dipakai untuk menghubungi).
+                'mobile' => $tenant->phone ?: '080000000000',
+            ],
+            amount: $quote['amount'],
+            description: "Strukasir {$plan->name} {$months} bulan - {$tenant->name}",
+            expiresAt: $expiresAt->copy()->utc(),
+            extra: ['order_id' => $orderId, 'tenant' => $tenant->code],
+        );
 
         DB::table('subscription_invoices')->insert([
             'id' => $id, 'tenant_id' => $tenant->id, 'plan_id' => $plan->id, 'period' => $period,
             'base_amount' => $quote['base'], 'discount_percent' => $quote['percent'], 'discount_reason' => $quote['reason'],
-            'amount' => $quote['amount'], 'order_id' => $orderId, 'gateway_ref' => $charge['transaction_id'],
-            'status' => 'pending', 'qr_string' => $charge['qr_string'], 'qr_url' => $charge['qr_url'],
-            // expiry_time Midtrans dalam WIB tanpa zona waktu.
-            'expires_at' => $charge['expires_at'] !== null
-                ? Carbon::parse($charge['expires_at'], 'Asia/Jakarta')->utc() : now()->addMinutes($minutes),
+            'amount' => $quote['amount'], 'gateway' => 'mayar', 'order_id' => $orderId, 'gateway_ref' => $invoice['id'],
+            'status' => 'pending', 'pay_url' => $invoice['link'],
+            'expires_at' => $invoice['expires_at'] !== null ? Carbon::createFromTimestampMs($invoice['expires_at']) : $expiresAt,
             'created_at' => now(), 'updated_at' => now(),
         ]);
         Audit::record('plan.checkout', $tenant, after: ['plan' => $plan->code, 'period' => $period, 'amount' => $quote['amount'], 'order_id' => $orderId]);
@@ -64,13 +76,13 @@ class SubscriptionCheckout
         return DB::table('subscription_invoices')->where('id', $id)->first();
     }
 
-    /** Cocokkan status tagihan dengan Midtrans; lunas → paket aktif (sekali saja). */
+    /** Cocokkan status tagihan dengan Mayar; lunas → paket aktif (sekali saja). */
     public function sync(stdClass $invoice): stdClass
     {
-        if ($invoice->status !== 'pending') {
+        if ($invoice->status !== 'pending' || $invoice->gateway_ref === null) {
             return $invoice;
         }
-        $status = $this->midtrans->status($invoice->order_id);
+        $status = $this->mayar->invoice($invoice->gateway_ref);
         if ($status === null) {
             return $invoice;
         }
@@ -78,18 +90,17 @@ class SubscriptionCheckout
         return $this->apply($invoice->id, $status);
     }
 
-    /** @param array<string, mixed> $status hasil GET status Midtrans */
+    /** @param array{status: string, amount: int} $status hasil GET invoice Mayar */
     private function apply(string $invoiceId, array $status): stdClass
     {
         return DB::transaction(function () use ($invoiceId, $status) {
             $invoice = DB::table('subscription_invoices')->where('id', $invoiceId)->lockForUpdate()->first();
             if ($invoice->status !== 'pending') {
-                return $invoice; // notifikasi/polling ganda
+                return $invoice; // webhook/polling ganda
             }
-            $next = Midtrans::mapStatus($status);
-            // Jumlah harus sama persis dengan tagihan (gross_amount Midtrans berupa "24900.00").
-            if ($next === 'paid' && (int) round((float) ($status['gross_amount'] ?? -1)) !== (int) $invoice->amount) {
-                report(new \RuntimeException("Jumlah Midtrans tidak cocok untuk {$invoice->order_id}"));
+            $next = Mayar::mapStatus($status['status']);
+            if ($next === 'paid' && $status['amount'] !== (int) $invoice->amount) {
+                report(new \RuntimeException("Jumlah Mayar tidak cocok untuk {$invoice->order_id}"));
 
                 return $invoice;
             }
@@ -108,7 +119,7 @@ class SubscriptionCheckout
                 $update['paid_at'] = now();
                 $update['payment_id'] = DB::table('subscription_payments')->where('tenant_id', $tenant->id)
                     ->orderByDesc('created_at')->value('id');
-                // Notifikasi datang tanpa konteks usaha: catat audit di usaha pemilik tagihan.
+                // Webhook datang tanpa konteks usaha: catat audit di usaha pemilik tagihan.
                 app(TenantContext::class)->run($tenant->id, fn () => Audit::record('plan.paid', $tenant, after: [
                     'plan' => $plan->code, 'period' => $invoice->period, 'amount' => (int) $invoice->amount, 'order_id' => $invoice->order_id,
                 ]));
@@ -120,27 +131,19 @@ class SubscriptionCheckout
     }
 
     /**
-     * Notifikasi HTTP Midtrans. Tanda tangan dicek, lalu status diambil ulang dari Midtrans (bukan dari isi
-     * notifikasi). Mengembalikan false bila tanda tangan salah.
+     * Webhook Mayar (tanpa tanda tangan): hanya pemicu untuk mencocokkan ulang ke API Mayar. Tagihan yang
+     * cocok dengan `data.productId` dicek dulu; bila tidak ketemu, semua tagihan yang masih menunggu (24 jam).
      *
      * @param array<string, mixed> $payload
      */
-    public function handleNotification(array $payload): bool
+    public function handleWebhook(array $payload): void
     {
-        if (! $this->midtrans->validSignature($payload)) {
-            return false;
+        $ref = (string) data_get($payload, 'data.productId', '');
+        $pending = DB::table('subscription_invoices')->where('status', 'pending')->where('created_at', '>', now()->subDay());
+        $matched = $ref !== '' ? (clone $pending)->where('gateway_ref', $ref)->get() : collect();
+        foreach ($matched->isNotEmpty() ? $matched : $pending->orderByDesc('created_at')->limit(50)->get() as $invoice) {
+            $this->sync($invoice);
         }
-        $invoice = DB::table('subscription_invoices')->where('order_id', (string) ($payload['order_id'] ?? ''))->first();
-        if ($invoice !== null) {
-            try {
-                $this->sync($invoice);
-            } catch (Throwable $e) {
-                report($e);
-                throw $e; // 5xx → Midtrans mengirim ulang notifikasi
-            }
-        }
-
-        return true;
     }
 
     /** @return array<string, mixed> */
@@ -155,8 +158,8 @@ class SubscriptionCheckout
             'discount_percent' => (int) $invoice->discount_percent,
             'period' => $invoice->period,
             'plan' => Plan::query()->whereKey($invoice->plan_id)->value('code'),
-            'qr_string' => $invoice->status === 'pending' ? $invoice->qr_string : null,
-            'qr_url' => $invoice->status === 'pending' ? $invoice->qr_url : null,
+            // Halaman bayar Mayar (QRIS); hanya selama masih menunggu.
+            'pay_url' => $invoice->status === 'pending' ? $invoice->pay_url : null,
             'expires_at' => $invoice->expires_at === null ? null : Carbon::parse($invoice->expires_at)->toIso8601String(),
             'paid_at' => $invoice->paid_at === null ? null : Carbon::parse($invoice->paid_at)->toIso8601String(),
         ];

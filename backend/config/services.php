@@ -36,11 +36,14 @@ return [
     ],
 
 
-    // Payment gateway paket langganan (QRIS). Kosong = pembayaran online nonaktif (aktivasi manual).
-    'midtrans' => [
-        'server_key' => env('MIDTRANS_SERVER_KEY'),
-        'production' => (bool) env('MIDTRANS_PRODUCTION', false),
-        'qris_expiry_minutes' => (int) env('MIDTRANS_QRIS_EXPIRY_MINUTES', 15),
+    // Payment gateway paket langganan (Mayar invoice). Kunci kosong = pembayaran online nonaktif (aktivasi manual).
+    'mayar' => [
+        'api_key' => env('MAYAR_API_KEY'),
+        'sandbox' => (bool) env('MAYAR_SANDBOX', true),
+        'webhook_token' => env('MAYAR_WEBHOOK_TOKEN'),
+        // Batasi ke QRIS (potongan termurah). Kosongkan untuk semua metode yang aktif di Mayar.
+        'payment_method' => env('MAYAR_PAYMENT_METHOD', 'qris'),
+        'expiry_minutes' => (int) env('MAYAR_EXPIRY_MINUTES', 30),
     ],
 
 ];

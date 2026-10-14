@@ -28,7 +28,7 @@ use App\Http\Controllers\Api\V1\ShiftController;
 use App\Http\Controllers\Api\V1\SignupController;
 use App\Http\Controllers\Api\V1\SignupEmailCodeController;
 use App\Http\Controllers\Api\V1\SignupOptionsController;
-use App\Http\Controllers\Api\V1\MidtransNotificationController;
+use App\Http\Controllers\Api\V1\MayarWebhookController;
 use App\Http\Controllers\Api\V1\StaffController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\TierController;
@@ -42,8 +42,8 @@ Route::prefix('v1')->group(function () {
     // Publik: pendaftaran usaha baru (tablet ini otomatis jadi tablet pertama).
     Route::post('signup', SignupController::class)->middleware('throttle:signup');
     Route::get('signup/options', SignupOptionsController::class);
-    // Notifikasi pembayaran paket dari Midtrans (tanda tangan diperiksa di controller).
-    Route::post('payments/midtrans/notification', MidtransNotificationController::class)->middleware('throttle:payment-webhook');
+    // Webhook pembayaran paket dari Mayar (token rahasia di URL; status dicek ulang ke API Mayar).
+    Route::post('payments/mayar/webhook', MayarWebhookController::class)->middleware('throttle:payment-webhook');
     Route::post('signup/email-code', SignupEmailCodeController::class)->middleware('throttle:auth'); // jenis usaha & wilayah untuk form daftar
     // Publik: lupa password owner (kode 6 digit ke email).
     Route::post('auth/password/forgot', [PasswordResetController::class, 'forgot'])->middleware('throttle:auth');

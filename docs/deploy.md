@@ -84,9 +84,10 @@ Isi `deploy/.env`:
 - `POSTGRES_PASSWORD` dan `APP_DB_PASSWORD`: acak, **hanya huruf & angka** (`openssl rand -base64 24 | tr -dc A-Za-z0-9`).
 - `BACKUP_HEARTBEAT_URL` (opsional).
 - `SENTRY_LARAVEL_DSN`: DSN proyek Laravel di Sentry (kosong = pelacak error mati).
-- `MIDTRANS_SERVER_KEY` (+ `MIDTRANS_PRODUCTION=true` untuk kunci produksi): pembayaran paket via QRIS. Di dashboard
-  Midtrans → Settings → Payment → Notification URL isi `https://<domain>/api/v1/payments/midtrans/notification`.
-  Kosong = owner hanya bisa meminta paket, aktivasi manual `pos:activate-plan`.
+- `MAYAR_API_KEY` (+ `MAYAR_SANDBOX=false` untuk kunci produksi dari web.mayar.id/api-keys) dan `MAYAR_WEBHOOK_TOKEN`
+  (string acak panjang): pembayaran paket via invoice Mayar (QRIS). Di Mayar → Integration → Webhook isi
+  `https://<domain>/api/v1/payments/mayar/webhook?token=<MAYAR_WEBHOOK_TOKEN>`. Aktifkan metode QRIS di pengaturan
+  pembayaran Mayar (atau kosongkan `MAYAR_PAYMENT_METHOD`). Kunci kosong = aktivasi manual `pos:activate-plan`.
 - `MAIL_*`: kredensial SMTP dari langkah 1.7. Uji setelah deploy: di app, **Masuk → Lupa password?**
   dengan email owner, kode harus sampai dalam 1 menit.
 
