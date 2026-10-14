@@ -687,7 +687,7 @@ class _ReferralCard extends StatelessWidget {
   }
 }
 
-/// QRIS tagihan paket: QR dari Midtrans, hitung mundur, dan cek status berkala sampai lunas / kedaluwarsa.
+/// Tagihan paket: halaman bayar Mayar (QRIS), hitung mundur, dan cek status berkala sampai lunas / kedaluwarsa.
 /// Hasil `true` = lunas (paket sudah aktif di server).
 class QrisPaymentDialog extends ConsumerStatefulWidget {
   const QrisPaymentDialog({super.key, required this.plan, required this.period, required this.invoice});
@@ -767,7 +767,7 @@ class _QrisPaymentDialogState extends ConsumerState<QrisPaymentDialog> {
       ]);
     } else if (expired || _status == 'failed') {
       body = Text(
-        expired ? 'QR sudah kedaluwarsa. Tutup lalu tekan Bayar QRIS lagi untuk membuat QR baru.' : 'Pembayaran gagal. Coba lagi.',
+        expired ? 'Tagihan sudah kedaluwarsa. Tutup lalu tekan Bayar QRIS lagi untuk membuat tagihan baru.' : 'Pembayaran gagal. Coba lagi.',
         style: muted,
       );
     } else {
@@ -775,26 +775,15 @@ class _QrisPaymentDialogState extends ConsumerState<QrisPaymentDialog> {
         Text(amount, style: AppType.headline),
         Text('Paket ${widget.plan.name} · ${periodMonths(widget.period)} bulan', style: muted),
         const SizedBox(height: AppSpace.s4),
-        Container(
-          width: 260,
-          height: 260,
-          padding: const EdgeInsets.all(AppSpace.s2),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: _invoice['qr_url'] == null
-              ? const Center(child: Text('QR tidak tersedia'))
-              : Image.network(
-                  _invoice['qr_url'] as String,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (_, child, p) => p == null ? child : const Center(child: CircularProgressIndicator()),
-                  errorBuilder: (_, _, _) => const Center(child: Text('QR gagal dimuat. Tutup lalu coba lagi.', textAlign: TextAlign.center)),
-                ),
+        // Halaman bayar Mayar menampilkan QRIS; app ini memeriksa status otomatis.
+        FilledButton(
+          onPressed: _invoice['pay_url'] == null
+              ? null
+              : () => launchUrl(Uri.parse(_invoice['pay_url'] as String), mode: LaunchMode.externalApplication),
+          child: const Text('Buka halaman pembayaran QRIS'),
         ),
         const SizedBox(height: AppSpace.s3),
-        Text('Pindai dengan aplikasi bank atau e-wallet (GoPay, OVO, DANA, ShopeePay, m-banking).',
+        Text('Pindai QRIS di halaman itu dengan aplikasi bank atau e-wallet (GoPay, OVO, DANA, ShopeePay, m-banking), lalu kembali ke sini.',
             style: muted, textAlign: TextAlign.center),
         const SizedBox(height: AppSpace.s2),
         Text('Berlaku ${_remaining()} · menunggu pembayaran…', style: AppType.label.copyWith(color: AppColors.ink)),
