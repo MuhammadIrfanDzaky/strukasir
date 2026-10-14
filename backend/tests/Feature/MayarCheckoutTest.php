@@ -126,6 +126,16 @@ class MayarCheckoutTest extends TestCase
         $this->api('GET', "/api/v1/subscription/invoices/{$inv['id']}", $this->pinLogin($other, $other->owner))->assertNotFound();
     }
 
+    public function test_tanggal_kedaluwarsa_dari_mayar_berupa_teks_atau_milidetik(): void
+    {
+        $this->assertSame('2026-10-14T06:47:30+00:00', \App\Services\Payments\Mayar::time('2026-10-14T06:47:30.000Z')->toIso8601String());
+        $this->assertSame(1791960703, \App\Services\Payments\Mayar::time(1791960703882)->timestamp);
+        $this->assertNull(\App\Services\Payments\Mayar::time(null));
+
+        $inv = $this->checkout()->json('data');
+        $this->assertTrue(\Illuminate\Support\Carbon::parse($inv['expires_at'])->isFuture());
+    }
+
     public function test_tanpa_kunci_mayar_pembayaran_online_nonaktif(): void
     {
         config(['services.mayar.api_key' => null]);

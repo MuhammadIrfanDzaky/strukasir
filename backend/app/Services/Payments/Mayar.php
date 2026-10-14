@@ -33,7 +33,7 @@ class Mayar
      * Buat invoice; pelanggan membayar di halaman Mayar (`link`), dibatasi ke QRIS bila diatur.
      *
      * @param  array{name: string, email: string, mobile: string}  $customer
-     * @return array{id: string, link: string, expires_at: ?int}
+     * @return array{id: string, link: string, expires_at: ?\Illuminate\Support\Carbon}
      */
     public function createInvoice(array $customer, int $amount, string $description, \DateTimeInterface $expiresAt, array $extra): array
     {
@@ -53,7 +53,17 @@ class Mayar
             throw new RuntimeException('Mayar invoice gagal: '.$res->status().' '.($res->json('messages') ?? ''));
         }
 
-        return ['id' => (string) $data['id'], 'link' => (string) $data['link'], 'expires_at' => $data['expiredAt'] ?? null];
+        return ['id' => (string) $data['id'], 'link' => (string) $data['link'], 'expires_at' => self::time($data['expiredAt'] ?? null)];
+    }
+
+    /** `expiredAt` Mayar bisa berupa epoch milidetik (sesuai dokumentasi) atau teks tanggal ISO (sandbox). */
+    public static function time(mixed $value): ?\Illuminate\Support\Carbon
+    {
+        return match (true) {
+            is_int($value), is_float($value), is_string($value) && ctype_digit($value) => \Illuminate\Support\Carbon::createFromTimestampMs((int) $value),
+            is_string($value) && $value !== '' => \Illuminate\Support\Carbon::parse($value)->utc(),
+            default => null,
+        };
     }
 
     /**

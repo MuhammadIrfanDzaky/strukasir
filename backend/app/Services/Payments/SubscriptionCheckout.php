@@ -68,7 +68,7 @@ class SubscriptionCheckout
             'base_amount' => $quote['base'], 'discount_percent' => $quote['percent'], 'discount_reason' => $quote['reason'],
             'amount' => $quote['amount'], 'gateway' => 'mayar', 'order_id' => $orderId, 'gateway_ref' => $invoice['id'],
             'status' => 'pending', 'pay_url' => $invoice['link'],
-            'expires_at' => $invoice['expires_at'] !== null ? Carbon::createFromTimestampMs($invoice['expires_at']) : $expiresAt,
+            'expires_at' => $invoice['expires_at'] ?? $expiresAt,
             'created_at' => now(), 'updated_at' => now(),
         ]);
         Audit::record('plan.checkout', $tenant, after: ['plan' => $plan->code, 'period' => $period, 'amount' => $quote['amount'], 'order_id' => $orderId]);
