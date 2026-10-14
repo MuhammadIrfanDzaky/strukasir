@@ -33,22 +33,23 @@ class PlanReminderMail extends BrandedMail
                 'greeting' => "Halo {$this->ownerName},",
                 'intro' => ["{$what} untuk {$this->businessName} berakhir {$date}. Kasir tidak bisa membuat order baru atau membuka shift sampai paket diaktifkan."],
                 'box' => ['label' => 'Data Anda aman', 'value' => 'Menu, pelanggan & laporan tetap tersimpan', 'caption' => 'Semua kembali seperti semula begitu paket aktif.'],
-                'steps' => ['Buka aplikasi Strukasir di tablet.', 'Ketuk kotak paket di bawah menu samping (Upgrade).', 'Pilih paket & periode, lalu bayar dengan QRIS.'],
-                'reason' => 'Anda menerima email ini sebagai owner usaha di Strukasir.',
+                'steps' => ['Buka aplikasi Strukasir di tablet.', 'Ketuk kotak paket di bawah menu samping.', 'Pilih paket & periode, lalu bayar dengan QRIS.'],
+                'reason' => 'Pemberitahuan akun untuk owner usaha di Strukasir.',
             ];
         }
 
         $when = $this->daysLeft === 1 ? 'besok' : "{$this->daysLeft} hari lagi";
 
+        // Gaya pemberitahuan akun (bukan promosi) supaya Gmail menaruhnya di tab Utama.
         return [
-            'subject' => "{$what} Strukasir berakhir {$when}",
-            'preheader' => "Berakhir {$date}. Perpanjang supaya kasir tidak terhenti.",
+            'subject' => "{$what} Strukasir Anda berakhir {$date}",
+            'preheader' => "{$what} untuk {$this->businessName} berakhir {$when}.",
             'title' => "{$what} berakhir {$when}",
             'greeting' => "Halo {$this->ownerName},",
-            'intro' => ["{$what} untuk {$this->businessName} berakhir {$date}. Setelah itu kasir tidak bisa membuat order baru sampai paket diaktifkan."],
+            'intro' => ["{$what} untuk {$this->businessName} berakhir {$date}. Setelah tanggal itu kasir tidak bisa membuat order baru sampai paket diaktifkan."],
             'box' => ['label' => 'Berakhir', 'value' => $date],
-            'steps' => ['Buka aplikasi Strukasir di tablet.', 'Ketuk kotak paket di bawah menu samping (Upgrade).', 'Pilih paket & periode (3, 6, atau 12 bulan lebih hemat), lalu bayar dengan QRIS.'],
-            'reason' => 'Anda menerima email ini sebagai owner usaha di Strukasir.',
+            'steps' => ['Buka aplikasi Strukasir di tablet.', 'Ketuk kotak paket di bawah menu samping.', 'Pilih paket & periode, lalu bayar dengan QRIS.'],
+            'reason' => 'Pemberitahuan akun untuk owner usaha di Strukasir.',
         ];
     }
 }

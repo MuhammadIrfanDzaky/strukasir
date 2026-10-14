@@ -63,7 +63,8 @@ class EmailNotificationsTest extends TestCase
         $mails[0]->assertSeeInText('Penjualan: Rp60.000')->assertDontSeeInText('*');
         $mails[1]->assertSeeInHtml('Rp50.400')->assertSeeInHtml('Diskon referral 25%')->assertSeeInHtml('3 bulan');
         $mails[2]->assertSeeInText('K7M2PQ');
-        $this->assertStringContainsString('besok', $mails[3]->envelope()->subject);
+        $mails[3]->assertSeeInHtml('berakhir besok');
+        $mails[0]->assertSeeInHtml('Laporan shift BerryBrew');
         $this->assertStringContainsString('sudah berakhir', $mails[4]->envelope()->subject);
     }
 
