@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+
+    // Payment gateway paket langganan (QRIS). Kosong = pembayaran online nonaktif (aktivasi manual).
+    'midtrans' => [
+        'server_key' => env('MIDTRANS_SERVER_KEY'),
+        'production' => (bool) env('MIDTRANS_PRODUCTION', false),
+        'qris_expiry_minutes' => (int) env('MIDTRANS_QRIS_EXPIRY_MINUTES', 15),
+    ],
+
 ];

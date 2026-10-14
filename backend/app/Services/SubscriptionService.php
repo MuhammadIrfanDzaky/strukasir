@@ -63,15 +63,15 @@ class SubscriptionService
      *
      * @return array{base: int, percent: int, reason: ?string, amount: int}
      */
-    public function activate(Tenant $tenant, Plan $plan, string $period): array
+    public function activate(Tenant $tenant, Plan $plan, string $period, ?array $quote = null): array
     {
-        return DB::transaction(fn () => $this->doActivate($tenant, $plan, $period));
+        return DB::transaction(fn () => $this->doActivate($tenant, $plan, $period, $quote));
     }
 
     /** @return array{base: int, percent: int, reason: ?string, amount: int} */
-    private function doActivate(Tenant $tenant, Plan $plan, string $period): array
+    private function doActivate(Tenant $tenant, Plan $plan, string $period, ?array $quote): array
     {
-        $quote = app(ReferralService::class)->recordPayment($tenant, $plan, $period);
+        $quote = app(ReferralService::class)->recordPayment($tenant, $plan, $period, $quote);
         $from = $tenant->plan_status === 'active' && $tenant->plan_id === $plan->id && $tenant->plan_ends_at?->isFuture()
             ? $tenant->plan_ends_at : now();
         $tenant->plan_id = $plan->id;

@@ -47,6 +47,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Login PIN/password: ketat per IP. Lockout per akun ada di User::registerFailedAttempt().
         RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(10)->by('auth:'.$request->ip()));
+        // Notifikasi Midtrans: longgar (dikirim ulang bila gagal), tetap dibatasi per IP.
+        RateLimiter::for('payment-webhook', fn (Request $request) => Limit::perMinute(120)->by('pg:'.$request->ip()));
 
         // Pendaftaran usaha: cegah pembuatan kedai massal dari satu IP (salah isi form tetap leluasa).
         RateLimiter::for('signup', fn (Request $request) => [

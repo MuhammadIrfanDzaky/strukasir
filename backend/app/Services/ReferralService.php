@@ -96,12 +96,13 @@ class ReferralService
      *
      * @return array{base: int, percent: int, reason: ?string, amount: int}
      */
-    public function recordPayment(Tenant $tenant, Plan $plan, string $period): array
+    public function recordPayment(Tenant $tenant, Plan $plan, string $period, ?array $quote = null): array
     {
         Tenant::query()->whereKey($tenant->id)->lockForUpdate()->first();
         $firstPaid = ! $this->hasPaid($tenant);
         $discount = $this->nextDiscount($tenant);
-        $quote = $this->quote($tenant, $plan, $period);
+        // Tagihan online: harga yang sudah dibayar pelanggan (dikunci saat QR dibuat) yang dicatat.
+        $quote ??= $this->quote($tenant, $plan, $period);
 
         $paymentId = (string) Str::uuid7();
         DB::table('subscription_payments')->insert([
@@ -109,7 +110,7 @@ class ReferralService
             'base_amount' => $quote['base'], 'discount_percent' => $quote['percent'], 'discount_reason' => $quote['reason'],
             'amount' => $quote['amount'], 'created_at' => now(),
         ]);
-        if ($quote['reason'] === 'referral_reward') {
+        if ($quote['reason'] === 'referral_reward' && $discount['reward_id'] !== null) {
             DB::table('referral_rewards')->where('id', $discount['reward_id'])->update(['used_at' => now(), 'used_payment_id' => $paymentId]);
         }
 

@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\V1\ShiftController;
 use App\Http\Controllers\Api\V1\SignupController;
 use App\Http\Controllers\Api\V1\SignupEmailCodeController;
 use App\Http\Controllers\Api\V1\SignupOptionsController;
+use App\Http\Controllers\Api\V1\MidtransNotificationController;
 use App\Http\Controllers\Api\V1\StaffController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\TierController;
@@ -41,6 +42,8 @@ Route::prefix('v1')->group(function () {
     // Publik: pendaftaran usaha baru (tablet ini otomatis jadi tablet pertama).
     Route::post('signup', SignupController::class)->middleware('throttle:signup');
     Route::get('signup/options', SignupOptionsController::class);
+    // Notifikasi pembayaran paket dari Midtrans (tanda tangan diperiksa di controller).
+    Route::post('payments/midtrans/notification', MidtransNotificationController::class)->middleware('throttle:payment-webhook');
     Route::post('signup/email-code', SignupEmailCodeController::class)->middleware('throttle:auth'); // jenis usaha & wilayah untuk form daftar
     // Publik: lupa password owner (kode 6 digit ke email).
     Route::post('auth/password/forgot', [PasswordResetController::class, 'forgot'])->middleware('throttle:auth');
@@ -65,6 +68,10 @@ Route::prefix('v1')->group(function () {
 
         Route::get('menu', [MenuController::class, 'show']);
         Route::get('subscription', [SubscriptionController::class, 'show']);
+        Route::post('subscription/checkout', [SubscriptionController::class, 'checkout'])
+            ->middleware(['can:'.Permission::UsersManage->value, 'throttle:10,1']);
+        Route::get('subscription/invoices/{invoice}', [SubscriptionController::class, 'invoice'])
+            ->whereUuid('invoice')->middleware('can:'.Permission::UsersManage->value);
         Route::post('subscription/request', [SubscriptionController::class, 'request'])
             ->middleware('can:'.Permission::UsersManage->value);
 
