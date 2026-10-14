@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -392,6 +394,34 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
   String _period = 'month';
   bool _busy = false;
 
+  /// Bayar via QRIS. Bila pembayaran online belum aktif di server (503), permintaan dicatat untuk diproses manual.
+  Future<void> _pay(PlanInfo plan, int discount) async {
+    setState(() => _busy = true);
+    try {
+      final res = await ref.read(sessionProvider.notifier).authed((api, token) =>
+          api.post('/subscription/checkout', token: token, data: {'plan': plan.code, 'period': _period}));
+      if (!mounted) return;
+      final paid = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => QrisPaymentDialog(plan: plan, period: _period, invoice: res['data'] as Map<String, dynamic>),
+      );
+      ref.invalidate(subscriptionProvider);
+      if (paid == true && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pembayaran diterima. Paket ${plan.name} aktif.')));
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.status == 503) {
+        await _request(plan, discount);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _request(PlanInfo plan, int discount) async {
     setState(() => _busy = true);
     try {
@@ -460,10 +490,10 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: FilledButton(
-                            onPressed: chosen == null || _busy ? null : () => _request(chosen, sub.discountPercent),
+                            onPressed: chosen == null || _busy ? null : () => _pay(chosen, sub.discountPercent),
                             child: Text(chosen == null
                                 ? 'Pilih salah satu paket'
-                                : '${chosen.code == sub.plan.code ? 'Perpanjang' : 'Pilih'} ${chosen.name} · '
+                                : 'Bayar QRIS · ${chosen.code == sub.plan.code ? 'Perpanjang' : 'Pilih'} ${chosen.name} · '
                                     '${chosen.priceWith(_period, sub.discountPercent)}'),
                           ),
                         )
@@ -471,8 +501,8 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                         Text('Hanya owner yang bisa mengganti paket.', style: AppType.body.copyWith(color: AppColors.inkMuted)),
                       const SizedBox(height: AppSpace.s2),
                       Text(
-                        'Harga per usaha (bukan per outlet). Pembayaran lewat transfer / QRIS dikonfirmasi tim Strukasir; '
-                        'paket aktif begitu pembayaran diterima. Data tidak hilang saat paket habis.',
+                        'Harga per usaha (bukan per outlet). Bayar dengan QRIS dari aplikasi bank / e-wallet apa pun; '
+                        'paket langsung aktif begitu pembayaran diterima. Data tidak hilang saat paket habis.',
                         style: AppType.caption.copyWith(color: AppColors.inkMuted),
                       ),
                       if (sub.referral != null) ...[
@@ -653,6 +683,134 @@ class _ReferralCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// QRIS tagihan paket: QR dari Midtrans, hitung mundur, dan cek status berkala sampai lunas / kedaluwarsa.
+/// Hasil `true` = lunas (paket sudah aktif di server).
+class QrisPaymentDialog extends ConsumerStatefulWidget {
+  const QrisPaymentDialog({super.key, required this.plan, required this.period, required this.invoice});
+
+  final PlanInfo plan;
+  final String period;
+  final Map<String, dynamic> invoice;
+
+  @override
+  ConsumerState<QrisPaymentDialog> createState() => _QrisPaymentDialogState();
+}
+
+class _QrisPaymentDialogState extends ConsumerState<QrisPaymentDialog> {
+  late Map<String, dynamic> _invoice = widget.invoice;
+  Timer? _poll;
+  Timer? _tick;
+  bool _checking = false;
+
+  String get _status => _invoice['status'] as String;
+
+  DateTime? get _expiresAt =>
+      _invoice['expires_at'] == null ? null : DateTime.parse(_invoice['expires_at'] as String).toLocal();
+
+  @override
+  void initState() {
+    super.initState();
+    _poll = Timer.periodic(const Duration(seconds: 4), (_) => _check());
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _check() async {
+    if (_checking || _status != 'pending') return;
+    _checking = true;
+    try {
+      final res = await ref
+          .read(sessionProvider.notifier)
+          .authed((api, token) => api.get('/subscription/invoices/${_invoice['id']}', token: token));
+      if (!mounted) return;
+      setState(() => _invoice = res['data'] as Map<String, dynamic>);
+      if (_status != 'pending') _poll?.cancel();
+    } on ApiException {
+      // Koneksi putus sesaat: coba lagi di putaran berikutnya.
+    } finally {
+      _checking = false;
+    }
+  }
+
+  String _remaining() {
+    final left = _expiresAt?.difference(DateTime.now());
+    if (left == null || left.isNegative) return '0:00';
+    return '${left.inMinutes}:${(left.inSeconds % 60).toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = AppType.body.copyWith(color: AppColors.inkMuted);
+    final amount = 'Rp${rupiah(_invoice['amount'] as int)}';
+    final expired = _status == 'expired' || (_status == 'pending' && (_expiresAt?.isBefore(DateTime.now()) ?? false));
+
+    final Widget body;
+    if (_status == 'paid') {
+      body = Column(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 56),
+        const SizedBox(height: AppSpace.s3),
+        Text('Pembayaran $amount diterima', style: AppType.title, textAlign: TextAlign.center),
+        const SizedBox(height: AppSpace.s1),
+        Text('Paket ${widget.plan.name} (${periodMonths(widget.period)} bulan) sudah aktif.', style: muted, textAlign: TextAlign.center),
+      ]);
+    } else if (expired || _status == 'failed') {
+      body = Text(
+        expired ? 'QR sudah kedaluwarsa. Tutup lalu tekan Bayar QRIS lagi untuk membuat QR baru.' : 'Pembayaran gagal. Coba lagi.',
+        style: muted,
+      );
+    } else {
+      body = Column(mainAxisSize: MainAxisSize.min, children: [
+        Text(amount, style: AppType.headline),
+        Text('Paket ${widget.plan.name} · ${periodMonths(widget.period)} bulan', style: muted),
+        const SizedBox(height: AppSpace.s4),
+        Container(
+          width: 260,
+          height: 260,
+          padding: const EdgeInsets.all(AppSpace.s2),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: _invoice['qr_url'] == null
+              ? const Center(child: Text('QR tidak tersedia'))
+              : Image.network(
+                  _invoice['qr_url'] as String,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (_, child, p) => p == null ? child : const Center(child: CircularProgressIndicator()),
+                  errorBuilder: (_, _, _) => const Center(child: Text('QR gagal dimuat. Tutup lalu coba lagi.', textAlign: TextAlign.center)),
+                ),
+        ),
+        const SizedBox(height: AppSpace.s3),
+        Text('Pindai dengan aplikasi bank atau e-wallet (GoPay, OVO, DANA, ShopeePay, m-banking).',
+            style: muted, textAlign: TextAlign.center),
+        const SizedBox(height: AppSpace.s2),
+        Text('Berlaku ${_remaining()} · menunggu pembayaran…', style: AppType.label.copyWith(color: AppColors.ink)),
+      ]);
+    }
+
+    return AlertDialog(
+      title: Text(_status == 'paid' ? 'Berhasil' : 'Bayar dengan QRIS'),
+      content: SizedBox(width: 340, child: SingleChildScrollView(child: body)),
+      actions: [
+        if (_status == 'pending' && !expired) TextButton(onPressed: _check, child: const Text('Cek pembayaran')),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _status == 'paid'),
+          child: Text(_status == 'paid' ? 'Selesai' : 'Tutup'),
+        ),
+      ],
     );
   }
 }
