@@ -1,0 +1,11 @@
+:root {
+  /* Strukasir — warna merek (sumber: app/lib/core/theme/tokens.dart) */
+  --strukasir-primary: #3730A3;     /* indigo: aksi utama & latar merek */
+  --strukasir-primary-dark: #312E81;
+  --strukasir-primary-soft: #E0E7FF;
+  --strukasir-accent: #F59E0B;      /* amber: titik logo & CTA paket */
+  --strukasir-neutral: #F8FAFC;     /* slate: latar */
+  --strukasir-line: #E2E8F0;
+  --strukasir-muted: #64748B;
+  --strukasir-dark: #0F172A;        /* ink: teks & latar gelap */
+}

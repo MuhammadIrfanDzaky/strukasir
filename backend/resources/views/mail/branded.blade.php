@@ -14,12 +14,16 @@
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;">
 <tr><td align="center" style="padding:32px 16px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
-    {{-- Merek --}}
+    {{-- Merek: logo PNG tertanam (CID) — Gmail tidak menampilkan SVG/data URI. Pratinjau tanpa $message: logo teks. --}}
     <tr><td style="padding:0 4px 16px;">
+      @isset($message)
+      <img src="{{ $message->embed(resource_path('brand/email-logo.png')) }}" alt="Strukasir" width="134" height="32" style="display:block;border:0;height:32px;width:134px;">
+      @else
       <table role="presentation" cellpadding="0" cellspacing="0"><tr>
         <td style="background:#3730A3;color:#FFFFFF;font-weight:800;font-size:18px;line-height:32px;width:32px;text-align:center;border-radius:6px;">S<span style="color:#F59E0B;">.</span></td>
         <td style="padding-left:10px;font-weight:800;font-size:18px;letter-spacing:0.5px;color:#0F172A;">STRUKASIR</td>
       </tr></table>
+      @endisset
     </td></tr>
 
     {{-- Kartu isi --}}

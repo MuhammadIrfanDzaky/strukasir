@@ -57,7 +57,7 @@ class EmailNotificationsTest extends TestCase
             new SecurityAlertMail('Wahyu', 'BerryBrew', SecurityAlertMail::DEVICE_ADDED, now(), ['Tablet' => 'Tablet 2 (T2)']),
         ];
         foreach ($mails as $mail) {
-            $mail->assertSeeInHtml('STRUKASIR');
+            $mail->assertSeeInHtml('Strukasir');
             $mail->assertSeeInText('Strukasir');
         }
         $mails[0]->assertSeeInText('Penjualan: Rp60.000')->assertDontSeeInText('*');
