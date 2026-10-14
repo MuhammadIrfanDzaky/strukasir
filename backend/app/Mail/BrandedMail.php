@@ -12,6 +12,7 @@ use Illuminate\Support\Carbon;
  * Turunan cukup mengisi `message()`:
  *  - subject, preheader (cuplikan di daftar email), title, greeting
  *  - intro / outro: paragraf; text: blok teks berbaris (laporan); code: kode besar; rows: [label => nilai]; box: kotak sorotan (judul + isi)
+ *  - partial: [view, data] isi HTML khusus (mis. laporan bergrafik), text_fallback: isinya di versi teks
  *  - steps: daftar langkah bernomor; button: [label, url]; note: catatan kecil abu-abu; reason: alasan email dikirim
  */
 abstract class BrandedMail extends Mailable
@@ -27,7 +28,7 @@ abstract class BrandedMail extends Mailable
     public function content(): Content
     {
         $m = $this->message() + [
-            'preheader' => null, 'title' => null, 'greeting' => null, 'intro' => [], 'text' => null, 'code' => null, 'rows' => [],
+            'preheader' => null, 'title' => null, 'greeting' => null, 'intro' => [], 'text' => null, 'text_fallback' => null, 'partial' => null, 'code' => null, 'rows' => [],
             'box' => null, 'steps' => [], 'button' => null, 'outro' => [], 'note' => null, 'reason' => null,
         ];
 

@@ -25,77 +25,112 @@ class ShiftReportService
 {
     private const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
-    public function text(Shift $shift): string
+    /**
+     * Data laporan shift (dipakai teks WhatsApp/email dan tampilan email bergrafik).
+     *
+     * @return array<string, mixed>
+     */
+    public function data(Shift $shift): array
     {
         $summary = app(ShiftService::class)->summary($shift);
         $tenant = Tenant::query()->findOrFail($shift->tenant_id);
         $tz = $tenant->timezone ?: 'Asia/Jakarta';
-        $shop = TenantSetting::query()->value('receipt_name') ?: $tenant->name;
         $names = User::query()->whereIn('id', array_filter([$shift->opened_by, $shift->closed_by]))->pluck('name', 'id');
-        $device = Device::query()->whereKey($shift->device_id)->value('code');
         $outlets = Outlet::query()->where('active', true)->count();
-        $outlet = Outlet::query()->whereKey($shift->outlet_id)->value('name');
         $opened = $shift->opened_at->copy()->setTimezone($tz);
         $closed = $shift->closed_at?->copy()->setTimezone($tz);
         $m = $summary['by_method'];
-        $sales = array_sum($m);
 
-        $top = DB::table('order_items')->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->where('orders.shift_id', $shift->id)->where('orders.status', 'paid')
-            ->groupBy('order_items.name')->orderByRaw('sum(order_items.qty) desc')->limit(3)
-            ->selectRaw('order_items.name, sum(order_items.qty) as qty')->get()
-            ->map(fn ($r) => "{$r->name} {$r->qty}×")->implode(', ');
-        $voids = DB::table('orders')->where('shift_id', $shift->id)->where('status', 'void')->count();
         $dayQuery = fn () => DB::table('orders')->where('status', 'paid')->where('business_date', $opened->toDateString())
             ->selectRaw('count(*) as n, coalesce(sum(grand_total), 0) as total');
         $day = $dayQuery()->first();
         $dayOutlet = $outlets > 1 ? $dayQuery()->where('outlet_id', $shift->outlet_id)->first() : null;
+        $low = app(InventoryService::class)->enabled() ? app(InventoryService::class)->lowStock($shift->outlet_id) : collect();
 
-        $methods = collect(['cash' => 'Tunai', 'qris' => 'QRIS', 'debit' => 'Debit', 'credit' => 'Kasbon'])
-            ->filter(fn ($label, $key) => ($m[$key] ?? 0) !== 0)
-            ->map(fn ($label, $key) => "{$label} ".self::rp($m[$key]))->implode(' · ');
+        return [
+            'shop' => TenantSetting::query()->value('receipt_name') ?: $tenant->name,
+            'outlet' => $outlets > 1 ? Outlet::query()->whereKey($shift->outlet_id)->value('name') : null,
+            'day' => self::DAYS[$opened->dayOfWeekIso - 1],
+            'date' => $opened->format('d/m/Y'),
+            'device' => Device::query()->whereKey($shift->device_id)->value('code'),
+            'from' => $opened->format('H:i'),
+            'to' => $closed?->format('H:i'),
+            'opened_by' => $names[$shift->opened_by] ?? '-',
+            'closed_by' => $shift->closed_by && $shift->closed_by !== $shift->opened_by ? ($names[$shift->closed_by] ?? '-') : null,
+            'sales' => array_sum($m),
+            'orders' => (int) $summary['paid_orders'],
+            'methods' => collect(['cash' => 'Tunai', 'qris' => 'QRIS', 'debit' => 'Debit', 'credit' => 'Kasbon'])
+                ->filter(fn ($label, $key) => ($m[$key] ?? 0) !== 0)
+                ->map(fn ($label, $key) => ['label' => $label, 'amount' => (int) $m[$key]])->values()->all(),
+            'cash_out' => (int) $summary['cash_out'],
+            'cash_in' => (int) $summary['cash_extra_in'],
+            'credit_repaid_cash' => (int) ($summary['credit_repaid_cash'] ?? 0),
+            'cash' => $shift->closed_at === null ? null : [
+                'expected' => (int) $shift->expected_cash, 'counted' => (int) $shift->counted_cash, 'diff' => (int) $shift->difference,
+            ],
+            'voids' => DB::table('orders')->where('shift_id', $shift->id)->where('status', 'void')->count(),
+            'top' => DB::table('order_items')->join('orders', 'orders.id', '=', 'order_items.order_id')
+                ->where('orders.shift_id', $shift->id)->where('orders.status', 'paid')
+                ->groupBy('order_items.name')->orderByRaw('sum(order_items.qty) desc')->limit(5)
+                ->selectRaw('order_items.name, sum(order_items.qty) as qty')->get()
+                ->map(fn ($r) => ['name' => $r->name, 'qty' => (int) $r->qty])->all(),
+            'note' => $shift->note,
+            'low_stock' => $low->map(fn ($i) => ['name' => $i->name, 'qty' => self::qty((float) $i->stock).' '.$i->unit])->values()->all(),
+            'day_outlet' => $dayOutlet === null ? null : ['total' => (int) $dayOutlet->total, 'n' => (int) $dayOutlet->n],
+            'day_total' => ['total' => (int) $day->total, 'n' => (int) $day->n],
+            'all_label' => $outlets > 1 ? 'semua outlet' : 'semua tablet',
+        ];
+    }
 
+    public function text(Shift $shift): string
+    {
+        return self::textFrom($this->data($shift));
+    }
+
+    /** @param array<string, mixed> $d hasil data() */
+    public static function textFrom(array $d): string
+    {
+        $methods = collect($d['methods'])->map(fn ($x) => "{$x['label']} ".self::rp($x['amount']))->implode(' · ');
         $lines = [
-            "*Laporan shift {$shop}*".($outlets > 1 ? " · {$outlet}" : ''),
-            self::DAYS[$opened->dayOfWeekIso - 1].', '.$opened->format('d/m/Y')." · Tablet {$device}",
-            'Jam '.$opened->format('H:i').'–'.($closed?->format('H:i') ?? 'sekarang')
-                .' · '.($names[$shift->opened_by] ?? '-').($shift->closed_by && $shift->closed_by !== $shift->opened_by ? ' → '.($names[$shift->closed_by] ?? '-') : ''),
+            "*Laporan shift {$d['shop']}*".($d['outlet'] ? " · {$d['outlet']}" : ''),
+            "{$d['day']}, {$d['date']} · Tablet {$d['device']}",
+            "Jam {$d['from']}–".($d['to'] ?? 'sekarang').' · '.$d['opened_by'].($d['closed_by'] ? " → {$d['closed_by']}" : ''),
             '',
-            '*Penjualan: '.self::rp($sales).'* ('.$summary['paid_orders'].' transaksi)',
+            '*Penjualan: '.self::rp($d['sales']).'* ('.$d['orders'].' transaksi)',
         ];
         if ($methods !== '') {
             $lines[] = $methods;
         }
-        if ($summary['cash_out'] > 0 || $summary['cash_extra_in'] > 0) {
-            $lines[] = 'Kas keluar '.self::rp($summary['cash_out']).' · kas masuk '.self::rp($summary['cash_extra_in']);
+        if ($d['cash_out'] > 0 || $d['cash_in'] > 0) {
+            $lines[] = 'Kas keluar '.self::rp($d['cash_out']).' · kas masuk '.self::rp($d['cash_in']);
         }
-        if (($summary['credit_repaid_cash'] ?? 0) > 0) {
-            $lines[] = 'Pelunasan kasbon tunai '.self::rp($summary['credit_repaid_cash']);
+        if ($d['credit_repaid_cash'] > 0) {
+            $lines[] = 'Pelunasan kasbon tunai '.self::rp($d['credit_repaid_cash']);
         }
-        if ($shift->closed_at !== null) {
-            $diff = (int) $shift->difference;
-            $lines[] = 'Kas seharusnya '.self::rp((int) $shift->expected_cash).' · dihitung '.self::rp((int) $shift->counted_cash)
+        if ($d['cash'] !== null) {
+            $diff = $d['cash']['diff'];
+            $lines[] = 'Kas seharusnya '.self::rp($d['cash']['expected']).' · dihitung '.self::rp($d['cash']['counted'])
                 .' · '.($diff === 0 ? 'cocok ✅' : ($diff > 0 ? 'LEBIH ' : 'KURANG ').self::rp(abs($diff)).' ⚠️');
         }
-        if ($voids > 0) {
-            $lines[] = "Void: {$voids} order";
+        if ($d['voids'] > 0) {
+            $lines[] = "Void: {$d['voids']} order";
         }
-        if ($top !== '') {
-            $lines[] = "Terlaris: {$top}";
+        if ($d['top'] !== []) {
+            $lines[] = 'Terlaris: '.collect($d['top'])->take(3)->map(fn ($t) => "{$t['name']} {$t['qty']}×")->implode(', ');
         }
-        if ($shift->note) {
-            $lines[] = "Catatan: {$shift->note}";
+        if ($d['note']) {
+            $lines[] = "Catatan: {$d['note']}";
         }
-        $low = app(InventoryService::class)->enabled() ? app(InventoryService::class)->lowStock($shift->outlet_id) : collect();
-        if ($low->isNotEmpty()) {
-            $lines[] = 'Stok menipis: '.$low->take(8)->map(fn ($i) => $i->name.' '.self::qty((float) $i->stock).' '.$i->unit)->implode(', ')
+        if ($d['low_stock'] !== []) {
+            $low = collect($d['low_stock']);
+            $lines[] = 'Stok menipis: '.$low->take(8)->map(fn ($i) => "{$i['name']} {$i['qty']}")->implode(', ')
                 .($low->count() > 8 ? ' (+'.($low->count() - 8).')' : '');
         }
         $lines[] = '';
-        if ($dayOutlet !== null) {
-            $lines[] = "Total hari ini {$outlet}: ".self::rp((int) $dayOutlet->total).' · '.$dayOutlet->n.' transaksi';
+        if ($d['day_outlet'] !== null) {
+            $lines[] = "Total hari ini {$d['outlet']}: ".self::rp($d['day_outlet']['total']).' · '.$d['day_outlet']['n'].' transaksi';
         }
-        $lines[] = 'Total hari ini ('.($outlets > 1 ? 'semua outlet' : 'semua tablet').'): '.self::rp((int) $day->total).' · '.$day->n.' transaksi';
+        $lines[] = "Total hari ini ({$d['all_label']}): ".self::rp($d['day_total']['total']).' · '.$d['day_total']['n'].' transaksi';
 
         return implode("\n", $lines);
     }
@@ -122,10 +157,11 @@ class ShiftReportService
                     }
                     $owners = User::query()->where('role', 'owner')->where('active', true)
                         ->whereNotNull('email')->whereNotNull('email_verified_at')->get();
-                    $text = $this->text($shift->fresh());
+                    $data = $this->data($shift->fresh());
+                    $text = self::textFrom($data);
                     $subject = 'Laporan shift '.Carbon::parse($shift->opened_at)->setTimezone(Tenant::query()->whereKey($shift->tenant_id)->value('timezone') ?: 'Asia/Jakarta')->format('d/m/Y H:i');
                     foreach ($owners as $owner) {
-                        Mail::to($owner->email)->send(new ShiftReportMail($subject, $text));
+                        Mail::to($owner->email)->send(new ShiftReportMail($subject, $text, $data));
                     }
                 });
             } catch (Throwable $e) {

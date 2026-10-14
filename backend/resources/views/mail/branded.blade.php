@@ -34,6 +34,10 @@
       <p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#334155;">{{ $p }}</p>
       @endforeach
 
+      @if ($m['partial'])
+      @include($m['partial']['view'], $m['partial']['data'])
+      @endif
+
       @if ($m['text'])
       <div style="margin:16px 0;padding:16px 18px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;line-height:1.7;color:#0F172A;white-space:pre-line;">{{ $m['text'] }}</div>
       @endif

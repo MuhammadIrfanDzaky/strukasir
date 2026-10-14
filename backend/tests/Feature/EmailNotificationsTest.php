@@ -66,6 +66,17 @@ class EmailNotificationsTest extends TestCase
         $mails[3]->assertSeeInHtml('berakhir besok');
         $mails[0]->assertSeeInHtml('Laporan shift BerryBrew');
         $this->assertStringContainsString('sudah berakhir', $mails[4]->envelope()->subject);
+
+        // Laporan shift bergrafik dari data terstruktur.
+        $data = ['shop' => 'BerryBrew', 'outlet' => null, 'day' => 'Selasa', 'date' => '14/10/2026', 'device' => 'T1', 'from' => '08:00',
+            'to' => '16:00', 'opened_by' => 'Sari', 'closed_by' => null, 'sales' => 1250000, 'orders' => 48,
+            'methods' => [['label' => 'Tunai', 'amount' => 700000], ['label' => 'QRIS', 'amount' => 550000]],
+            'cash_out' => 50000, 'cash_in' => 0, 'credit_repaid_cash' => 0, 'cash' => ['expected' => 650000, 'counted' => 645000, 'diff' => -5000],
+            'voids' => 1, 'top' => [['name' => 'Kopi Susu Aren', 'qty' => 21], ['name' => 'Americano', 'qty' => 9]], 'note' => 'Hujan deras',
+            'low_stock' => [], 'day_outlet' => null, 'day_total' => ['total' => 1250000, 'n' => 48], 'all_label' => 'semua tablet'];
+        $rich = new ShiftReportMail('Laporan shift', \App\Services\ShiftReportService::textFrom($data), $data);
+        $rich->assertSeeInHtml('Rp1.250.000')->assertSeeInHtml('56%')->assertSeeInHtml('Kurang Rp5.000')
+            ->assertSeeInHtml('Kopi Susu Aren')->assertSeeInText('Penjualan: Rp1.250.000');
     }
 
     public function test_daftar_mengirim_email_selamat_datang(): void

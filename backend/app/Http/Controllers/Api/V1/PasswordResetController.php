@@ -73,9 +73,8 @@ class PasswordResetController extends Controller
             $owner->save();
             Audit::record('auth.password_reset', $owner, user: $owner);
             $ownerId = $owner->id;
-            $info = ['Alamat IP' => (string) request()->ip()];
             OwnerMailer::send($owner->tenant_id, fn ($o, $t) => $o->id === $ownerId ? new SecurityAlertMail(
-                ownerName: $o->name, businessName: $t->name, kind: SecurityAlertMail::PASSWORD_CHANGED, at: now(), details: $info,
+                ownerName: $o->name, businessName: $t->name, kind: SecurityAlertMail::PASSWORD_CHANGED, at: now(),
             ) : null);
 
             return response()->json(['message' => 'Password diganti. Silakan masuk dengan password baru.']);

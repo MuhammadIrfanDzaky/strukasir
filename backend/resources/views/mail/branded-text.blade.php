@@ -10,8 +10,8 @@
 {!! $p !!}
 
 @endforeach
-@if ($m['text'])
-{!! $m['text'] !!}
+@if ($m['text'] ?? $m['text_fallback'])
+{!! $m['text'] ?? $m['text_fallback'] !!}
 
 @endif
 @if ($m['code'])

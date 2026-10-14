@@ -48,7 +48,7 @@ class DeviceRegistrar
 
                 // Tablet ke-2 dst. (bukan tablet pendaftaran usaha): beri tahu owner.
                 if ($number > 1) {
-                    $info = ['Tablet' => "{$device->name} ({$device->code})", 'Alamat IP' => (string) request()->ip()];
+                    $info = ['Tablet' => "{$device->name} ({$device->code})", 'Outlet' => (string) Outlet::query()->whereKey($device->outlet_id)->value('name')];
                     OwnerMailer::send($tenant->id, fn ($owner, $t) => new SecurityAlertMail(
                         ownerName: $owner->name, businessName: $t->name, kind: SecurityAlertMail::DEVICE_ADDED, at: now(), details: $info,
                     ));

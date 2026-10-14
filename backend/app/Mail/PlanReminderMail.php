@@ -47,7 +47,6 @@ class PlanReminderMail extends BrandedMail
             'title' => "{$what} berakhir {$when}",
             'greeting' => "Halo {$this->ownerName},",
             'intro' => ["{$what} untuk {$this->businessName} berakhir {$date}. Setelah tanggal itu kasir tidak bisa membuat order baru sampai paket diaktifkan."],
-            'box' => ['label' => 'Berakhir', 'value' => $date],
             'steps' => ['Buka aplikasi Strukasir di tablet.', 'Ketuk kotak paket di bawah menu samping.', 'Pilih paket & periode, lalu bayar dengan QRIS.'],
             'reason' => 'Pemberitahuan akun untuk owner usaha di Strukasir.',
         ];
