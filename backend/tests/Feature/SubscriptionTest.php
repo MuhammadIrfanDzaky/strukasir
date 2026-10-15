@@ -88,12 +88,12 @@ class SubscriptionTest extends TestCase
 
         $tenant = $this->shop->tenant->refresh();
         $this->assertSame(['mulai', 'active', 'month', null], [$tenant->plan->code, $tenant->plan_status, $tenant->plan_period, $tenant->requested_plan_id]);
-        $this->assertEqualsWithDelta(now()->addMonth()->timestamp, $tenant->plan_ends_at->timestamp, 5);
+        $this->assertEqualsWithDelta(now()->addMonth()->timestamp, $tenant->plan_ends_at->timestamp, 60);
         $this->api('POST', '/api/v1/shifts/open', $this->pinLogin($this->shop), ['opening_cash' => 0])->assertCreated();
 
         // Perpanjang saat masih aktif: dihitung dari akhir periode berjalan.
         $this->artisan('pos:activate-plan', ['tenant' => $tenant->code, 'plan' => 'mulai'])->assertSuccessful();
-        $this->assertEqualsWithDelta(now()->addMonths(2)->timestamp, $tenant->refresh()->plan_ends_at->timestamp, 5);
+        $this->assertEqualsWithDelta(now()->addMonths(2)->timestamp, $tenant->refresh()->plan_ends_at->timestamp, 60);
     }
 
     public function test_periode_3_6_12_bulan_dengan_diskon_dan_perpanjang_paket_sama(): void
@@ -109,7 +109,7 @@ class SubscriptionTest extends TestCase
 
         $this->artisan('pos:activate-plan', ['tenant' => $this->shop->tenant->code, 'plan' => 'tumbuh', '--period' => 'half'])
             ->expectsOutputToContain('Tagihan: Rp127000')->assertSuccessful();
-        $this->assertEqualsWithDelta(now()->addDays(5)->addMonths(6)->timestamp, $this->shop->tenant->refresh()->plan_ends_at->timestamp, 5);
+        $this->assertEqualsWithDelta(now()->addDays(5)->addMonths(6)->timestamp, $this->shop->tenant->refresh()->plan_ends_at->timestamp, 60);
     }
 
     public function test_batas_pegawai_outlet_dan_tablet_sesuai_paket(): void

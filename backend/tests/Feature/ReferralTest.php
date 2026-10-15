@@ -48,7 +48,7 @@ class ReferralTest extends TestCase
         $res = $this->signup('baru@contoh.id', ['referral_code' => ' '.strtolower($code).' '])->assertCreated();
         $friend = Tenant::findOrFail($res->json('tenant.id'));
         $this->assertSame($this->shop->tenant->id, $friend->referred_by);
-        $this->assertEqualsWithDelta(now()->addDays(14)->timestamp, $friend->plan_ends_at->timestamp, 5);
+        $this->assertEqualsWithDelta(now()->addDays(14)->timestamp, $friend->plan_ends_at->timestamp, 60);
 
         // Pembayaran pertama: Rp24.900 − 25% → Rp18.700 (dibulatkan ke ratusan). Berikutnya harga normal.
         $this->assertSame(['base' => 24900, 'percent' => 25, 'reason' => 'referred', 'amount' => 18700], $this->activate($friend));

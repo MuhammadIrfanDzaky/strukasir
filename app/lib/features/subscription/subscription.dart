@@ -26,6 +26,7 @@ class PlanInfo {
     this.trialDays,
     this.features = const [],
     this.prices = const {},
+    this.recommended = false,
   });
 
   factory PlanInfo.fromJson(Map<String, dynamic> j) => PlanInfo(
@@ -40,7 +41,17 @@ class PlanInfo {
         trialDays: j['trial_days'] as int?,
         features: (j['features'] as List? ?? const []).cast<String>(),
         prices: (j['prices'] as Map<String, dynamic>? ?? const {}).map((k, v) => MapEntry(k, v as int)),
+        recommended: j['recommended'] as bool? ?? false,
       );
+
+  /// Disorot di app sebagai "Paling banyak dipilih".
+  final bool recommended;
+
+  /// Harga efektif per bulan untuk periode (setelah diskon periode & referral).
+  int perMonth(String period, [int percent = 0]) => (discounted(period, percent) / periodMonths(period)).round();
+
+  /// Patokan harian, dibulatkan ke atas per Rp10 (mis. Rp830/hari).
+  int perDay(String period, [int percent = 0]) => ((perMonth(period, percent) / 30) / 10).ceil() * 10;
 
   final String code;
   final String name;
@@ -230,9 +241,10 @@ class PlanPicker extends StatelessWidget {
         LayoutBuilder(builder: (context, c) {
           final columns = (c.maxWidth >= 960 ? 4 : (c.maxWidth >= 560 ? 2 : 1)).clamp(1, plans.isEmpty ? 1 : plans.length);
           final cards = [
-            for (final p in plans)
+            for (final (i, p) in plans.indexed)
               _PlanCard(
                 plan: p,
+                previous: i == 0 ? null : plans[i - 1],
                 period: period,
                 selected: p.code == selected,
                 current: p.code == current,
@@ -274,6 +286,7 @@ class _PlanCard extends StatelessWidget {
     required this.period,
     required this.selected,
     required this.current,
+    this.previous,
     this.discountPercent = 0,
     this.onTap,
   });
@@ -281,6 +294,9 @@ class _PlanCard extends StatelessWidget {
   final int discountPercent;
 
   final PlanInfo plan;
+
+  /// Paket di bawahnya: fitur ditampilkan sebagai tambahan ("Semua di Mulai, plus:").
+  final PlanInfo? previous;
   final String period;
   final bool selected;
   final bool current;
@@ -289,6 +305,39 @@ class _PlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final muted = AppType.caption.copyWith(color: AppColors.inkMuted);
+    final months = periodMonths(period);
+    final extras = previous == null ? plan.highlights : plan.highlights.where((h) => !previous!.highlights.contains(h)).toList();
+
+    final Widget price;
+    if (plan.free) {
+      price = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text.rich(TextSpan(children: [
+          TextSpan(text: 'Rp0', style: AppType.headline.copyWith(color: AppColors.ink)),
+          TextSpan(text: '  ${plan.trialDays ?? 7} hari', style: AppType.body.copyWith(color: AppColors.inkMuted)),
+        ])),
+        Text('Lalu pilih paket untuk lanjut berjualan', style: muted),
+      ]);
+    } else {
+      final normalMonth = plan.perMonth('month');
+      final effMonth = plan.perMonth(period, discountPercent);
+      final billed = plan.discounted(period, discountPercent);
+      final saving = plan.priceMonth * months - billed;
+      price = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (effMonth < normalMonth)
+          Text('Rp${rupiah(normalMonth)}', style: muted.copyWith(decoration: TextDecoration.lineThrough)),
+        Text.rich(TextSpan(children: [
+          TextSpan(text: 'Rp${rupiah(effMonth)}', style: AppType.headline.copyWith(color: AppColors.ink)),
+          TextSpan(text: ' /bulan', style: AppType.body.copyWith(color: AppColors.inkMuted)),
+        ])),
+        Text(
+          months > 1 || discountPercent > 0
+              ? 'Rp${rupiah(billed)} untuk $months bulan · hemat Rp${rupiah(saving)}'
+              : '≈ Rp${rupiah(plan.perDay(period))} per hari',
+          style: muted,
+        ),
+      ]);
+    }
+
     return Material(
       color: selected ? AppColors.primarySoft : AppColors.surface,
       shape: RoundedRectangleBorder(
@@ -304,39 +353,58 @@ class _PlanCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: Text(plan.name, style: AppType.title)),
-                  if (current) const AppBadge('Paket saat ini'),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      if (plan.recommended || current)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpace.s2),
+                          child: current ? const AppBadge('Paket saat ini') : const _Tag('Paling banyak dipilih'),
+                        ),
+                      Text(plan.name, style: AppType.title),
+                      if (plan.tagline != null) Text(plan.tagline!, style: muted),
+                    ]),
+                  ),
+                  const SizedBox(width: AppSpace.s2),
+                  RadioDot(selected: selected),
                 ],
               ),
-              const SizedBox(height: AppSpace.s1),
-              if (discountPercent > 0 && !plan.free) ...[
-                Text(plan.price(period), style: muted.copyWith(decoration: TextDecoration.lineThrough)),
-                Text(
-                  'Rp${rupiah(plan.discounted(period, discountPercent))}/${periodLabel(period)} · diskon $discountPercent%',
-                  style: AppType.bodyStrong.copyWith(color: AppColors.ink),
-                ),
-              ] else
-                Text(plan.price(period), style: AppType.bodyStrong.copyWith(color: AppColors.ink)),
-              if (!plan.free && periodMonths(period) > 1)
-                Text(
-                  'setara Rp${rupiah((plan.discounted(period, discountPercent) / periodMonths(period)).round())}/bulan',
-                  style: muted,
-                ),
-              if (plan.tagline != null) ...[
-                const SizedBox(height: AppSpace.s2),
-                Text(plan.tagline!, style: AppType.body.copyWith(color: AppColors.inkMuted)),
-              ],
-              const SizedBox(height: AppSpace.s2),
+              const SizedBox(height: AppSpace.s3),
+              price,
+              const SizedBox(height: AppSpace.s3),
+              const Divider(height: 1),
+              const SizedBox(height: AppSpace.s3),
               Text(plan.limits, style: AppType.label.copyWith(color: AppColors.ink)),
               const SizedBox(height: AppSpace.s2),
-              for (final h in plan.highlights) Text('• $h', style: muted),
+              if (previous != null)
+                Text(extras.isEmpty ? 'Semua fitur ${previous!.name}, kapasitas lebih besar' : 'Semua di ${previous!.name}, plus:',
+                    style: muted),
+              for (final h in extras)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text('+ $h', style: AppType.caption.copyWith(color: AppColors.ink)),
+                ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+/// Label sorotan kecil (paket yang direkomendasikan).
+class _Tag extends StatelessWidget {
+  const _Tag(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.s2, vertical: 2),
+        decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(AppRadius.full)),
+        child: Text(text, style: AppType.caption.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.w700)),
+      );
 }
 
 /// CTA di sidebar (tepat di atas tombol Keluar): paket sekarang + ajakan upgrade.

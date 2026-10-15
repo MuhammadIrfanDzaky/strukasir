@@ -13,6 +13,8 @@ supaya layar tetap tenang dan profesional — bukan ramai warna & ikon.
 - **Grafik kategori** (metode bayar) boleh memakai palet grafik (`ChartColors`) — selalu dengan label & nilai.
 - **Satu pengecualian amber (`accent`):** CTA paket di sidebar (di atas Keluar), supaya paket & ajakan upgrade
   terlihat. Merah (`danger`) bila paket sudah habis. Jangan dipakai di tempat lain.
+- **Kartu pilihan** (paket, cara berjualan): bulatan pilihan + garis indigo saat terpilih. Satu label indigo kecil
+  "Paling banyak dipilih" hanya di paket yang direkomendasikan server — tidak ada label promosi lain.
 - Tidak ada kotak ikon berlatar warna, garis warna di judul bagian, atau warna berbeda per kelompok.
 
 ## Ikon

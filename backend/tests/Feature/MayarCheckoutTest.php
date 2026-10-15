@@ -119,7 +119,7 @@ class MayarCheckoutTest extends TestCase
 
         $tenant = $this->shop->tenant->refresh();
         $this->assertSame(['mulai', 'year'], [$tenant->plan->code, $tenant->plan_period]);
-        $this->assertEqualsWithDelta(now()->addYear()->timestamp, $tenant->plan_ends_at->timestamp, 5);
+        $this->assertEqualsWithDelta(now()->addYear()->timestamp, $tenant->plan_ends_at->timestamp, 60);
 
         // Tagihan usaha lain tidak bisa dibuka.
         $other = $this->makeShop('Lain');

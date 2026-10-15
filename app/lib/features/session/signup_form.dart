@@ -5,17 +5,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api_client.dart';
 import '../../core/config.dart';
 import '../../core/theme/tokens.dart';
+import '../../core/ui/components.dart';
 import '../legal/legal_screen.dart';
 import '../subscription/subscription.dart';
 import 'session_controller.dart';
 import 'setup_screen.dart';
 import 'signup_options.dart';
 
-/// Ikon cara berjualan (kode = enum `SalesMode` di server; label dari server).
-const _salesModeIcons = {
-  'takeaway': Icons.shopping_basket_rounded,
-  'dine_in': Icons.table_restaurant_rounded,
-  'mixed': Icons.compare_arrows_rounded,
+/// Keterangan cara berjualan (kode = enum `SalesMode` di server; judul dari server).
+const _salesModeHints = {
+  'takeaway': 'Pembeli pesan lalu dibawa pulang. Tanpa nomor meja.',
+  'dine_in': 'Ada meja. Pesanan bisa disimpan & dibayar nanti.',
+  'mixed': 'Sebagian dibawa pulang, sebagian makan di tempat.',
 };
 
 /// Field server yang ada di langkah 1 (usaha); sisanya di langkah 2 (akun owner).
@@ -340,19 +341,10 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           if (_asksSalesMode) ...[
             const SizedBox(height: AppSpace.s4),
             _label('Cara berjualan'),
-            Wrap(
-              spacing: AppSpace.s2,
-              runSpacing: AppSpace.s2,
-              children: [
-                for (final (code, label) in _options!.salesModes)
-                  ChoiceChip(
-                    avatar: Icon(_salesModeIcons[code] ?? Icons.storefront_rounded, size: 18),
-                    label: Text(label),
-                    showCheckmark: false,
-                    selected: _salesMode == code,
-                    onSelected: (_) => setState(() => _salesMode = code),
-                  ),
-              ],
+            ChoiceTiles<String>(
+              options: [for (final (code, label) in _options!.salesModes) (code, label, _salesModeHints[code] ?? '')],
+              selected: _salesMode,
+              onSelected: (code) => setState(() => _salesMode = code),
             ),
             if (_submitted && _salesMode == null) _choiceError('Pilih cara berjualan'),
             if (_serverError('sales_mode') != null) _choiceError(_serverError('sales_mode')!),
@@ -462,8 +454,8 @@ class _SignupFormState extends ConsumerState<SignupForm> {
         Text(
           chosen == null || chosen.free
               ? 'Tanpa kartu kredit. Setelah masa coba, pilih paket berbayar untuk lanjut berjualan; data tetap tersimpan.'
-              : 'Paket ${chosen.name} langsung aktif selama masa coba sambil menunggu pembayaran (transfer / QRIS). '
-                  'Tim Strukasir menghubungi Anda lewat email setelah pendaftaran.',
+              : 'Paket ${chosen.name} langsung bisa dipakai. Bayar dengan QRIS dari menu Upgrade paket '
+                  'sebelum masa coba berakhir; tanpa tagihan otomatis.',
           style: AppType.caption.copyWith(color: AppColors.inkMuted),
         ),
         const SizedBox(height: AppSpace.s4),

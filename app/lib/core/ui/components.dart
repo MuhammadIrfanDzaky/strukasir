@@ -264,3 +264,78 @@ class AppOverline extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(text.toUpperCase(), style: AppType.overline.copyWith(color: color));
 }
+
+
+/// Penanda pilihan berbentuk bulatan untuk kartu pilihan (bukan ikon hiasan).
+class RadioDot extends StatelessWidget {
+  const RadioDot({super.key, required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 20,
+        height: 20,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: selected ? AppColors.primary : AppColors.lineStrong, width: selected ? 6 : 1.5),
+          color: AppColors.surface,
+        ),
+      );
+}
+
+/// Kartu pilihan tunggal: judul + keterangan singkat. Sejajar (lebar ≥ 460) atau bertumpuk (HP).
+class ChoiceTiles<T> extends StatelessWidget {
+  const ChoiceTiles({super.key, required this.options, required this.selected, required this.onSelected});
+
+  /// (nilai, judul, keterangan)
+  final List<(T, String, String)> options;
+  final T? selected;
+  final ValueChanged<T> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget tile((T, String, String) o) {
+      final on = o.$1 == selected;
+      return Material(
+        color: on ? AppColors.primarySoft : AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          side: BorderSide(color: on ? AppColors.primary : AppColors.line, width: on ? 2 : 1),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => onSelected(o.$1),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpace.s3),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                RadioDot(selected: on),
+                const SizedBox(width: AppSpace.s2),
+                Expanded(child: Text(o.$2, style: AppType.bodyStrong.copyWith(color: AppColors.ink))),
+              ]),
+              const SizedBox(height: AppSpace.s1),
+              Text(o.$3, style: AppType.caption.copyWith(color: AppColors.inkMuted, height: 1.4)),
+            ]),
+          ),
+        ),
+      );
+    }
+
+    return LayoutBuilder(builder: (context, c) {
+      if (c.maxWidth < 460) {
+        return Column(children: [
+          for (final o in options) Padding(padding: const EdgeInsets.only(bottom: AppSpace.s2), child: tile(o)),
+        ]);
+      }
+      return IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (final (i, o) in options.indexed) ...[
+            if (i > 0) const SizedBox(width: AppSpace.s2),
+            Expanded(child: tile(o)),
+          ],
+        ]),
+      );
+    });
+  }
+}

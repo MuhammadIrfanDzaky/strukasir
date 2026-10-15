@@ -279,12 +279,13 @@ final signupOptions = SignupOptions.fromJson({
     {'code': 'gratis', 'name': 'Gratis', 'tagline': 'Coba semua fitur kasir dasar selama 7 hari.', 'price_month': 0, 'price_year': 0,
      'max_outlets': 1, 'max_devices': 1, 'max_staff': 2, 'trial_days': 7, 'features': ['reports', 'customers']},
     {'code': 'mulai', 'name': 'Mulai', 'tagline': 'Untuk usaha kecil & gerobak: kasir lengkap, laporan, promo.', 'price_month': 9900,
-     'price_year': 99000, 'max_outlets': 1, 'max_devices': 2, 'max_staff': 5, 'features': ['reports', 'promotions']},
+     'price_year': 99000, 'max_outlets': 1, 'max_devices': 2, 'max_staff': 5, 'features': ['reports', 'customers', 'promotions']},
     {'code': 'tumbuh', 'name': 'Tumbuh', 'tagline': 'Member & loyalitas, stok & resep, sampai 3 outlet.', 'price_month': 24900,
-     'price_year': 249000, 'max_outlets': 3, 'max_devices': 9, 'max_staff': 15,
-     'features': ['promotions', 'loyalty', 'customer_credit', 'customer_messaging', 'inventory', 'multi_outlet']},
+     'price_year': 249000, 'max_outlets': 3, 'max_devices': 9, 'max_staff': 15, 'recommended': true,
+     'features': ['reports', 'customers', 'promotions', 'loyalty', 'customer_credit', 'customer_messaging', 'inventory', 'multi_outlet']},
     {'code': 'juragan', 'name': 'Juragan', 'tagline': 'Sampai 10 outlet, tablet & pegawai tanpa batas.', 'price_month': 49900,
-     'price_year': 499000, 'max_outlets': 10, 'features': ['promotions', 'loyalty', 'inventory', 'multi_outlet']},
+     'price_year': 499000, 'max_outlets': 10,
+     'features': ['reports', 'customers', 'promotions', 'loyalty', 'customer_credit', 'customer_messaging', 'inventory', 'multi_outlet']},
   ],
   'sales_modes': [
     {'code': 'takeaway', 'label': 'Bawa pulang saja'},
@@ -567,6 +568,20 @@ final scenarios = <Scenario>[
     },
   ),
   (
+    name: 'daftar-cara-jualan',
+    session: const NeedsSetup(),
+    home: (_) => const SetupScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Daftar usaha baru'));
+      await settle(t);
+      await pick(t, 'Jenis usaha', 'Warung & gerobak makanan');
+      await t.ensureVisible(find.text('Keduanya'));
+      await t.tap(find.text('Keduanya'));
+      await settle(t);
+    },
+  ),
+  (
     name: 'daftar-akun',
     session: const NeedsSetup(),
     home: (_) => const SetupScreen(),
@@ -614,6 +629,26 @@ final scenarios = <Scenario>[
       await t.tap(find.text('Tumbuh'));
       await settle(t);
       expect(find.text('Lanjut dengan Tumbuh'), findsOneWidget);
+    },
+  ),
+  (
+    name: 'daftar-paket-atas',
+    session: const NeedsSetup(),
+    home: (_) => const SetupScreen(),
+    fillCart: false,
+    act: (t) async {
+      await t.tap(find.text('Daftar usaha baru'));
+      await settle(t);
+      await t.enterText(find.widgetWithText(TextFormField, 'Alamat server (development)'), 'http://test');
+      await t.enterText(find.widgetWithText(TextFormField, 'Nama usaha'), 'Laundry Bersih');
+      await pick(t, 'Jenis usaha', 'Laundry');
+      await pick(t, 'Provinsi', 'Sumatera Utara');
+      await pick(t, 'Kota / kabupaten', 'Kota Medan');
+      await t.ensureVisible(find.text('Lanjut'));
+      await t.tap(find.text('Lanjut'));
+      await settle(t);
+      await t.ensureVisible(find.text('Mulai').first);
+      await settle(t);
     },
   ),
   (

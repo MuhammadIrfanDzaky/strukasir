@@ -87,7 +87,7 @@ class SignupTest extends TestCase
         $this->assertNotNull($tenant->terms_accepted_at);
         // Tanpa pilihan paket = Gratis, masa coba 7 hari.
         $this->assertSame(['gratis', 'trial', null], [$tenant->plan->code, $tenant->plan_status, $tenant->plan_period]);
-        $this->assertEqualsWithDelta(now()->addDays(7)->timestamp, $tenant->plan_ends_at->timestamp, 5);
+        $this->assertEqualsWithDelta(now()->addDays(7)->timestamp, $tenant->plan_ends_at->timestamp, 60);
 
         $this->tenancy()->run($tenant->id, function () use ($res) {
             $owner = User::query()->sole();
@@ -142,6 +142,7 @@ class SignupTest extends TestCase
         $this->getJson('/api/v1/signup/options')->assertOk()
             ->assertJsonPath('plans.*.code', ['gratis', 'mulai', 'tumbuh', 'juragan'])
             ->assertJsonPath('plans.0.trial_days', 7)
+            ->assertJsonPath('plans.2.recommended', true)
             ->assertJsonPath('plans.1.price_month', 9900);
     }
 

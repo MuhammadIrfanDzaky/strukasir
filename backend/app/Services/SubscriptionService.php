@@ -161,6 +161,7 @@ class SubscriptionService
             'period_discounts' => collect(PlanCatalog::PERIODS)->map(fn ($p) => $p[1]),
             'max_outlets' => $plan->max_outlets, 'max_devices' => $plan->max_devices, 'max_staff' => $plan->max_staff,
             'trial_days' => $plan->code === PlanCatalog::FREE ? PlanCatalog::TRIAL_DAYS : null,
+            'recommended' => $plan->code === PlanCatalog::RECOMMENDED,
             'features' => $features,
         ];
     }

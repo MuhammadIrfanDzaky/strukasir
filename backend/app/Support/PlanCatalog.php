@@ -17,6 +17,9 @@ final class PlanCatalog
 
     public const FREE = 'gratis';
 
+    /** Paket yang disorot di app ("Paling banyak dipilih"). */
+    public const RECOMMENDED = 'tumbuh';
+
     /** Periode bayar: [jumlah bulan, diskon %]. */
     public const PERIODS = [
         'month' => [1, 0],
