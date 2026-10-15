@@ -2,7 +2,7 @@
 
 **Berlaku sejak:** [TANGGAL BERLAKU]  ·  **Versi:** 1.0
 
-Syarat & Ketentuan ini ("Ketentuan") adalah perjanjian antara **[NAMA PENYELENGGARA — perorangan / PT]**
+Syarat & Ketentuan ini ("Ketentuan") adalah perjanjian antara **MUHAMMAD IRFAN DZAKY**, berkedudukan di Kota Binjai, Sumatera Utara
 ("Strukasir", "kami") dan Anda selaku pemilik/pengelola usaha yang memakai aplikasi kasir Strukasir ("Anda",
 "Pengguna"). Dengan mendaftar, mencentang persetujuan, atau memakai Layanan, Anda setuju terikat Ketentuan ini dan
 [Kebijakan Privasi](kebijakan-privasi.md).
@@ -149,8 +149,8 @@ setelahnya berarti setuju.
 
 Ketentuan ini tunduk pada hukum Republik Indonesia. Sengketa diselesaikan lebih dulu secara musyawarah dalam
 **30 hari** sejak pemberitahuan tertulis. Bila tidak tercapai kesepakatan, sengketa diselesaikan melalui
-**Pengadilan Negeri [KOTA]**.
+**Pengadilan Negeri Binjai**.
 
 ## 17. Kontak
 
-Email: [halo@strukasir.id]  ·  WhatsApp: [NOMOR]  ·  Alamat: [ALAMAT]
+Email: [halo@strukasir.id]  ·  WhatsApp: [NOMOR USAHA]  ·  Kedudukan: Kota Binjai, Sumatera Utara

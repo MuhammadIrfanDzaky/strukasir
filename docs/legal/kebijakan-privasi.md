@@ -1,14 +1,10 @@
 # Kebijakan Privasi Strukasir
 
-**Berlaku sejak:** [TANGGAL BERLAKU]  ·  **Versi:** 1.0
+**Berlaku sejak:**  15 Oktober 2026 ·  **Versi:** 1.0
 
-Kebijakan ini menjelaskan bagaimana Strukasir mengumpulkan, memakai, menyimpan, membagikan, dan melindungi data
-pribadi saat Anda memakai aplikasi kasir Strukasir, situs strukasir.id, dan layanan terkait ("Layanan"). Kebijakan
-ini disusun mengacu pada Undang-Undang No. 27 Tahun 2022 tentang Pelindungan Data Pribadi ("UU PDP") dan
-peraturan pelaksananya.
+Kebijakan ini menjelaskan bagaimana Strukasir mengumpulkan, memakai, menyimpan, membagikan, dan melindungi data pribadi saat Anda memakai aplikasi kasir Strukasir, situs strukasir.id, dan layanan terkait ("Layanan"). Kebijakan ini disusun mengacu pada Undang-Undang No. 27 Tahun 2022 tentang Pelindungan Data Pribadi ("UU PDP") dan peraturan pelaksananya.
 
-Layanan diselenggarakan oleh **[NAMA PENYELENGGARA — perorangan / PT]**, beralamat di **[ALAMAT]** ("Strukasir",
-"kami"). Dengan mendaftar atau memakai Layanan, Anda menyatakan telah membaca kebijakan ini.
+Layanan diselenggarakan oleh **MUHAMMAD IRFAN DZAKY**, berkedudukan di **Kota Binjai, Sumatera Utara** ("Strukasir", "kami"). Dengan mendaftar atau memakai Layanan, Anda menyatakan telah membaca kebijakan ini.
 
 ---
 
@@ -115,14 +111,10 @@ perjanjian pemrosesan data. Dengan memakai Layanan, Anda memahami adanya transfe
 
 ## 7. Keamanan
 
-- Koneksi aplikasi–server terenkripsi (HTTPS/TLS).
-- Password & PIN di-*hash*; kode verifikasi email berlaku singkat dan sekali pakai; percobaan login dibatasi.
-- Data tiap usaha dipisahkan di tingkat database (*row-level security*), sehingga usaha lain tidak dapat
-  mengaksesnya.
-- Akses di dalam usaha dibatasi peran (owner/kasir); harga modal & laporan hanya untuk owner.
-- Owner mendapat email peringatan bila ada tablet baru didaftarkan atau password diubah; verifikasi dua langkah
-  (2FA) tersedia untuk pendaftaran tablet.
-- Akses kami ke data produksi dibatasi untuk pemeliharaan & dukungan, dan tercatat.
+Kami menerapkan langkah teknis dan organisasi yang wajar untuk melindungi data, antara lain koneksi terenkripsi,
+password dan PIN yang disimpan dalam bentuk yang tidak dapat dibaca, pemisahan data antarusaha, pembatasan akses
+sesuai peran, pemberitahuan keamanan ke owner, serta backup berkala. Akses kami ke data hanya untuk pemeliharaan
+dan dukungan, dan tercatat.
 
 Tidak ada sistem yang 100% aman. Jaga kerahasiaan password & PIN, dan segera hubungi kami bila menduga akun Anda
 disalahgunakan.
@@ -165,8 +157,7 @@ yang diperlukan agar situs berfungsi [dan analitik anonim — sesuaikan bila dip
 
 ## 12. Perubahan & kontak
 
-Kebijakan ini dapat diperbarui. Perubahan penting diberitahukan lewat email owner dan/atau aplikasi paling lambat
-**14 hari** sebelum berlaku. Versi terbaru selalu tersedia di [URL KEBIJAKAN PRIVASI].
+Kebijakan ini dapat diperbarui. Perubahan penting diberitahukan lewat email owner dan/atau aplikasi paling lambat **14 hari** sebelum berlaku. Versi terbaru selalu tersedia di [URL KEBIJAKAN PRIVASI].
 
-**Kontak pelindungan data:** [NAMA PETUGAS]  ·  Email: [privasi@strukasir.id]  ·  WhatsApp: [NOMOR]
-Alamat: [ALAMAT]
+**Kontak pelindungan data:** Tim Pelindungan Data Strukasir  ·  Email: [privasi@strukasir.id]  ·  WhatsApp: [NOMOR USAHA]
+Kedudukan: Kota Binjai, Sumatera Utara
