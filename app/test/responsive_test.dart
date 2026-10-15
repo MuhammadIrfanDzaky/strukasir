@@ -675,7 +675,10 @@ final scenarios = <Scenario>[
       await t.enterText(find.widgetWithText(TextFormField, 'Password'), 'rahasia123');
       await t.enterText(find.widgetWithText(TextFormField, 'PIN kasir (6 digit)'), '482915');
       await t.enterText(find.widgetWithText(TextFormField, 'Ulangi PIN'), '482915');
-      await t.ensureVisible(find.byType(Checkbox));
+      // Lepas fokus isian PIN (fokus menggulir balik ke isian), lalu gulir kotak persetujuan ke tengah.
+      FocusManager.instance.primaryFocus?.unfocus();
+      await settle(t);
+      await Scrollable.ensureVisible(t.element(find.byType(Checkbox)), alignment: 0.5);
       await settle(t);
       await t.tap(find.byType(Checkbox));
       await t.ensureVisible(find.text('Kirim kode verifikasi'));

@@ -25,9 +25,6 @@ class SetupScreen extends ConsumerStatefulWidget {
 class _SetupScreenState extends ConsumerState<SetupScreen> {
   _Mode _mode = _Mode.welcome;
 
-  /// Langkah pilih paket butuh kartu lebar (paket berdampingan di tablet).
-  bool _wide = false;
-
   void _go(_Mode mode) => setState(() => _mode = mode);
 
   @override
@@ -43,7 +40,8 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(AppSpace.s5),
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: _wide && _mode == _Mode.signup ? 1120 : 520),
+                // Daftar usaha: kartu lebar (isian 2 kolom, paket berdampingan); sambutan & masuk tetap ringkas.
+                constraints: BoxConstraints(maxWidth: _mode == _Mode.signup ? 1120 : 520),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -54,10 +52,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                         padding: const EdgeInsets.all(AppSpace.s6),
                         child: switch (_mode) {
                           _Mode.welcome => _Welcome(onSignup: () => _go(_Mode.signup), onSignin: () => _go(_Mode.signin)),
-                          _Mode.signup => SignupForm(
-                              onBack: () => _go(_Mode.welcome),
-                              onWide: (wide) => setState(() => _wide = wide),
-                            ),
+                          _Mode.signup => SignupForm(onBack: () => _go(_Mode.welcome)),
                           _Mode.signin => _OwnerSignIn(onBack: () => _go(_Mode.welcome)),
                         },
                       ),
