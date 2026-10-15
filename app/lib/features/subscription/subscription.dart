@@ -245,6 +245,7 @@ class PlanPicker extends StatelessWidget {
               _PlanCard(
                 plan: p,
                 previous: i == 0 ? null : plans[i - 1],
+                reserveTag: columns > 1,
                 period: period,
                 selected: p.code == selected,
                 current: p.code == current,
@@ -288,10 +289,14 @@ class _PlanCard extends StatelessWidget {
     required this.current,
     this.previous,
     this.discountPercent = 0,
+    this.reserveTag = false,
     this.onTap,
   });
 
   final int discountPercent;
+
+  /// Sediakan ruang label walau kartu ini tanpa label (kolom berdampingan → harga sejajar).
+  final bool reserveTag;
 
   final PlanInfo plan;
 
@@ -361,6 +366,11 @@ class _PlanCard extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(bottom: AppSpace.s2),
                           child: current ? const AppBadge('Paket saat ini') : const _Tag('Paling banyak dipilih'),
+                        )
+                      else if (reserveTag)
+                        const Opacity(
+                          opacity: 0,
+                          child: Padding(padding: EdgeInsets.only(bottom: AppSpace.s2), child: _Tag('Paling banyak dipilih')),
                         ),
                       Text(plan.name, style: AppType.title),
                       if (plan.tagline != null) Text(plan.tagline!, style: muted),

@@ -32,9 +32,12 @@ bool weakPin(String pin) =>
 /// Daftar usaha baru: (1) usaha, (2) paket, (3) akun owner, (4) kode email. Berhasil → tablet ini terdaftar
 /// dan owner langsung masuk ke Kasir.
 class SignupForm extends ConsumerStatefulWidget {
-  const SignupForm({super.key, required this.onBack});
+  const SignupForm({super.key, required this.onBack, this.onWide});
 
   final VoidCallback onBack;
+
+  /// Dipanggil saat langkah butuh kartu lebar (pilih paket) atau kembali sempit.
+  final ValueChanged<bool>? onWide;
 
   @override
   ConsumerState<SignupForm> createState() => _SignupFormState();
@@ -278,8 +281,15 @@ class _SignupFormState extends ConsumerState<SignupForm> {
     }
   }
 
+  bool _reportedWide = false;
+
   @override
   Widget build(BuildContext context) {
+    final wide = _step == 1;
+    if (wide != _reportedWide) {
+      _reportedWide = wide;
+      WidgetsBinding.instance.addPostFrameCallback((_) => widget.onWide?.call(wide));
+    }
     return switch (_step) {
       0 => _businessStep(),
       1 => _planStep(),
@@ -436,37 +446,48 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           onPeriod: (p) => setState(() => _period = p),
         ),
         if (_serverError('plan') != null) _choiceError(_serverError('plan')!),
-        const SizedBox(height: AppSpace.s3),
-        TextField(
-          controller: _referral,
-          textCapitalization: TextCapitalization.characters,
-          maxLength: 12,
-          decoration: InputDecoration(
-            labelText: 'Kode referral (opsional)',
-            helperText: 'Diajak usaha lain? Coba gratis 14 hari & diskon 25% untuk pembayaran paket pertama.',
-            helperMaxLines: 2,
-            counterText: '',
-            errorText: _serverError('referral_code'),
+        // Isian & tombol tetap selebar form biasa walau kartu melebar untuk paket.
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 472),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: AppSpace.s3),
+                TextField(
+                  controller: _referral,
+                  textCapitalization: TextCapitalization.characters,
+                  maxLength: 12,
+                  decoration: InputDecoration(
+                    labelText: 'Kode referral (opsional)',
+                    helperText: 'Diajak usaha lain? Coba gratis 14 hari & diskon 25% untuk pembayaran paket pertama.',
+                    helperMaxLines: 2,
+                    counterText: '',
+                    errorText: _serverError('referral_code'),
+                  ),
+                  onChanged: (_) => setState(() => _serverErrors.remove('referral_code')),
+                ),
+                const SizedBox(height: AppSpace.s2),
+                Text(
+                  chosen == null || chosen.free
+                      ? 'Tanpa kartu kredit. Setelah masa coba, pilih paket berbayar untuk lanjut berjualan; data tetap tersimpan.'
+                      : 'Paket ${chosen.name} langsung bisa dipakai. Bayar dengan QRIS dari menu Upgrade paket '
+                          'sebelum masa coba berakhir; tanpa tagihan otomatis.',
+                  style: AppType.caption.copyWith(color: AppColors.inkMuted),
+                ),
+                const SizedBox(height: AppSpace.s4),
+                FilledButton(
+                  onPressed: () => setState(() {
+                    _step = 2;
+                    _error = null;
+                  }),
+                  child: Text(chosen == null || chosen.free
+                      ? 'Mulai gratis ${_referral.text.trim().isEmpty ? 7 : 14} hari'
+                      : 'Lanjut dengan ${chosen.name}'),
+                ),
+              ],
+            ),
           ),
-          onChanged: (_) => setState(() => _serverErrors.remove('referral_code')),
-        ),
-        const SizedBox(height: AppSpace.s2),
-        Text(
-          chosen == null || chosen.free
-              ? 'Tanpa kartu kredit. Setelah masa coba, pilih paket berbayar untuk lanjut berjualan; data tetap tersimpan.'
-              : 'Paket ${chosen.name} langsung bisa dipakai. Bayar dengan QRIS dari menu Upgrade paket '
-                  'sebelum masa coba berakhir; tanpa tagihan otomatis.',
-          style: AppType.caption.copyWith(color: AppColors.inkMuted),
-        ),
-        const SizedBox(height: AppSpace.s4),
-        FilledButton(
-          onPressed: () => setState(() {
-            _step = 2;
-            _error = null;
-          }),
-          child: Text(chosen == null || chosen.free
-              ? 'Mulai gratis ${_referral.text.trim().isEmpty ? 7 : 14} hari'
-              : 'Lanjut dengan ${chosen.name}'),
         ),
       ],
     );
