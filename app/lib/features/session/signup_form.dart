@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api_client.dart';
 import '../../core/config.dart';
 import '../../core/theme/tokens.dart';
+import '../legal/legal_screen.dart';
 import '../subscription/subscription.dart';
 import 'session_controller.dart';
 import 'setup_screen.dart';
@@ -652,23 +653,5 @@ class _SignupFormState extends ConsumerState<SignupForm> {
         validator: validator,
       );
 
-  void _showTerms(BuildContext context) => showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          scrollable: true,
-          title: const Text('Syarat & kebijakan privasi'),
-          content: SizedBox(
-            width: 480,
-            child: Text(
-              'Data yang kami simpan: nama usaha, jenis usaha, alamat & nomor HP (bila diisi), nama dan email owner, '
-              'serta data transaksi, menu, dan staf yang Anda masukkan. Password & PIN disimpan dalam bentuk '
-              'terenkripsi satu arah (tidak bisa dibaca siapa pun).\n\n'
-              'Data dipakai hanya untuk menjalankan aplikasi kasir untuk usaha Anda, tidak dijual dan tidak '
-              'dibagikan ke pihak lain. Anda dapat meminta salinan atau penghapusan data usaha Anda kapan saja.',
-              style: AppType.body,
-            ),
-          ),
-          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Tutup'))],
-        ),
-      );
+  void _showTerms(BuildContext context) => LegalScreen.open(context);
 }
