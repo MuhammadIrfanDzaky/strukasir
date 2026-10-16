@@ -200,6 +200,7 @@ final subscriptionProvider = FutureProvider<Subscription>((ref) async {
 
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 String _date(DateTime d) => '${d.day} ${_months[d.month - 1]} ${d.year}';
+String _shortDate(DateTime d) => '${d.day} ${_months[d.month - 1]}';
 
 /// Pilihan paket + bulanan/tahunan (form daftar & halaman Upgrade).
 class PlanPicker extends StatelessWidget {
@@ -211,8 +212,12 @@ class PlanPicker extends StatelessWidget {
     required this.onSelected,
     required this.onPeriod,
     this.current,
+    this.currentLabel,
     this.discountPercent = 0,
   });
+
+  /// Label di kartu paket aktif (mis. "Paket Anda · s/d 15 Nov").
+  final String? currentLabel;
 
   /// Diskon referral yang berlaku (harga normal dicoret).
   final int discountPercent;
@@ -257,6 +262,7 @@ class PlanPicker extends StatelessWidget {
                 period: period,
                 selected: p.code == selected,
                 current: p.code == current,
+                currentLabel: currentLabel,
                 discountPercent: discountPercent,
                 onTap: () => onSelected(p.code),
               ),
@@ -295,11 +301,14 @@ class _PlanCard extends StatelessWidget {
     required this.period,
     required this.selected,
     required this.current,
+    this.currentLabel,
     this.previous,
     this.discountPercent = 0,
     this.reserveTag = false,
     this.onTap,
   });
+
+  final String? currentLabel;
 
   final int discountPercent;
 
@@ -373,7 +382,9 @@ class _PlanCard extends StatelessWidget {
                       if (plan.recommended || current)
                         Padding(
                           padding: const EdgeInsets.only(bottom: AppSpace.s2),
-                          child: current ? const AppBadge('Paket saat ini') : const _Tag('Paling banyak dipilih'),
+                          child: current
+                              ? AppBadge(currentLabel ?? 'Paket Anda', tone: AppTone.success)
+                              : const _Tag('Paling banyak dipilih'),
                         )
                       else if (reserveTag)
                         const Opacity(
@@ -393,8 +404,8 @@ class _PlanCard extends StatelessWidget {
               const SizedBox(height: AppSpace.s3),
               const Divider(height: 1),
               const SizedBox(height: AppSpace.s3),
-              Text(plan.limits, style: AppType.label.copyWith(color: AppColors.ink)),
-              const SizedBox(height: AppSpace.s2),
+              _LimitStrip(plan: plan, tinted: selected),
+              const SizedBox(height: AppSpace.s3),
               if (previous != null)
                 Text(extras.isEmpty ? 'Semua fitur ${previous!.name}, kapasitas lebih besar' : 'Semua di ${previous!.name}, plus:',
                     style: muted),
@@ -406,6 +417,45 @@ class _PlanCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Kapasitas paket: tiga sel angka besar + satuan (∞ = tanpa batas).
+class _LimitStrip extends StatelessWidget {
+  const _LimitStrip({required this.plan, this.tinted = false});
+
+  final PlanInfo plan;
+
+  /// Kartu terpilih berlatar indigo muda → sel putih supaya tetap kontras.
+  final bool tinted;
+
+  @override
+  Widget build(BuildContext context) {
+    final cells = [(plan.maxOutlets, 'outlet'), (plan.maxDevices, 'tablet'), (plan.maxStaff, 'pengguna')];
+    return Container(
+      decoration: BoxDecoration(
+        color: tinted ? AppColors.surface : AppColors.surfaceSunken,
+        borderRadius: AppRadius.smAll,
+      ),
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.s2),
+      child: IntrinsicHeight(
+        child: Row(children: [
+          for (final (i, (max, noun)) in cells.indexed) ...[
+            if (i > 0) const VerticalDivider(width: 1, thickness: 1, color: AppColors.line),
+            Expanded(
+              child: Semantics(
+                label: max == null ? '$noun tanpa batas' : '$max $noun',
+                excludeSemantics: true,
+                child: Column(children: [
+                  Text(max == null ? '∞' : '$max', style: AppType.title.copyWith(color: AppColors.ink, height: 1.2)),
+                  Text(noun, style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+                ]),
+              ),
+            ),
+          ],
+        ]),
       ),
     );
   }
@@ -591,6 +641,9 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                         period: _period,
                         // Paket berbayar sekarang bisa dipilih lagi untuk diperpanjang.
                         current: sub.plan.free ? null : sub.plan.code,
+                        currentLabel: sub.status == 'active' && sub.endsAt != null
+                            ? 'Paket Anda · s/d ${_shortDate(sub.endsAt!)}'
+                            : 'Paket Anda',
                         discountPercent: sub.discountPercent,
                         onSelected: (c) => setState(() => _selected = c),
                         onPeriod: (p) => setState(() => _period = p),
@@ -601,10 +654,12 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                           alignment: Alignment.centerRight,
                           child: FilledButton(
                             onPressed: chosen == null || _busy ? null : () => _pay(chosen, sub.discountPercent),
+                            style: FilledButton.styleFrom(minimumSize: const Size(240, AppSize.touchLg)),
                             child: Text(chosen == null
-                                ? 'Pilih salah satu paket'
-                                : 'Bayar QRIS · ${chosen.code == sub.plan.code ? 'Perpanjang' : 'Pilih'} ${chosen.name} · '
-                                    '${chosen.priceWith(_period, sub.discountPercent)}'),
+                                ? 'Pilih paket dulu'
+                                : chosen.code == sub.plan.code
+                                    ? 'Lanjut perpanjang'
+                                    : 'Lanjut ke pembayaran'),
                           ),
                         )
                       else
@@ -617,7 +672,7 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                       ),
                       if (sub.referral != null) ...[
                         const SizedBox(height: AppSpace.s6),
-                        const AppOverline('AJAK USAHA LAIN'),
+                        const AppOverline('REFERRAL'),
                         const SizedBox(height: AppSpace.s2),
                         _ReferralCard(info: sub.referral!),
                       ],
@@ -765,11 +820,24 @@ class _ReferralCard extends StatelessWidget {
             'yang mulai berlangganan.',
             style: muted,
           ),
-          const SizedBox(height: AppSpace.s3),
-          Text(
-            'Diajak ${info.invited}   ·   Sudah berlangganan ${info.paid}   ·   Kupon ${info.rewardPercent}% tersedia ${info.rewardsAvailable}',
-            style: AppType.label.copyWith(color: AppColors.ink),
-          ),
+          const SizedBox(height: AppSpace.s4),
+          LayoutBuilder(builder: (context, c) {
+            final tiles = [
+              _ReferralStat(value: info.invited, label: 'Usaha diajak'),
+              _ReferralStat(value: info.paid, label: 'Sudah berlangganan'),
+              _ReferralStat(value: info.rewardsAvailable, label: 'Kupon ${info.rewardPercent}% siap pakai', highlight: info.rewardsAvailable > 0),
+            ];
+            final row = c.maxWidth >= 420;
+            return row
+                ? IntrinsicHeight(
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      for (final (i, t) in tiles.indexed) ...[if (i > 0) const SizedBox(width: AppSpace.s2), Expanded(child: t)],
+                    ]),
+                  )
+                : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    for (final (i, t) in tiles.indexed) ...[if (i > 0) const SizedBox(height: AppSpace.s2), t],
+                  ]);
+          }),
           const SizedBox(height: AppSpace.s4),
           Wrap(
             spacing: AppSpace.s2,
@@ -795,6 +863,29 @@ class _ReferralCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Satu angka statistik referral. Kupon tersedia (> 0) diberi warna hijau: bisa langsung dipakai.
+class _ReferralStat extends StatelessWidget {
+  const _ReferralStat({required this.value, required this.label, this.highlight = false});
+
+  final int value;
+  final String label;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.s3, vertical: AppSpace.s3),
+        decoration: BoxDecoration(
+          color: highlight ? AppColors.successSoft : AppColors.surfaceSunken,
+          borderRadius: AppRadius.smAll,
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('$value', style: AppType.headline.copyWith(color: highlight ? AppColors.success : AppColors.ink, height: 1.1)),
+          const SizedBox(height: 2),
+          Text(label, style: AppType.caption.copyWith(color: highlight ? AppColors.success : AppColors.inkMuted)),
+        ]),
+      );
 }
 
 /// Tagihan paket: halaman bayar Mayar (QRIS), hitung mundur, dan cek status berkala sampai lunas / kedaluwarsa.
@@ -877,7 +968,7 @@ class _QrisPaymentDialogState extends ConsumerState<QrisPaymentDialog> {
       ]);
     } else if (expired || _status == 'failed') {
       body = Text(
-        expired ? 'Tagihan sudah kedaluwarsa. Tutup lalu tekan Bayar QRIS lagi untuk membuat tagihan baru.' : 'Pembayaran gagal. Coba lagi.',
+        expired ? 'Tagihan sudah kedaluwarsa. Tutup lalu tekan Lanjut ke pembayaran lagi untuk membuat tagihan baru.' : 'Pembayaran gagal. Coba lagi.',
         style: muted,
       );
     } else {
