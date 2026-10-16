@@ -19,6 +19,11 @@ class DeviceInfo {
   final String name;
   final String tenantName;
 
+  /// "Tablet T3" untuk nama bawaan ("Tablet 3"), atau "Kasir Depan (T3)" bila owner memberi nama.
+  String get label => RegExp(r'^Tablet \d+$').hasMatch(name) ? 'Tablet $code' : '$name ($code)';
+
+  DeviceInfo copyWith({String? name}) => DeviceInfo(id: id, code: code, name: name ?? this.name, tenantName: tenantName);
+
   Map<String, dynamic> toJson() =>
       {'id': id, 'code': code, 'name': name, 'tenant_name': tenantName};
 }
@@ -276,6 +281,24 @@ class SessionController extends AsyncNotifier<Session> {
       await _store.saveUser(token: s.token, user: user.toJson());
       state = AsyncData(LoggedIn(s.serverUrl, s.device, user, s.token));
     }
+  }
+
+  /// Nama tablet ini diganti owner (halaman Outlet): simpan juga di tablet supaya tampil tanpa daftar ulang.
+  Future<void> renameCurrentDevice(String name) async {
+    final s = state.value;
+    final device = switch (s) {
+      LoggedIn(:final device) || NeedsLogin(:final device) => device.copyWith(name: name),
+      _ => null,
+    };
+    if (device == null) return;
+    final token = await _store.deviceToken();
+    final serverUrl = await _store.serverUrl();
+    if (token != null && serverUrl != null) await _store.saveDevice(serverUrl: serverUrl, token: token, device: device.toJson());
+    state = AsyncData(switch (s) {
+      LoggedIn(:final serverUrl, :final user, :final token) => LoggedIn(serverUrl, device, user, token),
+      NeedsLogin(:final serverUrl) => NeedsLogin(serverUrl, device),
+      _ => s!,
+    });
   }
 
   /// Ubah profil sendiri (nama; owner juga email — email baru perlu diverifikasi ulang).

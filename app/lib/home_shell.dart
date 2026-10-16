@@ -83,7 +83,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       title: destinations[index].label,
       userName: user.name,
       role: user.role,
-      deviceCode: widget.session.device.code,
+      deviceCode: widget.session.device.label,
       outlet: (ref.watch(menuProvider).value?.menu.multiOutlet ?? false) ? ref.watch(menuProvider).value?.menu.outlet?.name : null,
       onRefresh: () {
         ref.read(menuProvider.notifier).refresh();
@@ -267,7 +267,7 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onLogout;
 
-  String get _roleLine => '${role == 'owner' ? 'Owner' : 'Kasir'} · Tablet $deviceCode${outlet == null ? '' : ' · $outlet'}';
+  String get _roleLine => '${role == 'owner' ? 'Owner' : 'Kasir'} · $deviceCode${outlet == null ? '' : ' · $outlet'}';
 
   @override
   Widget build(BuildContext context) {

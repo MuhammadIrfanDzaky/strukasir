@@ -307,7 +307,7 @@ class _AccountCard extends ConsumerWidget {
     final place = [
       if ((device?.tenantName ?? '').isNotEmpty) device!.tenantName,
       if (menu?.multiOutlet ?? false) ?menu?.outlet?.name,
-      if (device != null) 'Tablet ${device.code}',
+      if (device != null) device.label,
     ].join(' · ');
 
     return Container(

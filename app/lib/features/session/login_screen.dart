@@ -27,7 +27,7 @@ class LoginScreen extends ConsumerWidget {
       const Icon(Icons.tablet_android_rounded, size: 18, color: AppColors.onInkMuted),
       const SizedBox(width: AppSpace.s2),
       Flexible(
-        child: Text('Tablet ${session.device.code}',
+        child: Text(session.device.label,
             style: AppType.body.copyWith(color: AppColors.onInkMuted), overflow: TextOverflow.ellipsis),
       ),
     ]);

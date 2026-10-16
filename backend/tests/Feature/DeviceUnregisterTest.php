@@ -69,6 +69,14 @@ class DeviceUnregisterTest extends TestCase
         $otherDevice = $this->tenancy()->run($other->tenant->id, fn () => Device::query()->value('id'));
         $this->api('POST', "/api/v1/devices/{$otherDevice}/revoke", $owner)->assertNotFound(); // usaha lain
 
+        // Ganti nama tablet (owner saja; kode tetap).
+        $this->api('PUT', "/api/v1/devices/{$secondId}", $owner, ['name' => '  Kasir   Depan '])
+            ->assertOk()->assertJsonPath('data.name', 'Kasir Depan');
+        $this->api('PUT', "/api/v1/devices/{$secondId}", $owner, ['name' => '  '])->assertUnprocessable()->assertJsonValidationErrors('name');
+        $this->api('PUT', "/api/v1/devices/{$secondId}", $this->pinLogin($shop), ['name' => 'X'])->assertForbidden();
+        $this->api('PUT', "/api/v1/devices/{$otherDevice}", $owner, ['name' => 'X'])->assertNotFound();
+        $this->assertSame('Kasir Depan', collect($this->api('GET', '/api/v1/outlets', $owner)->json('data.outlets.0.devices'))->firstWhere('id', $secondId)['name']);
+
         $this->api('POST', "/api/v1/devices/{$secondId}/revoke", $owner)->assertOk();
         $this->api('GET', '/api/v1/auth/staff', $second)->assertUnauthorized();
         $this->assertCount(1, $this->api('GET', '/api/v1/outlets', $owner)->json('data.outlets.0.devices'));

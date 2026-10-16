@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\Outlet;
 use App\Services\OutletService;
+use App\Support\Audit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -45,6 +46,21 @@ class OutletController extends Controller
         $saved = $this->outlets->save($data, $outlet);
 
         return response()->json(['data' => $saved->present()], $outlet ? 200 : 201);
+    }
+
+    /** Ganti nama tablet (mis. "Kasir Depan", "Bar"); kode T1, T2 tetap. */
+    public function renameDevice(Request $request, Device $device): JsonResponse
+    {
+        abort_if($device->isRevoked(), 404);
+        $request->merge(['name' => preg_replace('/\s+/', ' ', trim((string) $request->input('name')))]);
+        $data = $request->validate(['name' => ['required', 'string', 'max:40', 'regex:/\S/']]);
+
+        $before = ['name' => $device->name];
+        $device->name = $data['name'];
+        $device->save();
+        Audit::record('device.renamed', $device, $before, ['name' => $device->name]);
+
+        return response()->json(['data' => ['id' => $device->id, 'code' => $device->code, 'name' => $device->name]]);
     }
 
     public function moveDevice(Request $request, Device $device): JsonResponse

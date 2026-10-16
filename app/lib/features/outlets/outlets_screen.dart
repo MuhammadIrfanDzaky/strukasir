@@ -116,6 +116,26 @@ class OutletsScreen extends ConsumerWidget {
     }
   }
 
+  /// Ketuk tablet: ganti nama (+ pindah outlet bila ada lebih dari satu outlet aktif).
+  Future<void> _deviceDialog(BuildContext context, WidgetRef ref, Map<String, dynamic> device, Outlet from, List<Outlet> outlets) async {
+    final canMove = outlets.where((o) => o.active).length > 1;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => _DeviceNameDialog(device: device, canMove: canMove),
+    );
+    if (result == null || !context.mounted) return;
+    if (result == '__move__') return _move(context, ref, device, from, outlets);
+    final messenger = AppToast.of(context);
+    try {
+      await ref.read(sessionProvider.notifier).authed((api, token) => api.put('/devices/${device['id']}', token: token, data: {'name': result}));
+      if (device['current'] == true) await ref.read(sessionProvider.notifier).renameCurrentDevice(result);
+      ref.invalidate(outletsProvider);
+      messenger.showSnackBar(SnackBar(content: Text('Nama ${device['code']} diganti menjadi $result.')));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.fieldErrors.values.expand((v) => v).firstOrNull ?? e.message)));
+    }
+  }
+
   /// Keluarkan tablet lain (hilang, rusak, aplikasinya di-reset): kuota tablet paket kembali.
   Future<void> _revoke(BuildContext context, WidgetRef ref, Map<String, dynamic> device) async {
     final seen = DateTime.tryParse(device['last_seen_at'] as String? ?? '')?.toLocal();
@@ -205,10 +225,10 @@ class OutletsScreen extends ConsumerWidget {
                           runSpacing: AppSpace.s2,
                           children: [
                             for (final dev in o.devices)
-                              // Ketuk = pindah outlet (bila > 1 outlet); × = keluarkan (bukan tablet ini).
+                              // Ketuk = ganti nama / pindah outlet; × = keluarkan (bukan tablet ini).
                               InputChip(
                                 label: Text('${dev['code']} · ${dev['name']}${dev['current'] == true ? ' (tablet ini)' : ''}'),
-                                onPressed: d.outlets.where((x) => x.active).length < 2 ? null : () => _move(context, ref, dev, o, d.outlets),
+                                onPressed: () => _deviceDialog(context, ref, dev, o, d.outlets),
                                 onDeleted: dev['current'] == true ? null : () => _revoke(context, ref, dev),
                                 deleteIcon: const Icon(Icons.close_rounded, size: 18),
                                 deleteButtonTooltipMessage: 'Keluarkan tablet',
@@ -240,17 +260,65 @@ class OutletsScreen extends ConsumerWidget {
                     ),
             ),
             const SizedBox(height: AppSpace.s2),
-            Text('Tablet yang hilang, rusak, atau aplikasinya di-reset: tekan × untuk mengeluarkannya agar kuota tablet kembali.',
+            Text('Ketuk tablet untuk mengganti namanya (mis. Kasir Depan, Bar). Tablet yang hilang, rusak, atau aplikasinya '
+                'di-reset: tekan × untuk mengeluarkannya agar kuota tablet kembali.',
                 style: muted),
             if (d.outlets.where((x) => x.active).length > 1) ...[
               const SizedBox(height: AppSpace.s2),
-              Text('Ketuk tablet untuk memindahkannya ke outlet lain (shift tablet harus sudah ditutup).', style: muted),
+              Text('Pindah outlet juga lewat ketuk tablet (shift tablet harus sudah ditutup).', style: muted),
             ],
           ],
         ),
       ),
     );
   }
+}
+
+/// Nama tablet; tombol "Pindah outlet" mengembalikan '__move__'.
+class _DeviceNameDialog extends StatefulWidget {
+  const _DeviceNameDialog({required this.device, required this.canMove});
+
+  final Map<String, dynamic> device;
+  final bool canMove;
+
+  @override
+  State<_DeviceNameDialog> createState() => _DeviceNameDialogState();
+}
+
+class _DeviceNameDialogState extends State<_DeviceNameDialog> {
+  late final _name = TextEditingController(text: widget.device['name'] as String? ?? '');
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final v = _name.text.trim();
+    if (v.isNotEmpty) Navigator.pop(context, v);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text('Tablet ${widget.device['code']}${widget.device['current'] == true ? ' (tablet ini)' : ''}'),
+        content: SizedBox(
+          width: 400,
+          child: TextField(
+            controller: _name,
+            autofocus: true,
+            maxLength: 40,
+            textCapitalization: TextCapitalization.words,
+            onSubmitted: (_) => _save(),
+            decoration: const InputDecoration(labelText: 'Nama tablet', hintText: 'mis. Kasir Depan, Bar, Drive-thru', counterText: ''),
+          ),
+        ),
+        actions: [
+          if (widget.canMove) TextButton(onPressed: () => Navigator.pop(context, '__move__'), child: const Text('Pindah outlet')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          FilledButton(onPressed: _save, child: const Text('Simpan')),
+        ],
+      );
 }
 
 class _OutletForm extends ConsumerStatefulWidget {

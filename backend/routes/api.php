@@ -152,6 +152,7 @@ Route::prefix('v1')->group(function () {
             Route::put('outlets/{outlet}', [OutletController::class, 'save'])->whereUuid('outlet');
             Route::put('devices/{device}/outlet', [OutletController::class, 'moveDevice'])->whereUuid('device');
             Route::post('devices/{device}/revoke', [DeviceUnregisterController::class, 'other'])->whereUuid('device');
+            Route::put('devices/{device}', [OutletController::class, 'renameDevice'])->whereUuid('device');
         });
 
         // Pegawai (owner): tambah kasir, ganti nama, reset PIN, nonaktifkan.
