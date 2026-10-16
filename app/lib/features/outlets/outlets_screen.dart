@@ -7,6 +7,7 @@ import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import '../menu/menu_controller.dart';
 import '../session/session_controller.dart';
+import '../subscription/locked_feature.dart';
 import '../../core/ui/toast.dart';
 
 /// Outlet / cabang usaha (fitur `multi_outlet`).
@@ -115,9 +116,51 @@ class OutletsScreen extends ConsumerWidget {
     }
   }
 
+  /// Keluarkan tablet lain (hilang, rusak, aplikasinya di-reset): kuota tablet paket kembali.
+  Future<void> _revoke(BuildContext context, WidgetRef ref, Map<String, dynamic> device) async {
+    final seen = DateTime.tryParse(device['last_seen_at'] as String? ?? '')?.toLocal();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Keluarkan ${device['code']} · ${device['name']}?'),
+        content: Text(
+          '${seen == null ? 'Belum pernah dipakai.' : 'Terakhir aktif ${_ago(seen)}.'} '
+          'Semua sesi di tablet itu langsung berakhir dan kuota tablet paket kembali. Data transaksi tetap aman. '
+          'Untuk memakainya lagi, daftarkan ulang dengan akun owner.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Keluarkan'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final messenger = AppToast.of(context);
+    try {
+      await ref.read(sessionProvider.notifier).authed((api, token) => api.post('/devices/${device['id']}/revoke', token: token));
+      ref.invalidate(outletsProvider);
+      messenger.showSnackBar(SnackBar(content: Text('${device['code']} dikeluarkan dari usaha.')));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.fieldErrors.values.expand((v) => v).firstOrNull ?? e.message)));
+    }
+  }
+
+  static String _ago(DateTime t) {
+    final d = DateTime.now().difference(t);
+    if (d.inMinutes < 1) return 'baru saja';
+    if (d.inHours < 1) return '${d.inMinutes} menit lalu';
+    if (d.inDays < 1) return '${d.inHours} jam lalu';
+    return '${d.inDays} hari lalu';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(outletsProvider);
+    final multiLock = ref.watch(menuProvider).value?.menu.locked('multi_outlet');
     final pad = context.isCompact ? AppSpace.s3 : AppSpace.s5;
     final muted = AppType.caption.copyWith(color: AppColors.inkMuted);
     return Scaffold(
@@ -162,9 +205,13 @@ class OutletsScreen extends ConsumerWidget {
                           runSpacing: AppSpace.s2,
                           children: [
                             for (final dev in o.devices)
-                              ActionChip(
+                              // Ketuk = pindah outlet (bila > 1 outlet); × = keluarkan (bukan tablet ini).
+                              InputChip(
                                 label: Text('${dev['code']} · ${dev['name']}${dev['current'] == true ? ' (tablet ini)' : ''}'),
                                 onPressed: d.outlets.where((x) => x.active).length < 2 ? null : () => _move(context, ref, dev, o, d.outlets),
+                                onDeleted: dev['current'] == true ? null : () => _revoke(context, ref, dev),
+                                deleteIcon: const Icon(Icons.close_rounded, size: 18),
+                                deleteButtonTooltipMessage: 'Keluarkan tablet',
                               ),
                           ],
                         ),
@@ -173,18 +220,28 @@ class OutletsScreen extends ConsumerWidget {
                 ),
               ),
             const SizedBox(height: AppSpace.s3),
-            if (!d.enabled)
+            if (!d.enabled && multiLock == null)
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpace.s2),
                 child: Text(
-                  'Paket ini hanya untuk satu outlet. Aktifkan fitur Multi-outlet untuk menambah outlet.',
+                  'Aktifkan fitur Multi-outlet (Pengaturan → Fitur) untuk menambah outlet.',
                   style: AppType.body.copyWith(color: AppColors.warning),
                 ),
               ),
             Align(
               alignment: Alignment.centerLeft,
-              child: FilledButton(onPressed: d.enabled ? () => _edit(context, ref) : null, child: const Text('Tambah outlet'), ),
+              child: d.enabled || multiLock == null
+                  ? FilledButton(onPressed: d.enabled ? () => _edit(context, ref) : null, child: const Text('Tambah outlet'))
+                  // Di luar paket: tombol tetap ada, terkunci → ajakan upgrade.
+                  : OutlinedButton.icon(
+                      onPressed: () => showLockedFeature(context, multiLock),
+                      icon: const Icon(Icons.lock_rounded, size: 18, color: AppColors.warning),
+                      label: Text('Tambah outlet · paket ${multiLock.planName}'),
+                    ),
             ),
+            const SizedBox(height: AppSpace.s2),
+            Text('Tablet yang hilang, rusak, atau aplikasinya di-reset: tekan × untuk mengeluarkannya agar kuota tablet kembali.',
+                style: muted),
             if (d.outlets.where((x) => x.active).length > 1) ...[
               const SizedBox(height: AppSpace.s2),
               Text('Ketuk tablet untuk memindahkannya ke outlet lain (shift tablet harus sudah ditutup).', style: muted),

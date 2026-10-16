@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuditLog;
+use App\Models\Device;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -48,5 +49,29 @@ class DeviceUnregisterTest extends TestCase
         $this->api('POST', '/api/v1/devices/current/unregister', $this->pinLogin($shop, $shop->owner))->assertOk();
 
         $this->api('GET', '/api/v1/auth/staff', $second)->assertOk();
+    }
+
+    public function test_owner_mengeluarkan_tablet_lain_dari_daftar_outlet(): void
+    {
+        $shop = $this->makeShop();
+        $other = $this->makeShop('Lain');
+        $register = fn () => $this->api('POST', '/api/v1/devices/register', null, [
+            'email' => $shop->owner->email, 'password' => self::OWNER_PASSWORD, 'device_id' => (string) Str::uuid(),
+        ]);
+        $second = $register()->json('token');
+        $owner = $this->pinLogin($shop, $shop->owner);
+        $devices = collect($this->api('GET', '/api/v1/outlets', $owner)->json('data.outlets.0.devices'));
+        $secondId = $devices->firstWhere('current', false)['id'];
+        $currentId = $devices->firstWhere('current', true)['id'];
+
+        $this->api('POST', "/api/v1/devices/{$secondId}/revoke", $this->pinLogin($shop))->assertForbidden(); // kasir
+        $this->api('POST', "/api/v1/devices/{$currentId}/revoke", $owner)->assertUnprocessable()->assertJsonValidationErrors('device');
+        $otherDevice = $this->tenancy()->run($other->tenant->id, fn () => Device::query()->value('id'));
+        $this->api('POST', "/api/v1/devices/{$otherDevice}/revoke", $owner)->assertNotFound(); // usaha lain
+
+        $this->api('POST', "/api/v1/devices/{$secondId}/revoke", $owner)->assertOk();
+        $this->api('GET', '/api/v1/auth/staff', $second)->assertUnauthorized();
+        $this->assertCount(1, $this->api('GET', '/api/v1/outlets', $owner)->json('data.outlets.0.devices'));
+        $this->api('POST', "/api/v1/devices/{$secondId}/revoke", $owner)->assertNotFound(); // sudah dicabut
     }
 }
