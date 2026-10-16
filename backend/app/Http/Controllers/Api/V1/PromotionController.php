@@ -19,6 +19,9 @@ use Illuminate\Validation\ValidationException;
  */
 class PromotionController extends Controller
 {
+    /** Diskon %, potongan Rp/item, harga spesial, beli banyak (diskon %), beli X gratis Y, paket. */
+    public const TYPES = ['percent', 'amount', 'price', 'min_qty', 'bogo', 'bundle'];
+
     public function __construct(private readonly PromotionService $promotions) {}
 
     public function index(): JsonResponse
@@ -36,9 +39,13 @@ class PromotionController extends Controller
     public function savePromotion(Request $request, ?Promotion $promotion = null): JsonResponse
     {
         $this->guard();
+        // Aplikasi lama mengirim satu rentang (start_time/end_time) → jadikan daftar rentang.
+        if (! $request->has('times') && $request->filled('start_time')) {
+            $request->merge(['times' => [['start' => $request->input('start_time'), 'end' => $request->input('end_time')]]]);
+        }
         $data = $request->validate([
             'name' => ['required', 'string', 'max:40', 'regex:/\S/'],
-            'type' => ['required', Rule::in(['percent', 'amount', 'bogo'])],
+            'type' => ['required', Rule::in(self::TYPES)],
             'value' => ['nullable', 'integer', 'min:0', 'max:100000000'],
             'buy_qty' => ['nullable', 'integer', 'min:1', 'max:50'],
             'free_qty' => ['nullable', 'integer', 'min:1', 'max:50'],
@@ -47,17 +54,35 @@ class PromotionController extends Controller
             'target_ids.*' => ['uuid', 'distinct'],
             'days' => ['nullable', 'array', 'max:7'],
             'days.*' => ['integer', 'between:1,7', 'distinct'],
-            'start_time' => ['nullable', 'date_format:H:i', 'required_with:end_time'],
-            'end_time' => ['nullable', 'date_format:H:i', 'required_with:start_time', 'different:start_time'],
+            'times' => ['nullable', 'array', 'max:4'],
+            'times.*.start' => ['required', 'date_format:H:i'],
+            'times.*.end' => ['required', 'date_format:H:i'],
+            'bundle_items' => ['nullable', 'array', 'max:10'],
+            'bundle_items.*.product_id' => ['required', 'uuid', 'distinct'],
+            'bundle_items.*.qty' => ['required', 'integer', 'min:1', 'max:20'],
             'starts_on' => ['nullable', 'date_format:Y-m-d'],
             'ends_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
             'active' => ['sometimes', 'boolean'],
         ]);
-        $errors = match ($data['type']) {
-            'percent' => ($data['value'] ?? 0) < 1 || $data['value'] > 10000 ? ['value' => 'Potongan persen harus 1–100%.'] : [],
+        $type = $data['type'];
+        $percentOk = ($data['value'] ?? 0) >= 1 && ($data['value'] ?? 0) <= 10000;
+        $errors = match ($type) {
+            'percent' => $percentOk ? [] : ['value' => 'Potongan persen harus 1–100%.'],
             'amount' => ($data['value'] ?? 0) < 1 ? ['value' => 'Isi potongan per item (Rp).'] : [],
-            default => empty($data['buy_qty']) || empty($data['free_qty']) ? ['buy_qty' => 'Isi jumlah beli & gratis.'] : [],
+            'price' => ! isset($data['value']) ? ['value' => 'Isi harga spesial per item (Rp).'] : [],
+            'min_qty' => ($data['buy_qty'] ?? 0) < 2 ? ['buy_qty' => 'Minimal beli harus 2 item atau lebih.']
+                : ($percentOk ? [] : ['value' => 'Potongan persen harus 1–100%.']),
+            'bogo' => empty($data['buy_qty']) || empty($data['free_qty']) ? ['buy_qty' => 'Isi jumlah beli & gratis.'] : [],
+            default => $this->bundleErrors($data),
         };
+        foreach ($data['times'] ?? [] as $w) {
+            if ($w['start'] === $w['end']) {
+                $errors['times'] = 'Jam mulai dan selesai tidak boleh sama.';
+            }
+        }
+        if ($type === 'bundle') {
+            $data['scope'] = 'all'; // isi paket ditentukan bundle_items
+        }
         if ($data['scope'] !== 'all' && empty($data['target_ids'])) {
             $errors['target_ids'] = $data['scope'] === 'categories' ? 'Pilih minimal satu kategori.' : 'Pilih minimal satu produk.';
         }
@@ -76,11 +101,15 @@ class PromotionController extends Controller
         $before = $promotion->exists ? PromotionService::presentPromotion($promotion) : null;
         $promotion->fill([
             ...$data,
-            'value' => $data['type'] === 'bogo' ? 0 : (int) $data['value'],
-            'buy_qty' => $data['type'] === 'bogo' ? $data['buy_qty'] : 0,
-            'free_qty' => $data['type'] === 'bogo' ? $data['free_qty'] : 0,
+            'value' => $type === 'bogo' ? 0 : (int) $data['value'],
+            'buy_qty' => in_array($type, ['bogo', 'min_qty'], true) ? $data['buy_qty'] : 0,
+            'free_qty' => $type === 'bogo' ? $data['free_qty'] : 0,
             'target_ids' => $data['scope'] === 'all' ? null : array_values($data['target_ids']),
+            'bundle_items' => $type === 'bundle'
+                ? array_map(fn ($b) => ['product_id' => $b['product_id'], 'qty' => (int) $b['qty']], array_values($data['bundle_items'])) : null,
             'days' => empty($data['days']) || count($data['days']) === 7 ? null : array_values(array_map('intval', $data['days'])),
+            'times' => empty($data['times']) ? null
+                : collect($data['times'])->map(fn ($w) => ['start' => $w['start'], 'end' => $w['end']])->sortBy('start')->values()->all(),
             'active' => $data['active'] ?? true,
         ])->save();
         Audit::record($before ? 'promotion.updated' : 'promotion.created', $promotion, $before, PromotionService::presentPromotion($promotion));
@@ -131,6 +160,26 @@ class PromotionController extends Controller
         $voucher = $this->promotions->voucher($data['code']);
 
         return response()->json(['data' => PromotionService::presentVoucher($voucher)]);
+    }
+
+    /** @return array<string, string> */
+    private function bundleErrors(array $data): array
+    {
+        $items = $data['bundle_items'] ?? [];
+        if (count($items) < 2 && array_sum(array_column($items, 'qty')) < 2) {
+            return ['bundle_items' => 'Isi paket minimal 2 item.'];
+        }
+        $prices = DB::table('products')->whereIn('id', array_column($items, 'product_id'))->pluck('price', 'id');
+        if ($prices->count() !== count($items)) {
+            return ['bundle_items' => 'Ada produk paket yang tidak ditemukan.'];
+        }
+        $normal = array_sum(array_map(fn ($b) => $b['qty'] * $prices[$b['product_id']], $items));
+        if (($data['value'] ?? 0) < 1) {
+            return ['value' => 'Isi harga paket (Rp).'];
+        }
+
+        return $data['value'] >= $normal
+            ? ['value' => 'Harga paket harus lebih murah dari harga normal (Rp'.number_format($normal, 0, ',', '.').').'] : [];
     }
 
     private function guard(): void

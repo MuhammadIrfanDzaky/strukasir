@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/api_client.dart';
+import '../../core/shop_clock.dart';
 import '../session/session_controller.dart';
 import 'menu_models.dart';
 
@@ -50,6 +51,7 @@ class MenuController extends AsyncNotifier<MenuState> {
   Future<Menu> _fetchAndCache() async {
     final json = await ref.read(sessionProvider.notifier).authed((api, token) => api.get('/menu', token: token));
     final menu = Menu.fromJson(json);
+    ShopClock.sync((json['clock'] as Map<String, dynamic>?)?['now'] as String?);
     await (await _cacheFile()).writeAsString(jsonEncode(json));
     return menu;
   }

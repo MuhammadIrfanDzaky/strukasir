@@ -20,9 +20,8 @@ class PosScreen extends ConsumerStatefulWidget {
 }
 
 class _PosScreenState extends ConsumerState<PosScreen> {
-  /// Kategori terpilih; null = Semua (default), [_favorites] = produk favorit.
+  /// Kategori terpilih; null = Semua (default).
   String? _categoryId;
-  static const _favorites = '__favorit__';
 
   /// Pencarian nama / kode produk (lintas kategori). null = kotak cari tertutup.
   String? _query;
@@ -49,20 +48,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           AppErrorState(title: 'Menu gagal dimuat', message: '$e', onRetry: () => ref.invalidate(menuProvider)),
       data: (s) {
         final categories = s.menu.activeCategories;
-        // Kasir: produk urut abjad di "Semua" (per kategori), per kategori, favorit, dan hasil cari.
+        // Kasir: produk urut abjad di "Semua" (per kategori), per kategori, dan hasil cari.
+        // Produk favorit ditandai bintang di kartunya (bukan filter terpisah).
         final byCategory = {for (final c in categories) c.id: s.menu.productsByName(c.id)};
         final all = [for (final c in categories) ...byCategory[c.id]!];
-        final hasFavorites = all.any((p) => p.favorite);
         // Kategori yang dipilih bisa hilang setelah menu diperbarui → kembali ke Semua.
-        final categoryId = (_categoryId == _favorites && hasFavorites) || categories.any((c) => c.id == _categoryId)
-            ? _categoryId
-            : null;
+        final categoryId = categories.any((c) => c.id == _categoryId) ? _categoryId : null;
         final searching = _query != null && _query!.trim().isNotEmpty;
         final products = searching
             ? Menu.sortByName(all.where((p) => p.matches(_query!)))
             : switch (categoryId) {
                 null => all,
-                _favorites => Menu.sortByName(all.where((p) => p.favorite)),
                 final id => byCategory[id] ?? const <MenuProduct>[],
               };
 
@@ -143,7 +139,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             icon: const Icon(Icons.search_rounded),
                           ),
                           chip('Semua', null),
-                          if (hasFavorites) chip('Favorit', _favorites),
                           for (final c in categories) chip(c.name, c.id),
                         ],
                       ),
@@ -374,11 +369,26 @@ class _ProductTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  product.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppType.title.copyWith(color: soldOut ? AppColors.inkMuted : AppColors.ink),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        product.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.title.copyWith(color: soldOut ? AppColors.inkMuted : AppColors.ink),
+                      ),
+                    ),
+                    if (product.favorite)
+                      Padding(
+                        padding: const EdgeInsets.only(left: AppSpace.s1),
+                        child: Semantics(
+                          label: 'Favorit',
+                          child: Icon(Icons.star_rounded, size: 20, color: soldOut ? AppColors.inkDisabled : AppColors.accent),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               if (soldOut)

@@ -12,6 +12,7 @@ import 'features/pos/pos_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/reports/reports_screen.dart';
 import 'features/session/account_dialogs.dart';
+import 'features/session/profile_screen.dart';
 import 'features/session/session_controller.dart';
 import 'features/shift/shift_chip.dart';
 import 'features/subscription/subscription.dart';
@@ -71,8 +72,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // Rail tanpa logo/label/tombol keluar bila tinggi tersisa tidak cukup untuk semua item
     // (HP landscape, atau tablet saat keyboard muncul). Keluar tetap lewat menu akun.
     final railHeight = MediaQuery.sizeOf(context).height - MediaQuery.viewInsetsOf(context).bottom;
-    // + CTA paket (~100) di atas tombol Keluar.
-    final tightRail = short || railHeight < 220 + destinations.length * 76;
+    // Logo (~90) + item (~80 per item, label 2 baris) + kotak paket (~80) + Keluar (~64), dengan sisa aman.
+    final tightRail = short || railHeight < 260 + destinations.length * 80;
 
     final needsVerify = user.email != null && !user.emailVerified;
     void verifyEmail() => showDialog<bool>(context: context, builder: (_) => VerifyEmailDialog(email: user.email!));
@@ -167,7 +168,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                           children: [
                             // Paket sekarang + ajakan upgrade, tepat di atas Keluar.
                             PlanCta(width: (context.widthClass == WidthClass.expanded && !short ? AppSize.rail : 80) - AppSpace.s3),
-                            const SizedBox(height: AppSpace.s3),
+                            const SizedBox(height: AppSpace.s2),
                             IconButton(
                               tooltip: 'Keluar',
                               color: AppColors.onInkMuted,
@@ -301,6 +302,7 @@ class _TopBar extends StatelessWidget {
               'verify' => onVerifyEmail?.call(),
               'settings' => onSettings?.call(),
               'upgrade' => onUpgrade(),
+              'profile' => openProfile(context),
               _ => onLogout(),
             },
             itemBuilder: (_) => [
@@ -315,6 +317,10 @@ class _TopBar extends StatelessWidget {
                 ),
               ),
               const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'profile',
+                child: ListTile(title: Text('Profil saya')),
+              ),
               if (onVerifyEmail != null)
                 const PopupMenuItem(
                   value: 'verify',

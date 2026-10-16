@@ -205,6 +205,7 @@ class Menu {
     this.loyalty,
     this.memberTiers = const [],
     this.promotions = const [],
+    this.utcOffset,
     required this.categories,
     required this.products,
     required this.modifierGroups,
@@ -223,6 +224,7 @@ class Menu {
         loyalty: j['loyalty'] == null ? null : LoyaltyProgram.fromJson(j['loyalty'] as Map<String, dynamic>),
         memberTiers: ((j['member_tiers'] as List?) ?? const []).cast<Map<String, dynamic>>().map(MemberTier.fromJson).toList(),
         promotions: ((j['promotions'] as List?) ?? const []).cast<Map<String, dynamic>>().map(Promotion.fromJson).toList(),
+        utcOffset: (j['clock'] as Map<String, dynamic>?)?['utc_offset'] as int?,
         categories: (j['categories'] as List)
             .cast<Map<String, dynamic>>()
             .map(MenuCategory.fromJson)
@@ -265,6 +267,9 @@ class Menu {
 
   /// Promo otomatis aktif (urut nama, sama dengan server); berlaku sesuai jadwalnya.
   final List<Promotion> promotions;
+
+  /// Selisih zona waktu kedai dari UTC (menit); jadwal promo dinilai dengan jam kedai (ShopClock).
+  final int? utcOffset;
   final List<MenuCategory> categories;
 
   bool feature(String key) => features[key] ?? false;

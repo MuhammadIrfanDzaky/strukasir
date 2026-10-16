@@ -158,7 +158,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                               Text('Catatan: ${l.note}', style: AppType.caption.copyWith(color: AppColors.warning)),
                             if (totals.lineDiscounts.length > i && totals.lineDiscounts[i] > 0)
                               Text(
-                                '${l.id == cart.rewardItemId ? 'Hadiah' : (pricingMenu == null ? null : lineBenefit(cart, pricingMenu, l, DateTime.now()))?.label ?? 'Diskon'} -${rupiah(totals.lineDiscounts[i])}',
+                                '${l.id == cart.rewardItemId ? 'Hadiah' : (pricingMenu == null ? null : lineBenefit(cart, pricingMenu, l, promoTime(cart, pricingMenu)))?.label ?? 'Diskon'} -${rupiah(totals.lineDiscounts[i])}',
                                 style: AppType.caption.copyWith(color: AppColors.inkMuted),
                               ),
                           ],
@@ -418,7 +418,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           final discount = totals.lineDiscounts.length > i ? totals.lineDiscounts[i] : 0;
           final isReward = l.id == cart.rewardItemId;
           // Diskon otomatis (promo / tingkat member) diberi nama sumbernya.
-          final auto = isReward || menu == null ? null : lineBenefit(cart, menu, l, DateTime.now());
+          final auto = isReward || menu == null ? null : lineBenefit(cart, menu, l, promoTime(cart, menu));
           final meta = [
             if (l.modifiers.isNotEmpty) modifierSummary(l.modifiers),
             if (l.note != null && l.note!.isNotEmpty) '“${l.note}”',
@@ -470,6 +470,10 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         );
         const divider = Divider(indent: AppSpace.s5, endIndent: AppSpace.s5);
 
+        // Voucher & diskon order tidak bisa digabung (juga dengan hadiah potongan).
+        final noRewardCut = reward == null || reward.isFreeProduct;
+        final showVoucher = cart.voucher == null && (menu?.feature('promotions') ?? false) && !cart.isEmpty && cart.orderDiscount == null && noRewardCut;
+        final showDiscount = canDiscount && !cart.isEmpty && cart.voucher == null && noRewardCut;
         final breakdown = <Widget>[
           AppSummaryRow('Subtotal', rupiah(totals.subtotal)),
           if (totals.orderDiscount > 0)
@@ -511,27 +515,39 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 child: const Text('Lepas voucher'),
               ),
             ]),
-          ] else if ((menu?.feature('promotions') ?? false) && !cart.isEmpty && cart.orderDiscount == null && (reward == null || reward.isFreeProduct))
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40)), onPressed: _busy
-                    ? null
-                    : () async {
-                        final v = await showVoucherDialog(context);
-                        if (v != null) notifier.setVoucher(v);
-                      }, child: const Text('Pakai voucher'), ),
-            ),
-          if (canDiscount && !cart.isEmpty && cart.voucher == null && (reward == null || reward.isFreeProduct))
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 40)), onPressed: () async {
-                  final (changed, d) = await showDiscountDialog(
-                    context,
-                    current: cart.orderDiscount,
-                    maxAmount: totals.subtotal,
-                  );
-                  if (changed) notifier.setOrderDiscount(d);
-                }, child: Text(cart.orderDiscount == null ? 'Diskon order' : 'Ubah diskon order'), ),
+          ],
+          if (showVoucher || showDiscount)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpace.s1, bottom: AppSpace.s1),
+              child: Row(children: [
+                if (showVoucher)
+                  Expanded(
+                    child: _SideButton(
+                      label: 'Voucher',
+                      onPressed: _busy
+                          ? null
+                          : () async {
+                              final v = await showVoucherDialog(context);
+                              if (v != null) notifier.setVoucher(v);
+                            },
+                    ),
+                  ),
+                if (showVoucher && showDiscount) const SizedBox(width: AppSpace.s2),
+                if (showDiscount)
+                  Expanded(
+                    child: _SideButton(
+                      label: cart.orderDiscount == null ? 'Diskon' : 'Ubah diskon',
+                      onPressed: () async {
+                        final (changed, d) = await showDiscountDialog(
+                          context,
+                          current: cart.orderDiscount,
+                          maxAmount: totals.subtotal,
+                        );
+                        if (changed) notifier.setOrderDiscount(d);
+                      },
+                    ),
+                  ),
+              ]),
             ),
         ];
 
@@ -769,4 +785,27 @@ class CartPage extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Tombol sekunder kecil di bawah subtotal (Voucher, Diskon): berlatar abu supaya terlihat bisa ditekan.
+class _SideButton extends StatelessWidget {
+  const _SideButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => FilledButton.tonal(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 40),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.s3),
+          backgroundColor: AppColors.surfaceSunken,
+          foregroundColor: AppColors.ink,
+          side: const BorderSide(color: AppColors.line),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
+          textStyle: AppType.label,
+        ),
+        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      );
 }

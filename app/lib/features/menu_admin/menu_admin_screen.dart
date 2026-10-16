@@ -447,7 +447,7 @@ class _ProductFormState extends ConsumerState<ProductForm> {
               ),
               SwitchListTile(
                 title: const Text('Favorit'),
-                subtitle: const Text('Tampil di filter "Favorit" layar kasir'),
+                subtitle: const Text('Ditandai bintang di layar kasir'),
                 value: _favorite,
                 onChanged: (v) => setState(() => _favorite = v),
               ),

@@ -183,6 +183,14 @@ class Subscription {
         'awaiting_payment' => 'Belum dibayar · $daysLeft hari',
         _ => daysLeft == null ? 'Aktif' : 'Aktif $daysLeft hari lagi',
       };
+
+  /// Status sangat singkat untuk kotak paket di sidebar (lebar ±90 dp).
+  String get railStatus => switch (status) {
+        'expired' => plan.free ? 'Coba habis' : 'Paket habis',
+        'trial' => daysLeft == 0 ? 'Coba: hari ini' : 'Coba $daysLeft hari',
+        'awaiting_payment' => 'Belum dibayar',
+        _ => daysLeft == null ? 'Aktif' : '$daysLeft hari lagi',
+      };
 }
 
 final subscriptionProvider = FutureProvider<Subscription>((ref) async {
@@ -427,28 +435,52 @@ class PlanCta extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sub = ref.watch(subscriptionProvider).value;
     if (sub == null) return const SizedBox.shrink();
+    // Paket berbayar aktif: kotak tenang di atas rail gelap. Masa coba / belum dibayar: amber (ajakan).
+    // Habis: merah. Ajakan berupa pil kecil, bukan teks bergaris bawah.
+    final calm = sub.status == 'active';
+    final (bg, fg, muted) = sub.expired
+        ? (AppColors.danger, AppColors.onPrimary, AppColors.onPrimary)
+        : calm
+            ? (AppColors.onInk.withValues(alpha: 0.08), AppColors.onInk, AppColors.onInkMuted)
+            : (AppColors.accent, AppColors.onAccent, AppColors.onAccent);
+    final cta = sub.expired ? (sub.plan.free ? 'Upgrade' : 'Perpanjang') : calm ? (sub.top ? null : 'Upgrade') : 'Upgrade';
     return SizedBox(
       width: width,
       child: Material(
-        color: sub.expired ? AppColors.danger : AppColors.accent,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        color: bg,
+        borderRadius: AppRadius.mdAll,
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderRadius: AppRadius.mdAll,
           onTap: () => openUpgrade(context),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpace.s2, vertical: AppSpace.s3),
-            child: DefaultTextStyle.merge(
-              style: TextStyle(color: sub.expired ? AppColors.onPrimary : AppColors.onAccent),
-              textAlign: TextAlign.center,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(sub.plan.name, style: AppType.label.copyWith(fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  Text(sub.shortStatus, style: AppType.caption.copyWith(fontSize: 11), maxLines: 2),
-                  const SizedBox(height: AppSpace.s1),
-                  Text(sub.top ? 'Lihat paket' : 'Upgrade', style: AppType.bodyStrong.copyWith(decoration: TextDecoration.underline)),
+            padding: const EdgeInsets.all(AppSpace.s2),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(sub.plan.name,
+                    style: AppType.label.copyWith(color: fg, fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                Text(sub.railStatus,
+                    style: AppType.caption.copyWith(color: muted, fontSize: 11, height: 1.3),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                if (cta != null) ...[
+                  const SizedBox(height: AppSpace.s1 + 2),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    decoration: BoxDecoration(
+                      color: calm ? AppColors.accent : AppColors.ink,
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                    ),
+                    child: Text(cta,
+                        textAlign: TextAlign.center,
+                        style: AppType.caption.copyWith(
+                            color: calm ? AppColors.onAccent : AppColors.onInk, fontSize: 11, fontWeight: FontWeight.w700)),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ),

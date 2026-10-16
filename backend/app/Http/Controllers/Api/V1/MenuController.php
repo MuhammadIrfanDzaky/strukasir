@@ -22,6 +22,7 @@ use App\Support\Pricing\PricingSettings;
 use App\Support\Tenancy\FeatureGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -65,6 +66,9 @@ class MenuController extends Controller
             // Program loyalitas + hadiah aktif (null bila tidak berjalan): kasir menukar hadiah & melihat
             // perkiraan stempel/poin; server tetap menghitung ulang saat simpan & bayar.
             'loyalty' => app(LoyaltyService::class)->presentForMenu(),
+            // Jam server & selisih zona waktu kedai: tablet menilai jadwal promo dengan jam kedai,
+            // bukan jam/zona tablet (jam tablet yang meleset tidak membuat total berbeda dengan server).
+            'clock' => ['now' => now()->toIso8601String(), 'utc_offset' => Carbon::now($tenant?->timezone ?: 'Asia/Jakarta')->utcOffset()],
             // Promo otomatis aktif + jadwalnya (kosong = fitur mati); tablet menghitung, server memeriksa ulang.
             'promotions' => app(PromotionService::class)->enabled()
                 ? Promotion::query()->where('active', true)->orderBy('name')->get()->map(fn ($p) => PromotionService::presentPromotion($p))->values() : [],

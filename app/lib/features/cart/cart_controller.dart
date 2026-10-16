@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/shop_clock.dart';
 import '../menu/menu_controller.dart';
 import '../menu/menu_models.dart';
 import '../customers/member_tier.dart';
@@ -88,7 +89,11 @@ class CartState {
     this.number,
     this.ticketed = const {},
     this.voucher,
+    this.createdAt,
   });
+
+  /// Jam open bill dibuat di server (UTC); null = order baru. Jadwal promo dinilai pada jam ini.
+  final DateTime? createdAt;
 
   /// UUID order dibuat di tablet = idempotency key. Kirim ulang aman.
   final String orderId;
@@ -142,6 +147,7 @@ class CartState {
         number: number ?? this.number,
         ticketed: ticketed ?? this.ticketed,
         voucher: clearVoucher ? null : (voucher ?? this.voucher),
+        createdAt: createdAt,
       );
 
   Map<String, dynamic> toJson(int expectedTotal) => {
@@ -159,8 +165,20 @@ class CartState {
 
 final cartProvider = NotifierProvider<CartController, CartState>(CartController.new);
 
+/// Detak jam untuk promo terjadwal: total keranjang dihitung ulang saat promo mulai/berakhir
+/// (keranjang yang dibiarkan terbuka melewati jam promo tidak menampilkan total lama).
+final promoTickProvider = StreamProvider<int>((ref) {
+  final menu = ref.watch(menuProvider).value?.menu;
+  final scheduled = menu?.promotions.any((p) => p.times != null || p.days != null || p.startsOn != null || p.endsOn != null) ?? false;
+  return scheduled ? Stream.periodic(const Duration(seconds: 15), (i) => i) : const Stream.empty();
+});
+
+/// Jam penilaian promo: jam open bill dibuat (order lama) atau sekarang, dalam jam kedai.
+DateTime promoTime(CartState cart, Menu menu) => ShopClock.wall(menu.utcOffset, cart.createdAt);
+
 /// Total keranjang dihitung di tablet dengan aturan yang sama dengan server.
 final cartTotalsProvider = Provider<PricingResult>((ref) {
+  ref.watch(promoTickProvider);
   final cart = ref.watch(cartProvider);
   final menu = ref.watch(menuProvider).value?.menu;
   if (menu == null || cart.isEmpty) return PricingResult.empty;
@@ -176,15 +194,15 @@ final cartTotalsProvider = Provider<PricingResult>((ref) {
 /// tingkat member = diskon % di setiap baris yang belum punya diskon (manual / hadiah).
 PricingResult priceCart(CartState cart, Menu menu, {DateTime? at}) {
   final reward = cart.reward;
-  final now = at ?? DateTime.now();
+  final benefits = lineBenefits(cart, menu, at ?? promoTime(cart, menu));
   final lines = [
-    for (final l in cart.lines)
+    for (final (i, l) in cart.lines.indexed)
       PricingLine(
         unitPrice: l.unitPrice,
         qty: l.qty,
         discount: reward != null && reward.isFreeProduct && l.id == cart.rewardItemId
             ? Discount.amount(l.product.price)
-            : l.discount ?? lineBenefit(cart, menu, l, now)?.discount,
+            : l.discount ?? benefits[i]?.discount,
       ),
   ];
   var orderDiscount = cart.orderDiscount;
@@ -202,14 +220,36 @@ PricingResult priceCart(CartState cart, Menu menu, {DateTime? at}) {
   return calculatePrice(lines, orderDiscount, menu.pricing);
 }
 
-/// Diskon otomatis satu baris (tanpa diskon manual & bukan baris hadiah), sama dengan
-/// OrderService::applyLineBenefits: yang terbesar antara promo berjalan dan tingkat member (seri → promo).
+/// Diskon otomatis satu baris; lihat [lineBenefits].
 ({String label, Discount discount})? lineBenefit(CartState cart, Menu menu, CartLine l, DateTime at) {
-  if (l.discount != null || (cart.reward?.isFreeProduct == true && l.id == cart.rewardItemId)) return null;
+  final i = cart.lines.indexWhere((x) => x.id == l.id);
+  return i < 0 ? null : lineBenefits(cart, menu, at)[i];
+}
+
+/// Diskon otomatis per baris (tanpa diskon manual & bukan baris hadiah), sama dengan
+/// OrderService::applyLineBenefits: paket bundling dulu (lintas baris), lalu per baris yang terbesar
+/// antara promo berjalan dan tingkat member (seri → promo).
+List<({String label, Discount discount})?> lineBenefits(CartState cart, Menu menu, DateTime at) {
+  final running = [for (final p in menu.promotions) if (p.runsAt(at)) p];
+  bool eligible(CartLine l) => l.discount == null && !(cart.reward?.isFreeProduct == true && l.id == cart.rewardItemId);
+  final bundled = bundleDiscounts(running, [
+    for (final l in cart.lines)
+      eligible(l) ? (productId: l.product.id, price: l.product.price, qty: l.qty, gross: l.unitPrice * l.qty) : null,
+  ]);
+  return [
+    for (final (i, l) in cart.lines.indexed)
+      !eligible(l)
+          ? null
+          : bundled.containsKey(i)
+              ? (bundled[i]!.$2 > 0 ? (label: bundled[i]!.$1.name, discount: Discount.amount(bundled[i]!.$2)) : null)
+              : _bestBenefit(cart, running, l),
+  ];
+}
+
+({String label, Discount discount})? _bestBenefit(CartState cart, List<Promotion> running, CartLine l) {
   Promotion? best;
   var promoAmount = 0;
-  for (final p in menu.promotions) {
-    if (!p.runsAt(at)) continue;
+  for (final p in running) {
     final d = p.discountFor(
         productId: l.product.id, categoryId: l.product.categoryId, unitPrice: l.unitPrice, qty: l.qty, basePrice: l.product.price);
     if (d > promoAmount) {
@@ -402,6 +442,7 @@ class CartController extends Notifier<CartState> {
     }
     state = CartState(
       orderId: order['id'] as String,
+      createdAt: DateTime.tryParse(order['created_at'] as String? ?? '')?.toUtc(),
       lines: lines,
       customerLabel: order['customer_label'] as String? ?? '',
       customer: customer == null

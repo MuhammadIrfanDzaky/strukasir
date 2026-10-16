@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\OutletController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductImportController;
+use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PromotionController;
 use App\Http\Controllers\Api\V1\ReceiptSettingsController;
 use App\Http\Controllers\Api\V1\ReportController;
@@ -65,6 +66,10 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::post('auth/email/send', [EmailVerificationController::class, 'send'])->middleware('throttle:auth');
         Route::post('auth/email/verify', [EmailVerificationController::class, 'verify'])->middleware('throttle:auth');
+        // Profil sendiri: nama (& email owner), ganti PIN, ganti password owner.
+        Route::put('auth/profile', [ProfileController::class, 'update'])->middleware('throttle:auth');
+        Route::put('auth/profile/pin', [ProfileController::class, 'updatePin'])->middleware('throttle:auth');
+        Route::put('auth/profile/password', [ProfileController::class, 'updatePassword'])->middleware('throttle:auth');
 
         Route::get('menu', [MenuController::class, 'show']);
         Route::get('subscription', [SubscriptionController::class, 'show']);

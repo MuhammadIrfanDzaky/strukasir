@@ -278,6 +278,31 @@ class SessionController extends AsyncNotifier<Session> {
     }
   }
 
+  /// Ubah profil sendiri (nama; owner juga email — email baru perlu diverifikasi ulang).
+  Future<void> updateProfile({required String name, String? email, String? currentPassword}) async {
+    final res = await authed((api, token) => api.put('/auth/profile', token: token, data: {
+          'name': name,
+          'email': ?email,
+          'current_password': ?currentPassword,
+        }));
+    final s = state.value;
+    if (s is LoggedIn) {
+      final user = SessionUser.fromJson(res['data'] as Map<String, dynamic>);
+      await _store.saveUser(token: s.token, user: user.toJson());
+      state = AsyncData(LoggedIn(s.serverUrl, s.device, user, s.token));
+    }
+  }
+
+  Future<void> changePin({required String currentPin, required String pin}) =>
+      authed((api, token) => api.put('/auth/profile/pin', token: token, data: {'current_pin': currentPin, 'pin': pin}));
+
+  Future<void> changePassword({required String current, required String password, required String confirmation}) =>
+      authed((api, token) => api.put('/auth/profile/password', token: token, data: {
+            'current_password': current,
+            'password': password,
+            'password_confirmation': confirmation,
+          }));
+
   /// Owner mengeluarkan tablet ini dari usahanya: server mencabut tablet & semua sesinya,
   /// lalu data lokal dihapus dan app kembali ke layar Selamat datang (Daftar / Masuk).
   Future<void> unregisterDevice() async {

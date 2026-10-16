@@ -69,7 +69,7 @@ class OrderService
         $this->guardDiscountFeature($data);
         $customer = $this->resolveCustomer($data['customer_id'] ?? null, $existing);
         [$lines, $orderDiscount, $reward] = $this->applyReward($data, $customer, $lines, $existing);
-        [$lines, $tier] = $this->applyLineBenefits($data, $customer, $lines);
+        [$lines, $tier] = $this->applyLineBenefits($data, $customer, $lines, $existing);
         [$orderDiscount, $voucher] = $this->applyVoucher($data, $lines, $orderDiscount, $reward, $existing);
         $result = $this->price($lines, $orderDiscount);
         $this->guardExpectedTotal($result, (int) $data['expected_total']);
@@ -510,19 +510,40 @@ class OrderService
      *
      * @return array{0: list<array<string, mixed>>, 1: ?MemberTier}
      */
-    private function applyLineBenefits(array $data, ?Customer $customer, array $lines): array
+    private function applyLineBenefits(array $data, ?Customer $customer, array $lines, ?Order $existing = null): array
     {
         $tier = $customer !== null && ! $customer->isAnonymized() && $this->tiers->enabled()
             ? $this->tiers->evaluate($customer)['tier'] : null;
-        $promos = $this->promotions->activeAt($this->promotions->now());
+        $promos = $this->promotions->activeAt($this->promotions->orderTime($existing));
 
         if (array_key_exists('tier_id', $data) && ($data['tier_id'] ?? null) !== $tier?->id) {
             throw ValidationException::withMessages([
                 'customer_id' => 'Tingkat member pelanggan ini berubah'.($tier ? " (sekarang {$tier->name})" : '').'. Pilih ulang membernya.',
             ]);
         }
+        $eligible = [];
         foreach ($lines as $i => $line) {
-            if (! empty($line['discount']) || ($line['reward'] ?? false)) {
+            if (empty($line['discount']) && ! ($line['reward'] ?? false)) {
+                $eligible[$i] = [
+                    'product_id' => $line['product']->id,
+                    'price' => $line['product']->price,
+                    'qty' => $line['qty'],
+                    'gross' => ($line['product']->price + $line['modifiers_total']) * $line['qty'],
+                ];
+            }
+        }
+        $bundled = PromotionService::bundles($promos, $eligible);
+        foreach ($lines as $i => $line) {
+            if (! isset($eligible[$i])) {
+                continue;
+            }
+            if (isset($bundled[$i])) {
+                [$promo, $amount] = $bundled[$i];
+                if ($amount > 0) {
+                    $lines[$i]['discount'] = ['type' => 'amount', 'value' => $amount];
+                    $lines[$i]['promo'] = $promo->name;
+                }
+
                 continue;
             }
             $unit = $line['product']->price + $line['modifiers_total'];

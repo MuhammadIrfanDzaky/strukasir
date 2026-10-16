@@ -19,7 +19,13 @@ use Illuminate\Validation\ValidationException;
  * dengan kasus yang sama di kedua sisi:
  * - percent: ⌊harga baris × bp / 10000⌋ (sama dengan diskon % di PricingService)
  * - amount: min(nilai × qty, harga baris)
+ * - price (harga spesial): max(0, harga dasar − nilai) × qty, maks. harga baris (tambahan tetap dibayar)
+ * - min_qty (beli banyak): qty ≥ X → ⌊harga baris × bp / 10000⌋
  * - bogo (beli X gratis Y): ⌊qty / (X+Y)⌋ × Y porsi gratis × harga dasar produk, maks. harga baris
+ * - bundle (paket): lihat bundles()
+ *
+ * Jadwal promo dinilai pada jam order dibuat (open bill yang dibuat saat happy hour tetap dapat promo
+ * walau dibayar setelahnya), dalam zona waktu kedai.
  */
 class PromotionService
 {
@@ -30,9 +36,18 @@ class PromotionService
 
     public function now(): Carbon
     {
-        $tz = Tenant::query()->whereKey(app(TenantContext::class)->id())->value('timezone') ?: 'Asia/Jakarta';
+        return Carbon::now($this->timezone());
+    }
 
-        return Carbon::now($tz);
+    /** Jam penilaian promo: saat order dibuat (order lama) atau sekarang (order baru). */
+    public function orderTime(?Order $existing): Carbon
+    {
+        return $existing?->created_at ? $existing->created_at->copy()->setTimezone($this->timezone()) : $this->now();
+    }
+
+    public function timezone(): string
+    {
+        return Tenant::query()->whereKey(app(TenantContext::class)->id())->value('timezone') ?: 'Asia/Jakarta';
     }
 
     /** @return Collection<int, Promotion> promo yang berlaku saat [$at] (dibaca sekali per request) */
@@ -58,15 +73,19 @@ class PromotionService
         if ($p->days && ! in_array($at->dayOfWeekIso, $p->days, true)) {
             return false;
         }
-        if ($p->start_time === null || $p->end_time === null) {
+        if (empty($p->times)) {
             return true;
         }
-        $t = $at->format('H:i:s');
-        $start = substr($p->start_time, 0, 8);
-        $end = substr($p->end_time, 0, 8);
+        $t = $at->format('H:i');
+        foreach ($p->times as $w) {
+            // Melewati tengah malam (mis. 22:00–02:00). Jam selesai tidak termasuk.
+            $in = $w['start'] <= $w['end'] ? ($t >= $w['start'] && $t < $w['end']) : ($t >= $w['start'] || $t < $w['end']);
+            if ($in) {
+                return true;
+            }
+        }
 
-        // Melewati tengah malam (mis. 22:00–02:00).
-        return $start <= $end ? ($t >= $start && $t < $end) : ($t >= $start || $t < $end);
+        return false;
     }
 
     public static function covers(Promotion $p, Product $product): bool
@@ -88,8 +107,64 @@ class PromotionService
         return match ($p->type) {
             'percent' => intdiv($gross * $p->value, 10000),
             'amount' => min($p->value * $qty, $gross),
-            default => min(intdiv($qty, $p->buy_qty + $p->free_qty) * $p->free_qty * $product->price, $gross),
+            'price' => min(max(0, $product->price - $p->value) * $qty, $gross),
+            'min_qty' => $qty >= $p->buy_qty ? intdiv($gross * $p->value, 10000) : 0,
+            'bogo' => min(intdiv($qty, $p->buy_qty + $p->free_qty) * $p->free_qty * $product->price, $gross),
+            default => 0, // bundle dihitung lintas baris (bundles())
         };
+    }
+
+    /**
+     * Promo paket (bundle) lintas baris, sebelum promo per baris. Untuk tiap paket (urut nama):
+     * jumlah set = min(⌊qty tersedia produk / qty di paket⌋); potongan = set × (harga normal − harga paket),
+     * harga normal = Σ qty × harga dasar (tambahan tetap dibayar). Potongan dibagi per isi paket sebanding
+     * harga normalnya (sisa pembulatan ke isi terakhir), lalu ke baris produk itu berurutan (maks. harga baris).
+     * Baris yang terpakai paket tidak ikut paket lain / promo per baris / diskon member.
+     *
+     * @param  Collection<int, Promotion>  $promos
+     * @param  array<int, array{product_id: string, price: int, qty: int, gross: int}>  $lines  baris yang boleh dapat promo
+     * @return array<int, array{0: Promotion, 1: int}> indeks baris → [promo, potongan]
+     */
+    public static function bundles(Collection $promos, array $lines): array
+    {
+        $used = [];
+        foreach ($promos as $p) {
+            if ($p->type !== 'bundle' || empty($p->bundle_items)) {
+                continue;
+            }
+            $parts = array_values($p->bundle_items);
+            $free = fn (string $productId) => array_filter($lines, fn ($l, $i) => $l['product_id'] === $productId && ! isset($used[$i]), ARRAY_FILTER_USE_BOTH);
+            $sets = PHP_INT_MAX;
+            $normal = 0;
+            foreach ($parts as $part) {
+                $matches = $free($part['product_id']);
+                $sets = min($sets, intdiv(array_sum(array_column($matches, 'qty')), $part['qty']));
+                $normal += $part['qty'] * ($matches === [] ? 0 : reset($matches)['price']);
+            }
+            if ($sets < 1 || $normal <= $p->value) {
+                continue;
+            }
+            $discount = $sets * ($normal - $p->value);
+            $left = $discount;
+            foreach ($parts as $j => $part) {
+                $matches = $free($part['product_id']);
+                $price = reset($matches)['price'];
+                $share = $j === count($parts) - 1 ? $left : intdiv($discount * $part['qty'] * $price, $normal);
+                $left -= $share;
+                $units = $sets * $part['qty'];
+                foreach ($matches as $i => $l) {
+                    if ($units <= 0) {
+                        break;
+                    }
+                    $units -= $l['qty'];
+                    $amount = min($share, $l['gross']);
+                    $share -= $amount;
+                    $used[$i] = [$p, $amount];
+                }
+            }
+        }
+
+        return $used;
     }
 
     /**
@@ -172,9 +247,12 @@ class PromotionService
             'free_qty' => $p->free_qty,
             'scope' => $p->scope,
             'target_ids' => $p->target_ids ?? [],
+            'bundle_items' => $p->bundle_items,
             'days' => $p->days,
-            'start_time' => $p->start_time ? substr($p->start_time, 0, 5) : null,
-            'end_time' => $p->end_time ? substr($p->end_time, 0, 5) : null,
+            'times' => empty($p->times) ? null : array_values($p->times),
+            // Rentang pertama untuk aplikasi versi lama (sebelum ada beberapa rentang jam).
+            'start_time' => $p->times[0]['start'] ?? null,
+            'end_time' => $p->times[0]['end'] ?? null,
             'starts_on' => $p->starts_on?->toDateString(),
             'ends_on' => $p->ends_on?->toDateString(),
             'active' => $p->active,

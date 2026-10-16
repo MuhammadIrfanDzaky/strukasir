@@ -141,7 +141,7 @@ class CheckoutFlow {
 
   // ───────────────────────────── internal ─────────────────────────────
 
-  Future<OrderJson?> _save({Approval? approval}) async {
+  Future<OrderJson?> _save({Approval? approval, bool retried = false}) async {
     final cart = ref.read(cartProvider);
     final total = ref.read(cartTotalsProvider).grandTotal;
     if (cart.isEmpty) return null;
@@ -157,16 +157,58 @@ class CheckoutFlow {
           context: context,
           builder: (_) => ApprovalDialog(reason: 'Diskon melebihi batas kasir. ${approval == null ? '' : e.field('approval')!}'),
         );
-        return next == null ? null : _save(approval: next);
+        return next == null ? null : _save(approval: next, retried: retried);
       }
       if (e.field('expected_total') != null) {
-        await ref.read(menuProvider.notifier).refresh();
-        _snack('Harga menu berubah. Menu sudah diperbarui — periksa total lalu coba lagi.');
-        return null;
+        return await _totalChanged(total, retried) ? _save(approval: approval, retried: true) : null;
       }
       _snack(e.fieldErrors.values.expand((v) => v).firstOrNull ?? e.message);
       return null;
     }
+  }
+
+  /// Total tablet ≠ server (promo baru mulai/berakhir, jam tablet meleset, harga diubah): segarkan menu,
+  /// hitung ulang, jelaskan perubahannya ke kasir, dan tawarkan lanjut dengan total baru.
+  Future<bool> _totalChanged(int oldTotal, bool retried) async {
+    final before = _promoNames();
+    await ref.read(menuProvider.notifier).refresh();
+    final after = _promoNames();
+    final newTotal = ref.read(cartTotalsProvider).grandTotal;
+    if (retried || newTotal == oldTotal || !context.mounted) {
+      _snack('Total di tablet berbeda dengan server. Menu sudah diperbarui — periksa total lalu coba lagi.');
+      return false;
+    }
+    final ended = before.difference(after);
+    final started = after.difference(before);
+    final reason = [
+      for (final n in ended) 'Promo “$n” sudah berakhir.',
+      for (final n in started) 'Promo “$n” mulai berlaku.',
+      if (ended.isEmpty && started.isEmpty) 'Harga atau promo diperbarui dari server.',
+    ].join(' ');
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Total berubah'),
+        content: Text('$reason\n\nTotal sebelumnya ${rp(oldTotal)}, sekarang ${rp(newTotal)}.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Periksa dulu')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Lanjut ${rp(newTotal)}')),
+        ],
+      ),
+    );
+    return go == true;
+  }
+
+  /// Nama promo yang sedang dipakai keranjang.
+  Set<String> _promoNames() {
+    final cart = ref.read(cartProvider);
+    final menu = ref.read(menuProvider).value?.menu;
+    if (menu == null) return const {};
+    final names = <String>{};
+    for (final b in lineBenefits(cart, menu, promoTime(cart, menu))) {
+      if (b != null && b.label != 'Diskon member') names.add(b.label);
+    }
+    return names;
   }
 
   Future<OrderJson?> _tryGet(String id) async {

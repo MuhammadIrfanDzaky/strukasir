@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
 import '../../core/money.dart';
+import '../../core/shop_clock.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
@@ -94,7 +95,7 @@ class _PromotionsScreenState extends ConsumerState<PromotionsScreen> {
                               [p.effect, _target(p, menu), p.schedule, if (!p.active) 'nonaktif'].join(' · '),
                               style: AppType.caption.copyWith(color: AppColors.inkMuted),
                             ),
-                            trailing: p.active && p.runsAt(DateTime.now()) ? const AppBadge('Berjalan', tone: AppTone.success) : null,
+                            trailing: p.active && menu != null && p.runsAt(ShopClock.wall(menu.utcOffset)) ? const AppBadge('Berjalan', tone: AppTone.success) : null,
                           ),
                         ),
                       const SizedBox(height: AppSpace.s3),
@@ -104,7 +105,7 @@ class _PromotionsScreenState extends ConsumerState<PromotionsScreen> {
                       ),
                     ]),
                     ListView(padding: EdgeInsets.fromLTRB(pad, pad, pad, 96), children: [
-                      Text('Kasir memasukkan kode di keranjang (Pakai voucher). Tidak bisa digabung dengan diskon order atau hadiah potongan.',
+                      Text('Kasir memasukkan kode di keranjang (tombol Voucher). Tidak bisa digabung dengan diskon order atau hadiah potongan.',
                           style: AppType.body.copyWith(color: AppColors.inkMuted)),
                       const SizedBox(height: AppSpace.s3),
                       if (vouchers.isEmpty) const AppEmptyState(icon: Icons.confirmation_number_rounded, title: 'Belum ada voucher'),
@@ -164,29 +165,38 @@ class _PromoForm extends ConsumerStatefulWidget {
 }
 
 class _PromoFormState extends ConsumerState<_PromoForm> {
-  late final _name = TextEditingController(text: widget.promo?.name ?? '');
-  late String _type = widget.promo?.type ?? 'percent';
-  late final _value = TextEditingController(
-      text: widget.promo == null
-          ? ''
-          : widget.promo!.type == 'percent'
-              ? percentBp(widget.promo!.value).replaceAll('%', '')
-              : widget.promo!.type == 'amount' ? rupiah(widget.promo!.value) : '');
-  late int _buy = widget.promo?.buyQty == 0 || widget.promo == null ? 2 : widget.promo!.buyQty;
-  late int _free = widget.promo?.freeQty == 0 || widget.promo == null ? 1 : widget.promo!.freeQty;
-  late String _scope = widget.promo?.scope ?? 'all';
-  late final Set<String> _targets = {...?widget.promo?.targetIds};
-  late final Set<int> _days = {...?widget.promo?.days};
-  late bool _timed = widget.promo?.startTime != null;
-  late TimeOfDay _start = _parse(widget.promo?.startTime) ?? const TimeOfDay(hour: 14, minute: 0);
-  late TimeOfDay _end = _parse(widget.promo?.endTime) ?? const TimeOfDay(hour: 17, minute: 0);
-  late bool _active = widget.promo?.active ?? true;
+  late final Promotion? _p = widget.promo;
+  late final _name = TextEditingController(text: _p?.name ?? '');
+  late String _type = _p?.type ?? 'percent';
+  late final _value = TextEditingController(text: _initialValue(_p));
+  late int _buy = _p == null || _p.buyQty == 0 ? (_type == 'min_qty' ? 3 : 2) : _p.buyQty;
+  late int _free = _p == null || _p.freeQty == 0 ? 1 : _p.freeQty;
+  late String _scope = _p?.scope ?? 'all';
+  late final Set<String> _targets = {...?_p?.targetIds};
+  late final List<({String? productId, int qty})> _bundle = _p?.bundleItems.isNotEmpty == true
+      ? [for (final b in _p!.bundleItems) (productId: b.productId, qty: b.qty)]
+      : [(productId: null, qty: 1), (productId: null, qty: 1)];
+  late final Set<int> _days = {...?_p?.days};
+  late bool _timed = _p?.times?.isNotEmpty == true;
+  late final List<(TimeOfDay, TimeOfDay)> _windows = _p?.times?.isNotEmpty == true
+      ? [for (final w in _p!.times!) (_parse(w.start), _parse(w.end))]
+      : [(const TimeOfDay(hour: 14, minute: 0), const TimeOfDay(hour: 17, minute: 0))];
+  late bool _active = _p?.active ?? true;
   String? _error;
   bool _busy = false;
 
-  static TimeOfDay? _parse(String? hm) =>
-      hm == null ? null : TimeOfDay(hour: int.parse(hm.substring(0, 2)), minute: int.parse(hm.substring(3, 5)));
+  static const _maxWindows = 4;
+
+  static String _initialValue(Promotion? p) => switch (p?.type) {
+        null || 'bogo' => '',
+        'percent' || 'min_qty' => percentBp(p!.value).replaceAll('%', ''),
+        _ => rupiah(p!.value),
+      };
+
+  static TimeOfDay _parse(String hm) => TimeOfDay(hour: int.parse(hm.substring(0, 2)), minute: int.parse(hm.substring(3, 5)));
   static String _fmt(TimeOfDay t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  bool get _percentType => _type == 'percent' || _type == 'min_qty';
 
   @override
   void dispose() {
@@ -195,9 +205,13 @@ class _PromoFormState extends ConsumerState<_PromoForm> {
     super.dispose();
   }
 
+  /// Harga normal isi paket (harga dasar × qty).
+  int get _bundleNormal => _bundle.fold(0, (s, b) => s + (b.productId == null ? 0 : (widget.menu.product(b.productId!)?.price ?? 0) * b.qty));
+
   Future<void> _submit() async {
     final percent = double.tryParse(_value.text.trim().replaceAll(',', '.'));
     final amount = parseRupiah(_value.text);
+    final bundle = [for (final b in _bundle) if (b.productId != null) {'product_id': b.productId, 'qty': b.qty}];
     setState(() {
       _busy = true;
       _error = null;
@@ -205,24 +219,131 @@ class _PromoFormState extends ConsumerState<_PromoForm> {
     await _save(
       context,
       ref,
-      widget.promo == null ? 'post' : 'put',
-      widget.promo == null ? '/promotions' : '/promotions/${widget.promo!.id}',
+      _p == null ? 'post' : 'put',
+      _p == null ? '/promotions' : '/promotions/${_p.id}',
       {
         'name': _name.text.trim(),
         'type': _type,
-        if (_type == 'percent') 'value': ((percent ?? 0) * 100).round(),
-        if (_type == 'amount') 'value': amount ?? 0,
+        if (_percentType) 'value': ((percent ?? 0) * 100).round(),
+        if (_type == 'amount' || _type == 'price' || _type == 'bundle') 'value': amount,
         if (_type == 'bogo') ...{'buy_qty': _buy, 'free_qty': _free},
-        'scope': _scope,
-        'target_ids': _scope == 'all' ? null : _targets.toList(),
+        if (_type == 'min_qty') 'buy_qty': _buy,
+        if (_type == 'bundle') 'bundle_items': bundle,
+        'scope': _type == 'bundle' ? 'all' : _scope,
+        'target_ids': _type == 'bundle' || _scope == 'all' ? null : _targets.toList(),
         'days': _days.isEmpty ? null : (_days.toList()..sort()),
-        'start_time': _timed ? _fmt(_start) : null,
-        'end_time': _timed ? _fmt(_end) : null,
+        'times': _timed ? [for (final (s, e) in _windows) {'start': _fmt(s), 'end': _fmt(e)}] : null,
         'active': _active,
       },
       (e) => setState(() => _error = e),
     );
     if (mounted) setState(() => _busy = false);
+  }
+
+  Future<void> _pickTime(int i, bool start) async {
+    final (s, e) = _windows[i];
+    final t = await showTimePicker(context: context, initialTime: start ? s : e);
+    if (t != null) setState(() => _windows[i] = start ? (t, e) : (s, t));
+  }
+
+  Widget _caption(String text) => Padding(
+        padding: const EdgeInsets.only(top: AppSpace.s1),
+        child: Text(text, style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+      );
+
+  Widget _labeled(String label, Widget child) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Text(label),
+        const SizedBox(width: AppSpace.s3),
+        child,
+      ]);
+
+  /// Isian sesuai tipe promo.
+  List<Widget> _typeFields(List<MenuProduct> products) {
+    TextField money(String label, {String? helper}) => TextField(
+          controller: _value,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+          onChanged: _type == 'bundle' ? (_) => setState(() {}) : null,
+          decoration: InputDecoration(labelText: label, prefixText: 'Rp ', helperText: helper, helperMaxLines: 2),
+        );
+    TextField percentField() => TextField(
+          controller: _value,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+          decoration: const InputDecoration(labelText: 'Diskon', suffixText: '%'),
+        );
+    switch (_type) {
+      case 'percent':
+        return [percentField()];
+      case 'amount':
+        return [money('Potongan per item')];
+      case 'price':
+        return [money('Harga jual per item selama promo', helper: 'Tambahan (topping, ukuran) tetap dibayar.')];
+      case 'min_qty':
+        return [
+          Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: AppSpace.s5, runSpacing: AppSpace.s2, children: [
+            _labeled('Minimal beli', NumberStepper(value: _buy, min: 2, onChanged: (v) => setState(() => _buy = v))),
+            SizedBox(width: 160, child: percentField()),
+          ]),
+          _caption('Diskon berlaku untuk item yang dibeli sebanyak minimal jumlah ini dalam satu baris.'),
+        ];
+      case 'bogo':
+        return [
+          // Wrap: di HP sempit pasangan "gratis [−1+]" turun ke baris berikutnya.
+          Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: AppSpace.s5, runSpacing: AppSpace.s2, children: [
+            _labeled('Beli', NumberStepper(value: _buy, onChanged: (v) => setState(() => _buy = v))),
+            _labeled('gratis', NumberStepper(value: _free, onChanged: (v) => setState(() => _free = v))),
+          ]),
+          _caption('Item gratis dihitung dari harga dasar produk yang sama (tambahan tetap dibayar).'),
+        ];
+      default: // bundle
+        final normal = _bundleNormal;
+        final price = parseRupiah(_value.text) ?? 0;
+        return [
+          Text('Isi paket', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+          const SizedBox(height: AppSpace.s1),
+          for (final (i, b) in _bundle.indexed)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpace.s2),
+              child: Row(children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('$i-${b.productId}'),
+                    initialValue: products.any((p) => p.id == b.productId) ? b.productId : null,
+                    isExpanded: true,
+                    menuMaxHeight: 360,
+                    decoration: const InputDecoration(labelText: 'Produk', isDense: true),
+                    items: [
+                      for (final p in products)
+                        DropdownMenuItem(value: p.id, child: Text('${p.name} · ${rp(p.price)}', overflow: TextOverflow.ellipsis)),
+                    ],
+                    onChanged: (v) => setState(() => _bundle[i] = (productId: v, qty: b.qty)),
+                  ),
+                ),
+                const SizedBox(width: AppSpace.s2),
+                NumberStepper(value: b.qty, onChanged: (v) => setState(() => _bundle[i] = (productId: b.productId, qty: v))),
+                IconButton(
+                  tooltip: 'Hapus',
+                  onPressed: _bundle.length > 1 ? () => setState(() => _bundle.removeAt(i)) : null,
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ]),
+            ),
+          if (_bundle.length < 10)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => setState(() => _bundle.add((productId: null, qty: 1))),
+                child: const Text('+ Tambah isi paket'),
+              ),
+            ),
+          const SizedBox(height: AppSpace.s2),
+          money('Harga paket',
+              helper: normal == 0
+                  ? 'Tambahan (topping, ukuran) tetap dibayar.'
+                  : 'Harga normal ${rp(normal)}${price > 0 && price < normal ? ' · pelanggan hemat ${rp(normal - price)}' : ''}'),
+        ];
+    }
   }
 
   @override
@@ -232,9 +353,9 @@ class _PromoFormState extends ConsumerState<_PromoForm> {
     const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
     return AlertDialog(
       scrollable: true,
-      title: Text(widget.promo == null ? 'Tambah promo' : 'Ubah promo'),
+      title: Text(_p == null ? 'Tambah promo' : 'Ubah promo'),
       content: SizedBox(
-        width: 480,
+        width: 520,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           TextField(
             controller: _name,
@@ -243,84 +364,55 @@ class _PromoFormState extends ConsumerState<_PromoForm> {
             decoration: const InputDecoration(labelText: 'Nama promo (tampil di keranjang & struk)', hintText: 'mis. Happy Hour', counterText: ''),
           ),
           const SizedBox(height: AppSpace.s3),
-          SegmentedButton<String>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: 'percent', label: Text('Diskon %')),
-              ButtonSegment(value: 'amount', label: Text('Rp/item')),
-              ButtonSegment(value: 'bogo', label: Text('Beli X gratis Y')),
-            ],
-            selected: {_type},
-            onSelectionChanged: (v) => setState(() {
-              _type = v.first;
+          DropdownButtonFormField<String>(
+            initialValue: _type,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Jenis promo'),
+            items: [for (final e in promotionTypes.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
+            onChanged: (v) => setState(() {
+              if (v == null || v == _type) return;
+              _type = v;
               _value.clear();
+              if (_type == 'min_qty' && _buy < 2) _buy = 3;
             }),
           ),
           const SizedBox(height: AppSpace.s3),
-          if (_type == 'bogo')
-            // Wrap: di HP sempit pasangan "gratis [−1+]" turun ke baris berikutnya.
-            Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: AppSpace.s5, runSpacing: AppSpace.s2, children: [
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                const Text('Beli'),
-                const SizedBox(width: AppSpace.s3),
-                NumberStepper(value: _buy, onChanged: (v) => setState(() => _buy = v)),
-              ]),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                const Text('gratis'),
-                const SizedBox(width: AppSpace.s3),
-                NumberStepper(value: _free, onChanged: (v) => setState(() => _free = v)),
-              ]),
-            ])
-          else
-            TextField(
-              controller: _value,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-              decoration: InputDecoration(
-                labelText: _type == 'percent' ? 'Diskon' : 'Potongan per item',
-                suffixText: _type == 'percent' ? '%' : null,
-                prefixText: _type == 'amount' ? 'Rp ' : null,
+          ..._typeFields(products),
+          if (_type != 'bundle') ...[
+            const SizedBox(height: AppSpace.s4),
+            Text('Berlaku untuk', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+            const SizedBox(height: AppSpace.s1),
+            SegmentedButton<String>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: 'all', label: Text('Semua')),
+                ButtonSegment(value: 'categories', label: Text('Kategori')),
+                ButtonSegment(value: 'products', label: Text('Produk')),
+              ],
+              selected: {_scope},
+              onSelectionChanged: (v) => setState(() {
+                _scope = v.first;
+                _targets.clear();
+              }),
+            ),
+            if (_scope != 'all') ...[
+              const SizedBox(height: AppSpace.s2),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200),
+                child: SingleChildScrollView(
+                  child: Wrap(spacing: AppSpace.s2, runSpacing: AppSpace.s2, children: [
+                    for (final (id, name) in _scope == 'categories'
+                        ? [for (final c in categories) (c.id, c.name)]
+                        : [for (final p in products) (p.id, p.name)])
+                      FilterChip(
+                        label: Text(name),
+                        selected: _targets.contains(id),
+                        onSelected: (v) => setState(() => v ? _targets.add(id) : _targets.remove(id)),
+                      ),
+                  ]),
+                ),
               ),
-            ),
-          if (_type == 'bogo')
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpace.s1),
-              child: Text('Item gratis dihitung dari harga dasar produk yang sama (tambahan tetap dibayar).',
-                  style: AppType.caption.copyWith(color: AppColors.inkMuted)),
-            ),
-          const SizedBox(height: AppSpace.s4),
-          Text('Berlaku untuk', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
-          const SizedBox(height: AppSpace.s1),
-          SegmentedButton<String>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: 'all', label: Text('Semua')),
-              ButtonSegment(value: 'categories', label: Text('Kategori')),
-              ButtonSegment(value: 'products', label: Text('Produk')),
             ],
-            selected: {_scope},
-            onSelectionChanged: (v) => setState(() {
-              _scope = v.first;
-              _targets.clear();
-            }),
-          ),
-          if (_scope != 'all') ...[
-            const SizedBox(height: AppSpace.s2),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: SingleChildScrollView(
-                child: Wrap(spacing: AppSpace.s2, runSpacing: AppSpace.s2, children: [
-                  for (final (id, name) in _scope == 'categories'
-                      ? [for (final c in categories) (c.id, c.name)]
-                      : [for (final p in products) (p.id, p.name)])
-                    FilterChip(
-                      label: Text(name),
-                      selected: _targets.contains(id),
-                      onSelected: (v) => setState(() => v ? _targets.add(id) : _targets.remove(id)),
-                    ),
-                ]),
-              ),
-            ),
           ],
           const SizedBox(height: AppSpace.s4),
           Text('Hari (kosong = setiap hari)', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
@@ -339,30 +431,33 @@ class _PromoFormState extends ConsumerState<_PromoForm> {
             value: _timed,
             onChanged: (v) => setState(() => _timed = v),
             title: const Text('Hanya jam tertentu'),
-            subtitle: _timed ? Text('${_fmt(_start)} – ${_fmt(_end)}') : const Text('Sepanjang hari'),
+            subtitle: Text(_timed ? [for (final (s, e) in _windows) '${_fmt(s)}–${_fmt(e)}'].join(', ') : 'Sepanjang hari'),
           ),
-          if (_timed)
-            Row(children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () async {
-                    final t = await showTimePicker(context: context, initialTime: _start);
-                    if (t != null) setState(() => _start = t);
-                  },
-                  child: Text('Mulai ${_fmt(_start)}'),
+          if (_timed) ...[
+            for (final (i, (s, e)) in _windows.indexed)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpace.s2),
+                child: Row(children: [
+                  Expanded(child: OutlinedButton(onPressed: () => _pickTime(i, true), child: Text('Mulai ${_fmt(s)}'))),
+                  const SizedBox(width: AppSpace.s2),
+                  Expanded(child: OutlinedButton(onPressed: () => _pickTime(i, false), child: Text('Selesai ${_fmt(e)}'))),
+                  IconButton(
+                    tooltip: 'Hapus rentang',
+                    onPressed: _windows.length > 1 ? () => setState(() => _windows.removeAt(i)) : null,
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ]),
+              ),
+            if (_windows.length < _maxWindows)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () => setState(() => _windows.add((const TimeOfDay(hour: 19, minute: 0), const TimeOfDay(hour: 21, minute: 0)))),
+                  child: const Text('+ Tambah rentang jam'),
                 ),
               ),
-              const SizedBox(width: AppSpace.s2),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () async {
-                    final t = await showTimePicker(context: context, initialTime: _end);
-                    if (t != null) setState(() => _end = t);
-                  },
-                  child: Text('Selesai ${_fmt(_end)}'),
-                ),
-              ),
-            ]),
+            _caption('Promo mengikuti jam order dibuat: open bill yang dibuat di jam promo tetap dapat promo walau dibayar setelahnya.'),
+          ],
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: _active,

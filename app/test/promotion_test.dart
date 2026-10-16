@@ -1,3 +1,4 @@
+import 'package:berrybrew_pos/core/shop_clock.dart';
 import 'package:berrybrew_pos/features/cart/cart_controller.dart';
 import 'package:berrybrew_pos/features/cart/pricing.dart';
 import 'package:berrybrew_pos/features/customers/member_tier.dart';
@@ -42,11 +43,63 @@ void main() {
       expect(p.runsAt(DateTime(2026, 10, 15, 15)), isFalse, reason: 'Kamis');
     });
     test('melewati tengah malam & rentang tanggal', () {
-      const night = Promotion(id: 'n', name: 'Malam', type: 'percent', value: 1000, startTime: '22:00', endTime: '02:00');
+      const night = Promotion(id: 'n', name: 'Malam', type: 'percent', value: 1000, times: [(start: '22:00', end: '02:00')]);
       expect([night.runsAt(at(23)), night.runsAt(at(1, 59)), night.runsAt(at(2)), night.runsAt(at(12))], [true, true, false, false]);
       const dated = Promotion(id: 'd', name: 'Okt', type: 'percent', value: 1000, startsOn: '2026-10-15', endsOn: '2026-10-31');
       expect([dated.runsAt(at(10)), dated.runsAt(DateTime(2026, 10, 31, 23)), dated.runsAt(DateTime(2026, 11, 1))], [false, true, false]);
     });
+  });
+
+  test('beberapa rentang jam (happy hour siang & malam)', () {
+    final p = Promotion.fromJson({
+      'id': 'w', 'name': 'HH', 'type': 'percent', 'value': 2000,
+      'times': [{'start': '12:00', 'end': '14:00'}, {'start': '19:00', 'end': '21:00'}],
+    });
+    expect([p.runsAt(at(12, 30)), p.runsAt(at(15)), p.runsAt(at(20, 59)), p.runsAt(at(21))], [true, false, true, false]);
+    expect(p.schedule, 'Setiap hari · 12:00–14:00, 19:00–21:00');
+  });
+
+  test('harga spesial, beli banyak, paket bundling (angka sama dengan PromotionTest server)', () {
+    final m = menuWith([
+      {'id': 'b', 'name': 'Borong roti', 'type': 'min_qty', 'buy_qty': 3, 'value': 1000, 'scope': 'all'},
+      {'id': 'l', 'name': 'Latte 15rb', 'type': 'price', 'value': 15000, 'scope': 'products', 'target_ids': ['latte']},
+    ]);
+    var (c, _) = cart([(latte, 2), (roti, 3)]);
+    expect(priceCart(c.read(cartProvider), m, at: at(9)).lineDiscounts, [10000, 3000]);
+    (c, _) = cart([(roti, 2)]);
+    expect(priceCart(c.read(cartProvider), m, at: at(9)).lineDiscounts, [0]);
+
+    final paket = menuWith([
+      {'id': 'p', 'name': 'Paket Sarapan', 'type': 'bundle', 'value': 25000, 'scope': 'all', 'bundle_items': [
+        {'product_id': 'latte', 'qty': 1}, {'product_id': 'roti', 'qty': 1},
+      ]},
+    ]);
+    (c, _) = cart([(latte, 2), (roti, 1)]);
+    var s = c.read(cartProvider);
+    final r = priceCart(s, paket, at: at(9));
+    expect([r.lineDiscounts, r.grandTotal], [[3333, 1667], 45000]);
+    expect(lineBenefit(s, paket, s.lines.last, at(9))?.label, 'Paket Sarapan');
+    (c, _) = cart([(latte, 2)]);
+    expect(priceCart(c.read(cartProvider), paket, at: at(9)).lineDiscounts, [0]);
+    (c, _) = cart([(roti, 2), (latte, 2)]); // 2 paket
+    s = c.read(cartProvider);
+    expect(priceCart(s, paket, at: at(9)).lineDiscounts, [3334, 6666]);
+  });
+
+  test('jam kedai: zona waktu kedai & jam open bill dibuat', () {
+    // 16:55 WIB = 09:55 UTC; menu WIB (+420 menit).
+    final created = DateTime.utc(2026, 10, 14, 9, 55);
+    expect(ShopClock.wall(420, created), DateTime.utc(2026, 10, 14, 16, 55));
+    final m = Menu.fromJson({...loyaltyMenuJson, 'promotions': [happyHour], 'clock': {'now': '2026-10-14T10:20:00+00:00', 'utc_offset': 420}});
+    expect(m.utcOffset, 420);
+    final (c, n) = cart([(latte, 2)]);
+    n.loadOrder({
+      'id': 'o1', 'number': 'T1-0001', 'created_at': created.toIso8601String(), 'customer_label': 'A',
+      'items': [{'id': 'i1', 'product_id': 'latte', 'name': 'Latte', 'unit_price': 20000, 'qty': 2, 'modifiers': [], 'discount': null}],
+    }, m);
+    final s = c.read(cartProvider);
+    expect(promoTime(s, m), DateTime.utc(2026, 10, 14, 16, 55));
+    expect(priceCart(s, m).lineDiscounts, [8000], reason: 'open bill dibuat saat happy hour tetap dapat promo');
   });
 
   test('potongan per jenis promo', () {

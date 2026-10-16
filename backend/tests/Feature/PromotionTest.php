@@ -217,7 +217,7 @@ class PromotionTest extends TestCase
 
     public function test_time_window_across_midnight(): void
     {
-        $p = new Promotion(['days' => null, 'start_time' => '22:00:00', 'end_time' => '02:00:00']);
+        $p = new Promotion(['days' => null, 'times' => [['start' => '22:00', 'end' => '02:00']]]);
         $at = fn (string $t) => Carbon::parse("2026-10-14 {$t}", 'Asia/Jakarta');
         $this->assertTrue(PromotionService::runsAt($p, $at('23:30')));
         $this->assertTrue(PromotionService::runsAt($p, $at('01:59')));
@@ -225,8 +225,80 @@ class PromotionTest extends TestCase
         $this->assertFalse(PromotionService::runsAt($p, $at('12:00')));
 
         // Hari: hanya Rabu (14 Okt 2026 = Rabu).
-        $wednesday = new Promotion(['days' => [3], 'start_time' => null, 'end_time' => null]);
+        $wednesday = new Promotion(['days' => [3], 'times' => null]);
         $this->assertTrue(PromotionService::runsAt($wednesday, $at('09:00')));
         $this->assertFalse(PromotionService::runsAt($wednesday, Carbon::parse('2026-10-15 09:00', 'Asia/Jakarta')));
+    }
+
+    public function test_several_time_windows_and_legacy_single_window(): void
+    {
+        $this->promo(['start_time' => null, 'end_time' => null, 'days' => null,
+            'times' => [['start' => '19:00', 'end' => '21:00'], ['start' => '12:00', 'end' => '14:00']]])->assertCreated()
+            ->assertJsonPath('data.times', [['start' => '12:00', 'end' => '14:00'], ['start' => '19:00', 'end' => '21:00']])
+            ->assertJsonPath('data.start_time', '12:00');
+
+        foreach (['12:30' => 32000, '15:00' => 40000, '20:59' => 32000, '21:00' => 40000] as $time => $total) {
+            Carbon::setTestNow(Carbon::parse("2026-10-14 {$time}", 'Asia/Jakarta'));
+            $this->save([$this->line($this->latte, 2)], $total)->assertOk();
+        }
+        $this->promo(['times' => [['start' => '10:00', 'end' => '10:00']]])->assertUnprocessable()->assertJsonValidationErrors('times');
+        $this->promo(['times' => array_fill(0, 5, ['start' => '10:00', 'end' => '11:00'])])->assertUnprocessable()->assertJsonValidationErrors('times');
+    }
+
+    public function test_open_bill_keeps_promo_of_the_time_it_was_ordered(): void
+    {
+        $this->promo([])->assertCreated(); // Rabu 14:00–17:00
+        Carbon::setTestNow(Carbon::parse('2026-10-14 16:55', 'Asia/Jakarta'));
+        $id = (string) Str::uuid();
+        $this->save([$this->line($this->latte, 2)], 32000, [], $id)->assertOk();
+
+        // Dibayar / ditambah setelah happy hour selesai: tetap pakai jam order dibuat.
+        Carbon::setTestNow(Carbon::parse('2026-10-14 17:20', 'Asia/Jakarta'));
+        $this->save([$this->line($this->latte, 3)], 48000, [], $id)->assertOk()->assertJsonPath('data.promo_discount', 12000);
+        $this->pay($id, 48000)->assertOk();
+        // Order baru pada jam yang sama tidak dapat promo.
+        $this->save([$this->line($this->latte, 2)], 40000)->assertOk();
+        $this->api('GET', '/api/v1/menu', $this->cashier)->assertJsonPath('clock.utc_offset', 420);
+    }
+
+    public function test_special_price_and_buy_more(): void
+    {
+        $this->promo(['name' => 'Latte 15rb', 'type' => 'price', 'value' => 15000, 'scope' => 'products',
+            'target_ids' => [$this->latte->id], 'days' => null, 'start_time' => null, 'end_time' => null])->assertCreated();
+        $this->promo(['name' => 'Borong roti', 'type' => 'min_qty', 'buy_qty' => 3, 'value' => 1000, 'scope' => 'all',
+            'days' => null, 'start_time' => null, 'end_time' => null])->assertCreated();
+
+        // Latte: (20.000 − 15.000) × 2 = 10.000 (lebih besar dari 10% borong yang belum berlaku: qty 2).
+        // Roti ×3 → 10% × 30.000 = 3.000.
+        $this->save([$this->line($this->latte, 2), $this->line($this->roti, 3)], 30000 + 27000)->assertOk()
+            ->assertJsonPath('data.items.0.promo', 'Latte 15rb')
+            ->assertJsonPath('data.items.0.discount_total', 10000)
+            ->assertJsonPath('data.items.1.promo', 'Borong roti')
+            ->assertJsonPath('data.items.1.discount_total', 3000);
+        $this->save([$this->line($this->roti, 2)], 20000)->assertOk()->assertJsonPath('data.items.0.promo', null);
+        $this->promo(['type' => 'min_qty', 'buy_qty' => 1, 'value' => 1000])->assertUnprocessable()->assertJsonValidationErrors('buy_qty');
+    }
+
+    public function test_bundle_price_across_lines(): void
+    {
+        $bundle = fn (array $extra = []) => $this->promo(['name' => 'Paket Sarapan', 'type' => 'bundle', 'value' => 25000,
+            'bundle_items' => [['product_id' => $this->latte->id, 'qty' => 1], ['product_id' => $this->roti->id, 'qty' => 1]],
+            'scope' => 'categories', 'days' => null, 'start_time' => null, 'end_time' => null, ...$extra]);
+        $bundle(['value' => 30000])->assertUnprocessable()->assertJsonValidationErrors('value'); // tidak lebih murah
+        $bundle(['bundle_items' => [['product_id' => $this->latte->id, 'qty' => 1]]])->assertUnprocessable()->assertJsonValidationErrors('bundle_items');
+        $bundle()->assertCreated()->assertJsonPath('data.scope', 'all');
+
+        // 2 latte + 1 roti → 1 paket: potongan 5.000 dibagi sebanding harga (latte 3.333, roti 1.667).
+        $this->save([$this->line($this->latte, 2), $this->line($this->roti)], 45000)->assertOk()
+            ->assertJsonPath('data.items.0.promo', 'Paket Sarapan')
+            ->assertJsonPath('data.items.0.discount_total', 3333)
+            ->assertJsonPath('data.items.1.promo', 'Paket Sarapan')
+            ->assertJsonPath('data.items.1.discount_total', 1667)
+            ->assertJsonPath('data.promo_discount', 5000);
+        // Isi paket tidak lengkap → tanpa potongan.
+        $this->save([$this->line($this->latte, 2)], 40000)->assertOk()->assertJsonPath('data.items.0.promo', null);
+        // 2 set.
+        $this->save([$this->line($this->roti, 2), $this->line($this->latte, 1), $this->line($this->latte, 1)], 50000)->assertOk()
+            ->assertJsonPath('data.promo_discount', 10000);
     }
 }
