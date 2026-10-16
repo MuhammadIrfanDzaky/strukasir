@@ -136,6 +136,15 @@ class InventoryTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('unit');
     }
 
+    public function test_satuan_dasar_tambahan_diterima_dan_satuan_asing_ditolak(): void
+    {
+        foreach (['kg', 'L', 'butir', 'sachet', 'bungkus'] as $unit) {
+            $this->api('POST', '/api/v1/ingredients', $this->owner, ['name' => "Bahan {$unit}", 'unit' => $unit])->assertCreated();
+        }
+        $this->api('POST', '/api/v1/ingredients', $this->owner, ['name' => 'Bahan ons', 'unit' => 'ons'])
+            ->assertUnprocessable()->assertJsonValidationErrors('unit');
+    }
+
     public function test_pembelian_modal_rata_rata_bergerak_dan_kiriman_ulang_aman(): void
     {
         $susu = $this->ingredient('Susu', 'ml');

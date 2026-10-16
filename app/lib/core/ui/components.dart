@@ -339,3 +339,44 @@ class ChoiceTiles<T> extends StatelessWidget {
     });
   }
 }
+
+/// Pengatur angka −/+ dalam kotak bergaris (senada dengan isian & tombol segmen).
+class NumberStepper extends StatelessWidget {
+  const NumberStepper({super.key, required this.value, required this.onChanged, this.min = 1, this.max = 20});
+
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget button(IconData icon, VoidCallback? onPressed, String tooltip) => IconButton(
+          tooltip: tooltip,
+          onPressed: onPressed,
+          icon: Icon(icon, size: 20),
+          style: IconButton.styleFrom(
+            fixedSize: const Size.square(AppSize.touch),
+            foregroundColor: AppColors.ink,
+            disabledForegroundColor: AppColors.inkDisabled,
+            shape: const RoundedRectangleBorder(),
+          ),
+        );
+    const divider = SizedBox(height: AppSize.touch, child: VerticalDivider(width: 1, thickness: 1, color: AppColors.lineStrong));
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.smAll,
+        border: Border.all(color: AppColors.lineStrong),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        button(Icons.remove_rounded, value > min ? () => onChanged(value - 1) : null, 'Kurangi'),
+        divider,
+        SizedBox(width: 48, child: Text('$value', textAlign: TextAlign.center, style: AppType.title)),
+        divider,
+        button(Icons.add_rounded, value < max ? () => onChanged(value + 1) : null, 'Tambah'),
+      ]),
+    );
+  }
+}

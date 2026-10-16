@@ -259,14 +259,16 @@ class _PromoFormState extends ConsumerState<_PromoForm> {
           const SizedBox(height: AppSpace.s3),
           if (_type == 'bogo')
             // Wrap: di HP sempit pasangan "gratis [−1+]" turun ke baris berikutnya.
-            Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: AppSpace.s2, children: [
+            Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: AppSpace.s5, runSpacing: AppSpace.s2, children: [
               Row(mainAxisSize: MainAxisSize.min, children: [
                 const Text('Beli'),
-                _Stepper(value: _buy, onChanged: (v) => setState(() => _buy = v)),
+                const SizedBox(width: AppSpace.s3),
+                NumberStepper(value: _buy, onChanged: (v) => setState(() => _buy = v)),
               ]),
               Row(mainAxisSize: MainAxisSize.min, children: [
                 const Text('gratis'),
-                _Stepper(value: _free, onChanged: (v) => setState(() => _free = v)),
+                const SizedBox(width: AppSpace.s3),
+                NumberStepper(value: _free, onChanged: (v) => setState(() => _free = v)),
               ]),
             ])
           else
@@ -376,20 +378,6 @@ class _PromoFormState extends ConsumerState<_PromoForm> {
       ],
     );
   }
-}
-
-class _Stepper extends StatelessWidget {
-  const _Stepper({required this.value, required this.onChanged});
-
-  final int value;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-        IconButton(onPressed: value > 1 ? () => onChanged(value - 1) : null, icon: const Icon(Icons.remove_rounded)),
-        Text('$value', style: AppType.title),
-        IconButton(onPressed: value < 20 ? () => onChanged(value + 1) : null, icon: const Icon(Icons.add_rounded)),
-      ]);
 }
 
 class _VoucherForm extends ConsumerStatefulWidget {

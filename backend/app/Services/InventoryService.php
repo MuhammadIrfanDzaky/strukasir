@@ -25,7 +25,8 @@ use Illuminate\Validation\ValidationException;
  */
 class InventoryService
 {
-    public const UNITS = ['g', 'ml', 'pcs'];
+    /** Satuan dasar bahan (stok & resep memakai satuan ini). Urutan = urutan di aplikasi. */
+    public const UNITS = ['g', 'kg', 'ml', 'L', 'pcs', 'butir', 'lembar', 'potong', 'sachet', 'bungkus', 'botol', 'kaleng', 'cup', 'porsi', 'ikat', 'dus'];
 
     public const KINDS = [
         'purchase' => 'Pembelian',

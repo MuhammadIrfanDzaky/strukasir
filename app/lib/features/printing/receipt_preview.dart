@@ -18,8 +18,18 @@ class ReceiptPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final logo = logoBase64 == null || logoBase64!.isEmpty ? null : base64Decode(logoBase64!);
-    // Lebar 32 karakter monospace 13 px ≈ 250 px; logo diskalakan sama (384 titik → lebar kertas).
-    const paperWidth = 252.0;
+    // Lebar kertas = lebar nyata 32 karakter (tebal bisa lebih lebar di sebagian font monospace),
+    // supaya angka di kanan tidak terpotong. Logo diskalakan sama (384 titik → lebar kertas).
+    final scaler = MediaQuery.textScalerOf(context);
+    final base = DefaultTextStyle.of(context).style.merge(_style);
+    double measure(FontWeight? w) => (TextPainter(
+          text: TextSpan(text: 'W' * kLineWidth, style: base.copyWith(fontWeight: w)),
+          textDirection: TextDirection.ltr,
+          textScaler: scaler,
+          maxLines: 1,
+        )..layout())
+            .width;
+    final paperWidth = [measure(null), measure(FontWeight.w800)].reduce((a, b) => a > b ? a : b).ceilToDouble() + 2;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpace.s4, vertical: AppSpace.s5),

@@ -451,17 +451,18 @@ class _IngredientFormState extends ConsumerState<_IngredientForm> {
             decoration: const InputDecoration(labelText: 'Nama bahan', hintText: 'mis. Susu UHT', counterText: ''),
           ),
           const SizedBox(height: AppSpace.s3),
-          Text('Satuan dasar (pembelian boleh diisi kg / L)', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
-          const SizedBox(height: AppSpace.s1),
-          SegmentedButton<String>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: 'g', label: Text('gram')),
-              ButtonSegment(value: 'ml', label: Text('ml')),
-              ButtonSegment(value: 'pcs', label: Text('pcs')),
+          DropdownButtonFormField<String>(
+            initialValue: ingredientUnits.containsKey(_unit) ? _unit : null,
+            isExpanded: true,
+            menuMaxHeight: 360,
+            decoration: InputDecoration(
+              labelText: 'Satuan dasar',
+              helperText: bigUnit(_unit) == null ? 'Stok & resep dihitung dalam satuan ini.' : 'Pembelian boleh diisi dalam ${bigUnit(_unit)}.',
+            ),
+            items: [
+              for (final e in ingredientUnits.entries) DropdownMenuItem(value: e.key, child: Text(e.value)),
             ],
-            selected: {_unit},
-            onSelectionChanged: (v) => setState(() => _unit = v.first),
+            onChanged: (v) => setState(() => _unit = v ?? _unit),
           ),
           const SizedBox(height: AppSpace.s3),
           TextField(

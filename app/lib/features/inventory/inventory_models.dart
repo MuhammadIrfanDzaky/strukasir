@@ -135,6 +135,26 @@ String costPerUnit(double cost) {
   return 'Rp$s';
 }
 
+/// Satuan dasar bahan (sama dengan InventoryService::UNITS di server) → label di pilihan.
+const ingredientUnits = <String, String>{
+  'g': 'gram (g)',
+  'kg': 'kilogram (kg)',
+  'ml': 'mililiter (ml)',
+  'L': 'liter (L)',
+  'pcs': 'pcs',
+  'butir': 'butir',
+  'lembar': 'lembar',
+  'potong': 'potong',
+  'sachet': 'sachet',
+  'bungkus': 'bungkus',
+  'botol': 'botol',
+  'kaleng': 'kaleng',
+  'cup': 'cup',
+  'porsi': 'porsi',
+  'ikat': 'ikat',
+  'dus': 'dus',
+};
+
 /// Satuan besar untuk input pembelian (×1000): g → kg, ml → L.
 String? bigUnit(String unit) => switch (unit) {
   'g' => 'kg',
