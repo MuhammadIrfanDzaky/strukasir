@@ -12,6 +12,7 @@ import 'features/session/login_screen.dart';
 import 'features/session/session_controller.dart';
 import 'features/session/setup_screen.dart';
 import 'features/shift/shift_controller.dart';
+import 'features/subscription/subscription.dart';
 import 'features/update/version_gate.dart';
 import 'home_shell.dart';
 
@@ -88,6 +89,7 @@ class SessionGate extends ConsumerWidget {
       if (prev?.value is! LoggedIn && next.value is LoggedIn) {
         ref.invalidate(menuProvider);
         ref.invalidate(shiftProvider);
+        ref.invalidate(subscriptionProvider);
       }
       // Kasir keluar → keranjang yang belum selesai tidak diwariskan ke kasir berikutnya.
       if (prev?.value is LoggedIn && next.value is! LoggedIn) ref.invalidate(cartProvider);
