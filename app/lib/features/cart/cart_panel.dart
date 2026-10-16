@@ -9,6 +9,7 @@ import '../customers/customer_picker.dart';
 import '../customers/member_tier.dart';
 import '../loyalty/reward_dialog.dart';
 import '../promotions/voucher_dialog.dart';
+import '../subscription/locked_feature.dart';
 import '../menu/menu_controller.dart';
 import '../menu/modifier_selection.dart';
 import '../session/session_controller.dart';
@@ -473,6 +474,8 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         // Voucher & diskon order tidak bisa digabung (juga dengan hadiah potongan).
         final noRewardCut = reward == null || reward.isFreeProduct;
         final showVoucher = cart.voucher == null && (menu?.feature('promotions') ?? false) && !cart.isEmpty && cart.orderDiscount == null && noRewardCut;
+        // Owner di paket tanpa promo: tombol Voucher tetap ada, terkunci → ajakan upgrade.
+        final voucherLock = (user?.can('settings.manage') ?? false) && !cart.isEmpty ? menu?.locked('promotions') : null;
         final showDiscount = canDiscount && !cart.isEmpty && cart.voucher == null && noRewardCut;
         final breakdown = <Widget>[
           AppSummaryRow('Subtotal', rupiah(totals.subtotal)),
@@ -516,10 +519,15 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               ),
             ]),
           ],
-          if (showVoucher || showDiscount)
+          if (showVoucher || showDiscount || voucherLock != null)
             Padding(
               padding: const EdgeInsets.only(top: AppSpace.s1, bottom: AppSpace.s1),
               child: Row(children: [
+                if (voucherLock != null && !showVoucher)
+                  Expanded(
+                    child: _SideButton(label: 'Voucher', locked: true, onPressed: () => showLockedFeature(context, voucherLock)),
+                  ),
+                if (voucherLock != null && !showVoucher && showDiscount) const SizedBox(width: AppSpace.s2),
                 if (showVoucher)
                   Expanded(
                     child: _SideButton(
@@ -789,10 +797,13 @@ class CartPage extends ConsumerWidget {
 
 /// Tombol sekunder kecil di bawah subtotal (Voucher, Diskon): berlatar abu supaya terlihat bisa ditekan.
 class _SideButton extends StatelessWidget {
-  const _SideButton({required this.label, required this.onPressed});
+  const _SideButton({required this.label, required this.onPressed, this.locked = false});
 
   final String label;
   final VoidCallback? onPressed;
+
+  /// Fitur di luar paket: ikon gembok, ketuk → ajakan upgrade.
+  final bool locked;
 
   @override
   Widget build(BuildContext context) => FilledButton.tonal(
@@ -806,6 +817,9 @@ class _SideButton extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
           textStyle: AppType.label,
         ),
-        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (locked) ...[const Icon(Icons.lock_rounded, size: 16, color: AppColors.warning), const SizedBox(width: AppSpace.s1)],
+          Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis)),
+        ]),
       );
 }

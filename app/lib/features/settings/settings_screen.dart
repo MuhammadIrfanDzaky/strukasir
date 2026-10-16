@@ -16,6 +16,7 @@ import '../printing/printer_settings_screen.dart';
 import '../printing/receipt_settings_screen.dart';
 import '../printing/stations_screen.dart';
 import '../promotions/promotions_screen.dart';
+import '../subscription/locked_feature.dart';
 import '../session/session_controller.dart';
 import '../staff/staff_screen.dart';
 import 'feature_settings_screen.dart';
@@ -28,8 +29,8 @@ class _Item {
   final String subtitle;
   final VoidCallback onTap;
 
-  /// Status singkat di kanan (mis. nama printer belum dipilih).
-  final AppBadge? badge;
+  /// Status singkat di kanan (mis. nama printer belum dipilih, paket pembuka fitur terkunci).
+  final Widget? badge;
 
   /// Kata tambahan untuk pencarian.
   final String keywords;
@@ -107,6 +108,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     bool can(String p) => user?.can(p) ?? false;
     bool on(String f) => menu?.feature(f) ?? false;
     final owner = can('settings.manage');
+    // Fitur di luar paket tetap tampil (terkunci) untuk owner: ketuk → penjelasan & ajakan upgrade.
+    LockedFeature? lockedOf(String f) => owner ? menu?.locked(f) : null;
+    bool shown(String f) => on(f) || lockedOf(f) != null;
+    _Item gated(String feature, _Item item) {
+      final l = lockedOf(feature);
+      return l == null || on(feature)
+          ? item
+          : _Item(
+              title: item.title,
+              subtitle: item.subtitle,
+              keywords: '${item.keywords} upgrade paket',
+              badge: LockedBadge(l),
+              onTap: () => showLockedFeature(context, l),
+            );
+    }
 
     return [
       if (owner)
@@ -119,7 +135,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           _Item(
             title: 'Outlet',
-            subtitle: menu?.outlet == null ? 'Cabang & tablet per outlet' : 'Tablet ini di ${menu!.outlet!.name}',
+            subtitle: lockedOf('multi_outlet') != null
+                ? 'Tambah cabang mulai paket ${lockedOf('multi_outlet')!.planName}'
+                : menu?.outlet == null ? 'Cabang & tablet per outlet' : 'Tablet ini di ${menu!.outlet!.name}',
+            badge: lockedOf('multi_outlet') == null ? null : LockedBadge(lockedOf('multi_outlet')!),
             keywords: 'cabang toko tablet pindah',
             onTap: () => _open(const OutletsScreen()),
           ),
@@ -154,46 +173,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           onTap: () => _open(const StationsScreen()),
         ),
       ]),
-      if (owner && (on('promotions') || (on('inventory') && can('inventory.manage'))))
+      if (owner && (shown('promotions') || (shown('inventory') && (can('inventory.manage') || lockedOf('inventory') != null))))
         _Group('Penjualan & produk', [
-          if (on('promotions'))
-            _Item(
+          if (shown('promotions'))
+            gated('promotions', _Item(
               title: 'Promo & voucher',
-              subtitle: 'Happy hour, beli X gratis Y, kode voucher',
-              keywords: 'diskon',
+              subtitle: 'Happy hour, bundling, harga spesial, kode voucher',
+              keywords: 'diskon paket',
               onTap: () => _open(const PromotionsScreen()),
-            ),
-          if (on('inventory') && can('inventory.manage'))
-            _Item(
+            )),
+          if (shown('inventory') && (can('inventory.manage') || lockedOf('inventory') != null))
+            gated('inventory', _Item(
               title: 'Stok & resep',
               subtitle: 'Bahan baku, pembelian, opname, HPP',
               keywords: 'inventory gudang supplier',
               onTap: () => _open(const InventoryScreen()),
-            ),
+            )),
         ]),
-      if (owner && (on('loyalty') || on('member_tiers') || on('customer_messaging')))
+      if (owner && (shown('loyalty') || shown('member_tiers') || shown('customer_messaging')))
         _Group('Pelanggan', [
-          if (on('loyalty'))
-            _Item(
+          if (shown('loyalty'))
+            gated('loyalty', _Item(
               title: 'Program loyalitas',
               subtitle: 'Stempel / poin & hadiah',
               keywords: 'member reward',
               onTap: () => _open(const LoyaltySettingsScreen()),
-            ),
-          if (on('member_tiers'))
-            _Item(
+            )),
+          if (shown('member_tiers'))
+            gated('member_tiers', _Item(
               title: 'Tingkat member',
               subtitle: 'Silver, Gold: diskon & pengali stempel',
               keywords: 'tier level',
               onTap: () => _open(const TierSettingsScreen()),
-            ),
-          if (on('customer_messaging'))
-            _Item(
+            )),
+          if (shown('customer_messaging'))
+            gated('customer_messaging', _Item(
               title: 'Pesan WhatsApp',
               subtitle: 'Struk digital, ulang tahun, pengingat kasbon',
               keywords: 'wa template',
               onTap: () => _open(const MessageTemplatesScreen()),
-            ),
+            )),
+          if (lockedOf('customer_credit') != null)
+            gated('customer_credit', const _Item(
+              title: 'Kasbon pelanggan',
+              subtitle: 'Bayar nanti dengan batas, pelunasan di kasir, laporan piutang',
+              keywords: 'piutang hutang',
+              onTap: _noop,
+            )),
         ]),
       if (owner && device != null)
         _Group('Tablet ini', danger: true, [
@@ -397,3 +423,5 @@ class _VersionFooter extends StatelessWidget {
     ),
   );
 }
+
+void _noop() {}

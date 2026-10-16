@@ -49,6 +49,19 @@ class SubscriptionTest extends TestCase
         $this->assertNotContains('inventory', $res->json('data.plans.1.features'));
     }
 
+    public function test_menu_menyebut_fitur_terkunci_dan_paket_pembukanya(): void
+    {
+        $this->onPlan('gratis');
+        $locked = collect($this->api('GET', '/api/v1/menu', $this->owner)->assertOk()->json('locked_features'))->keyBy('key');
+        $this->assertSame('mulai', $locked['promotions']['plan']['code']);
+        $this->assertSame('Tumbuh', $locked['inventory']['plan']['name']);
+        $this->assertSame('Stok & resep', $locked['inventory']['label']);
+        $this->assertArrayNotHasKey('reports', $locked->all());
+
+        $this->onPlan('tumbuh', 'active', '+30 days');
+        $this->assertSame([], $this->api('GET', '/api/v1/menu', $this->owner)->json('locked_features'));
+    }
+
     public function test_owner_meminta_upgrade_kasir_tidak_boleh(): void
     {
         $this->onPlan('gratis');

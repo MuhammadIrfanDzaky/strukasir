@@ -5,6 +5,7 @@ import '../cart/pricing.dart';
 import '../customers/member_tier.dart';
 import '../loyalty/loyalty_models.dart';
 import '../promotions/promotion_models.dart';
+import '../subscription/locked_feature.dart';
 
 class MenuCategory {
   const MenuCategory({required this.id, required this.name, required this.sort, required this.active});
@@ -206,6 +207,7 @@ class Menu {
     this.memberTiers = const [],
     this.promotions = const [],
     this.utcOffset,
+    this.lockedFeatures = const [],
     required this.categories,
     required this.products,
     required this.modifierGroups,
@@ -225,6 +227,7 @@ class Menu {
         memberTiers: ((j['member_tiers'] as List?) ?? const []).cast<Map<String, dynamic>>().map(MemberTier.fromJson).toList(),
         promotions: ((j['promotions'] as List?) ?? const []).cast<Map<String, dynamic>>().map(Promotion.fromJson).toList(),
         utcOffset: (j['clock'] as Map<String, dynamic>?)?['utc_offset'] as int?,
+        lockedFeatures: ((j['locked_features'] as List?) ?? const []).cast<Map<String, dynamic>>().map(LockedFeature.fromJson).toList(),
         categories: (j['categories'] as List)
             .cast<Map<String, dynamic>>()
             .map(MenuCategory.fromJson)
@@ -270,6 +273,11 @@ class Menu {
 
   /// Selisih zona waktu kedai dari UTC (menit); jadwal promo dinilai dengan jam kedai (ShopClock).
   final int? utcOffset;
+
+  /// Fitur di luar paket + paket pembukanya (tampil terkunci ke owner).
+  final List<LockedFeature> lockedFeatures;
+
+  LockedFeature? locked(String key) => lockedFeatures.where((f) => f.key == key).firstOrNull;
   final List<MenuCategory> categories;
 
   bool feature(String key) => features[key] ?? false;

@@ -18,6 +18,7 @@ use App\Services\LoyaltyService;
 use App\Services\PromotionService;
 use App\Services\TierService;
 use App\Support\BusinessTemplate;
+use App\Support\PlanCatalog;
 use App\Support\Pricing\PricingSettings;
 use App\Support\Tenancy\FeatureGate;
 use Illuminate\Http\JsonResponse;
@@ -59,6 +60,8 @@ class MenuController extends Controller
                 'cashier_discount_limit_bp' => $settings->cashier_discount_limit_bp,
             ],
             'features' => $features,
+            // Fitur di luar paket (tampil terkunci + ajakan upgrade untuk owner); fitur yang dimatikan owner tidak termasuk.
+            'locked_features' => PlanCatalog::lockedFeatures($tenant?->plan?->code),
             // Label kolom nama di kasir ("meja" hanya untuk usaha makan di tempat).
             'customer_label_hint' => BusinessTemplate::customerLabelHint($tenant?->sector, $tenant?->sales_mode),
             // Form "Pelanggan baru" di kasir: no HP wajib atau boleh kosong (Pengaturan → Fitur).

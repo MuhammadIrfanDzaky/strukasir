@@ -79,6 +79,38 @@ final class PlanCatalog
         ];
     }
 
+    /**
+     * Fitur yang tidak ada di paket ini + paket publik termurah yang membukanya, untuk ditampilkan
+     * terkunci di aplikasi ("Buka di paket Tumbuh"). Paket tak dikenal → tidak ada yang terkunci.
+     *
+     * @return list<array{key: string, label: string, description: string, plan: array{code: string, name: string}}>
+     */
+    public static function lockedFeatures(?string $planCode): array
+    {
+        $plans = self::plans();
+        if ($planCode === null || ! isset($plans[$planCode])) {
+            return [];
+        }
+        $has = $plans[$planCode]['features'];
+        $public = array_filter($plans, fn ($p) => $p['public']);
+        uasort($public, fn ($a, $b) => $a['sort'] <=> $b['sort']);
+        $locked = [];
+        foreach (Feature::cases() as $f) {
+            if (in_array($f, $has, true)) {
+                continue;
+            }
+            foreach ($public as $code => $p) {
+                if ($p['sort'] > $plans[$planCode]['sort'] && in_array($f, $p['features'], true)) {
+                    $locked[] = ['key' => $f->value, 'label' => $f->label(), 'description' => $f->description(),
+                        'plan' => ['code' => $code, 'name' => $p['name']]];
+                    break;
+                }
+            }
+        }
+
+        return $locked;
+    }
+
     /** Buat/perbarui paket & fitur tiap paket (idempotent). */
     public static function sync(): void
     {

@@ -9,6 +9,7 @@ import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import '../menu/menu_controller.dart';
 import '../session/session_controller.dart';
+import '../subscription/locked_feature.dart';
 
 /// Satu fitur dari GET /settings/features.
 class FeatureOption {
@@ -312,9 +313,11 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
     final on = _on[o.key] ?? false;
     final locked = !o.available && !on; // di luar paket: hanya bisa dimatikan
     final error = _fieldErrors[o.key];
+    final unlock = locked ? ref.watch(menuProvider).value?.menu.locked(o.key) : null;
     return SwitchListTile(
       value: on,
-      onChanged: _busy || locked ? null : (v) => _toggle(o, v),
+      // Fitur terkunci: ketuk → penjelasan & ajakan upgrade (bukan sakelar mati tanpa penjelasan).
+      onChanged: _busy ? null : locked ? (unlock == null ? null : (_) => showLockedFeature(context, unlock)) : (v) => _toggle(o, v),
       title: Text(o.label, style: AppType.bodyStrong),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,7 +326,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
           if (locked) ...[
             const SizedBox(height: AppSpace.s1),
             // Teks biasa (bukan badge) supaya bisa terlipat di layar sempit.
-            Text('Tidak termasuk paket Anda',
+            Text(unlock == null ? 'Tidak termasuk paket Anda' : 'Buka di paket ${unlock.planName} · ketuk untuk lihat',
                 style: AppType.caption.copyWith(color: AppColors.warning, fontWeight: FontWeight.w700)),
           ],
           if (error != null) ...[
