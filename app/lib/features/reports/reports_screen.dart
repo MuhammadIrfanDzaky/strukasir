@@ -14,6 +14,7 @@ import '../inventory/inventory_screen.dart';
 import '../menu/menu_controller.dart';
 import '../outlets/outlets_screen.dart';
 import '../session/session_controller.dart';
+import '../subscription/locked_feature.dart';
 import 'dashboard_charts.dart';
 
 String _isoDate(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -546,6 +547,14 @@ class _Dashboard extends StatelessWidget {
           const DashSection('Pelanggan'),
           DashGrid(columns: cols, children: [..._customerCards(r), ?creditCard, ?tierCard, if (loyaltyUnit != null) _loyaltyCard(r, loyaltyUnit!)]),
         ],
+        // Owner di paket tanpa stok / member: laporan yang bisa dibuka dengan upgrade.
+        const Padding(
+          padding: EdgeInsets.only(top: AppSpace.s6),
+          child: LockedFeaturesPanel(
+            title: 'Laporan lain di paket lebih tinggi',
+            keys: ['inventory', 'member_tiers', 'loyalty', 'customer_credit', 'multi_outlet'],
+          ),
+        ),
         const SizedBox(height: AppSpace.s4),
         Text(
           'Penjualan = order lunas (void tidak dihitung). Laba kotor = penjualan − pajak − HPP; margin = laba kotor ÷ (penjualan − pajak).',

@@ -10,6 +10,7 @@ import '../../core/ui/components.dart';
 import '../../core/ui/csv_import.dart';
 import '../../core/ui/responsive.dart';
 import '../menu/menu_controller.dart';
+import '../subscription/locked_feature.dart';
 import 'customer_api.dart';
 import 'customer_form.dart';
 import 'credit_dialogs.dart';
@@ -354,6 +355,14 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             Padding(
               padding: EdgeInsets.fromLTRB(pad, pad, pad - AppSpace.s1, AppSpace.s2),
               child: Row(children: [Expanded(child: search), const SizedBox(width: AppSpace.s1), ...actions]),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(pad, 0, pad, AppSpace.s2),
+              child: const LockedFeaturesPanel(
+                compact: true,
+                title: 'Buka untuk member',
+                keys: ['loyalty', 'member_tiers', 'customer_credit', 'customer_messaging'],
+              ),
             ),
             chips,
             if (_segment != null)
