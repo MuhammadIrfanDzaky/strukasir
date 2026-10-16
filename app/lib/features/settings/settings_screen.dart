@@ -20,6 +20,7 @@ import '../subscription/locked_feature.dart';
 import '../session/session_controller.dart';
 import '../staff/staff_screen.dart';
 import 'feature_settings_screen.dart';
+import '../../core/ui/toast.dart';
 
 /// Satu baris pengaturan: judul (apa), keterangan (isi/status), lalu buka halaman atau jalankan aksi.
 class _Item {
@@ -91,7 +92,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
     if (ok != true || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
+    final messenger = AppToast.of(context);
     try {
       await ref.read(sessionProvider.notifier).unregisterDevice();
     } catch (e) {

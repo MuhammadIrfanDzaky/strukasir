@@ -10,6 +10,7 @@ import '../menu/menu_controller.dart';
 import '../menu/menu_models.dart';
 import 'menu_admin_api.dart';
 import 'product_import.dart';
+import '../../core/ui/toast.dart';
 
 /// Kelola menu oleh owner: produk, kategori, grup modifier.
 class MenuAdminScreen extends ConsumerWidget {
@@ -61,7 +62,7 @@ Future<bool> _run(BuildContext context, Future<void> Function() action) async {
   } on ApiException catch (e) {
     if (context.mounted) {
       final detail = e.fieldErrors.values.expand((v) => v).join('\n');
-      ScaffoldMessenger.of(context)
+      AppToast.of(context)
           .showSnackBar(SnackBar(content: Text(detail.isEmpty ? e.message : detail)));
     }
     return false;

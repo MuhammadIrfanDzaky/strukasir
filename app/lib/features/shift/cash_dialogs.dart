@@ -10,6 +10,7 @@ import '../../core/ui/components.dart';
 import '../cart/dialogs.dart' show ApprovalDialog;
 import '../cart/order_api.dart' show Approval;
 import '../session/session_controller.dart';
+import '../../core/ui/toast.dart';
 
 final cashApiProvider = Provider((ref) => CashApi(ref));
 
@@ -223,7 +224,7 @@ class _CashListState extends ConsumerState<_CashList> {
         return;
       } on ApiException catch (e) {
         if (e.field('approval') == null) {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+          if (mounted) AppToast.of(context).showSnackBar(SnackBar(content: Text(e.message)));
           return;
         }
         if (!mounted) return;

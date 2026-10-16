@@ -15,6 +15,7 @@ import '../session/session_controller.dart';
 import 'receipt_format.dart';
 import 'receipt_logo.dart';
 import 'receipt_preview.dart';
+import '../../core/ui/toast.dart';
 
 /// Owner mengatur identitas struk kedainya: logo, nama, alamat, dan pesan penutup.
 /// Pratinjau di layar memakai format yang sama persis dengan hasil cetak.
@@ -103,7 +104,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
       // Tablet mengambil identitas struk dari menu → muat ulang agar langsung dipakai & di-cache.
       await ref.read(menuProvider.notifier).refresh();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pengaturan struk disimpan.')));
+      AppToast.of(context).showSnackBar(const SnackBar(content: Text('Pengaturan struk disimpan.')));
       Navigator.of(context).pop();
     } on ApiException catch (e) {
       setState(() => _error = e.fieldErrors.values.expand((v) => v).firstOrNull ?? e.message);

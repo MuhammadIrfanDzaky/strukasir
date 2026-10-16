@@ -16,6 +16,7 @@ import '../session/session_controller.dart';
 import '../shift/shift_controller.dart';
 import '../customers/messaging.dart';
 import '../printing/stations.dart';
+import '../../core/ui/toast.dart';
 
 String _isoDate(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -228,7 +229,7 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
     final menu = ref.read(menuProvider).value?.menu;
     final stations = ref.read(stationsProvider).value ?? const <TicketStation>[];
     final items = orderTicketItems(o, (id) => menu?.product(id)?.categoryId ?? '');
-    final messenger = ScaffoldMessenger.of(context);
+    final messenger = AppToast.of(context);
     setState(() => _busy = true);
     try {
       for (final s in stations) {
@@ -334,7 +335,7 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
   }
 
   void _snack(String message) {
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    if (mounted) AppToast.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override

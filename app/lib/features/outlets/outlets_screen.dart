@@ -7,6 +7,7 @@ import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import '../menu/menu_controller.dart';
 import '../session/session_controller.dart';
+import '../../core/ui/toast.dart';
 
 /// Outlet / cabang usaha (fitur `multi_outlet`).
 class Outlet {
@@ -103,7 +104,7 @@ class OutletsScreen extends ConsumerWidget {
       ),
     );
     if (target == null || !context.mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
+    final messenger = AppToast.of(context);
     try {
       await ref.read(sessionProvider.notifier).authed((api, token) => api.put('/devices/${device['id']}/outlet', token: token, data: {'outlet_id': target}));
       ref.invalidate(outletsProvider);

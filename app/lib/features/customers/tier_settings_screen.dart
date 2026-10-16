@@ -10,6 +10,7 @@ import '../../core/ui/responsive.dart';
 import '../menu/menu_controller.dart';
 import '../session/session_controller.dart';
 import 'member_tier.dart';
+import '../../core/ui/toast.dart';
 
 const _windows = [null, 3, 6, 12, 24];
 
@@ -95,7 +96,7 @@ class _TierSettingsScreenState extends ConsumerState<TierSettingsScreen> {
       _apply(res['data'] as Map<String, dynamic>);
       await ref.read(menuProvider.notifier).refresh();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tingkat member disimpan. Semua tablet ikut berubah.')));
+      AppToast.of(context).showSnackBar(const SnackBar(content: Text('Tingkat member disimpan. Semua tablet ikut berubah.')));
       Navigator.of(context).maybePop();
     } on ApiException catch (e) {
       setState(() => _error = e.fieldErrors.isEmpty ? e.message : e.fieldErrors.values.first.first);

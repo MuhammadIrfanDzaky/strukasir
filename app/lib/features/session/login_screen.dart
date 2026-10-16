@@ -6,6 +6,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import 'session_controller.dart';
+import '../../core/ui/toast.dart';
 
 final staffProvider = FutureProvider.autoDispose<List<StaffMember>>(
     (ref) => ref.read(sessionProvider.notifier).staff());
@@ -145,7 +146,7 @@ class LoginScreen extends ConsumerWidget {
 Future<void> _leave(BuildContext context, WidgetRef ref, List<StaffMember> members) async {
   final owner = members.where((m) => m.role == 'owner').firstOrNull;
   if (owner == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    AppToast.of(context).showSnackBar(
         const SnackBar(content: Text('Daftar staf belum termuat. Ketuk muat ulang, lalu coba lagi.')));
     return;
   }

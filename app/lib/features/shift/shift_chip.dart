@@ -6,6 +6,7 @@ import '../../core/theme/tokens.dart';
 import 'cash_dialogs.dart';
 import 'shift_controller.dart';
 import 'shift_dialogs.dart';
+import '../../core/ui/toast.dart';
 
 /// Menu shift terbuka: kas keluar, kas masuk, catatan kas, tutup shift.
 Future<void> _menu(BuildContext context, WidgetRef ref) async {
@@ -36,7 +37,7 @@ Future<void> _menu(BuildContext context, WidgetRef ref) async {
   switch (action) {
     case 'out' || 'in':
       if (await showCashDialog(context, kind: action) && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(action == 'out' ? 'Kas keluar dicatat.' : 'Kas masuk dicatat.')));
+        AppToast.of(context).showSnackBar(SnackBar(content: Text(action == 'out' ? 'Kas keluar dicatat.' : 'Kas masuk dicatat.')));
       }
     case 'list':
       await showCashListDialog(context);

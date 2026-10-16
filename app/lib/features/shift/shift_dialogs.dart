@@ -11,6 +11,7 @@ import '../printing/printer_service.dart';
 import '../printing/receipt_format.dart';
 import '../session/session_controller.dart';
 import 'shift_controller.dart';
+import '../../core/ui/toast.dart';
 
 /// Minta modal awal lalu buka shift. Mengembalikan true jika shift terbuka.
 Future<bool> showOpenShiftDialog(BuildContext context, WidgetRef ref) async {
@@ -164,7 +165,7 @@ class ShiftResultDialog extends ConsumerWidget {
       actions: [
         // Laporan ke owner lewat WhatsApp (email terkirim otomatis bila diaktifkan).
         TextButton(onPressed: () async {
-            final messenger = ScaffoldMessenger.of(context);
+            final messenger = AppToast.of(context);
             try {
               final res = await ref.read(sessionProvider.notifier).authed((api, token) => api.get('/shifts/${shift['id']}/report', token: token));
               final url = (res['data'] as Map)['whatsapp_url'] as String?;
@@ -183,7 +184,7 @@ class ShiftResultDialog extends ConsumerWidget {
               await ref.read(printerProvider.notifier).printLines(shiftReport(shift));
             } on PrintException catch (e) {
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+                AppToast.of(context).showSnackBar(SnackBar(content: Text(e.message)));
               }
             }
           },

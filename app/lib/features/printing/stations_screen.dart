@@ -8,6 +8,7 @@ import '../../core/ui/responsive.dart';
 import '../menu/menu_controller.dart';
 import 'printer_service.dart';
 import 'stations.dart';
+import '../../core/ui/toast.dart';
 
 /// Pengaturan → Tiket bar / dapur (per tablet): stasiun, printernya, dan kategori yang dicetak.
 class StationsScreen extends ConsumerWidget {
@@ -31,7 +32,7 @@ class StationsScreen extends ConsumerWidget {
     }
 
     Future<void> test(TicketStation s) async {
-      final messenger = ScaffoldMessenger.of(context);
+      final messenger = AppToast.of(context);
       try {
         await ref.read(printerProvider.notifier).printTo(
               s.printerMac,

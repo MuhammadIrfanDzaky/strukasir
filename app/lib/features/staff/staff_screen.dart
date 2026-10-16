@@ -7,6 +7,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import '../session/session_controller.dart';
+import '../../core/ui/toast.dart';
 
 /// Pegawai di daftar Pengaturan → Pegawai.
 class Staff {
@@ -49,7 +50,7 @@ class StaffScreen extends ConsumerWidget {
     );
     if (saved != null && context.mounted) {
       ref.invalidate(staffListProvider);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(saved)));
+      AppToast.of(context).showSnackBar(SnackBar(content: Text(saved)));
     }
   }
 

@@ -10,6 +10,7 @@ import '../../core/ui/responsive.dart';
 import '../menu/menu_controller.dart';
 import '../session/session_controller.dart';
 import '../subscription/locked_feature.dart';
+import '../../core/ui/toast.dart';
 
 /// Satu fitur dari GET /settings/features.
 class FeatureOption {
@@ -149,7 +150,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
       }
     });
     if (note != null) {
-      ScaffoldMessenger.of(context)
+      AppToast.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(note!)));
     }
@@ -193,7 +194,7 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
       _apply(res['data'] as Map<String, dynamic>);
       await ref.read(menuProvider.notifier).refresh();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fitur disimpan. Semua tablet ikut berubah.')));
+      AppToast.of(context).showSnackBar(const SnackBar(content: Text('Fitur disimpan. Semua tablet ikut berubah.')));
       Navigator.of(context).maybePop();
     } on ApiException catch (e) {
       setState(() {

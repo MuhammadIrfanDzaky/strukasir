@@ -9,6 +9,7 @@ import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import '../session/session_controller.dart';
 import 'customer_api.dart';
+import '../../core/ui/toast.dart';
 import 'customer_form.dart' show formatDate;
 
 final messagingApiProvider = Provider((ref) => MessagingApi(ref));
@@ -44,7 +45,7 @@ class MessagingApi {
 
 /// Siapkan pesan lalu buka WhatsApp; kasir/owner tinggal menekan kirim. True bila WhatsApp terbuka.
 Future<bool> openWhatsApp(BuildContext context, WidgetRef ref, String customerId, String template, {String? orderId}) async {
-  final messenger = ScaffoldMessenger.of(context);
+  final messenger = AppToast.of(context);
   try {
     final msg = await ref.read(messagingApiProvider).prepare(customerId, template, orderId: orderId);
     final ok = await launchUrl(Uri.parse(msg['url'] as String), mode: LaunchMode.externalApplication);
@@ -234,10 +235,10 @@ class _MessageTemplatesScreenState extends ConsumerState<MessageTemplatesScreen>
     try {
       _apply(await ref.read(messagingApiProvider).saveTemplates({for (final e in _controllers.entries) e.key: e.value.text}));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Template pesan disimpan.')));
+      AppToast.of(context).showSnackBar(const SnackBar(content: Text('Template pesan disimpan.')));
       Navigator.of(context).maybePop();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) AppToast.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

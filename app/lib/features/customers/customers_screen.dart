@@ -17,6 +17,7 @@ import 'credit_dialogs.dart';
 import 'customer_picker.dart';
 import 'member_tier.dart';
 import 'messaging.dart';
+import '../../core/ui/toast.dart';
 
 /// Kelompok pelanggan (sama dengan server: CustomerService::SEGMENTS).
 const _segments = [
@@ -435,7 +436,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
       await ref.read(customerApiProvider).setCreditLimit(c.id, r.$2);
       _load();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) AppToast.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -466,7 +467,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
       _changed = true;
       _load();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.fieldErrors.values.expand((v) => v).firstOrNull ?? e.message)));
+      if (mounted) AppToast.of(context).showSnackBar(SnackBar(content: Text(e.fieldErrors.values.expand((v) => v).firstOrNull ?? e.message)));
     }
   }
 
@@ -498,7 +499,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
       _changed = true;
       _load();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) AppToast.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -511,7 +512,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
       _changed = true;
       _load();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) AppToast.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -543,10 +544,10 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     try {
       await ref.read(customerApiProvider).anonymize(c.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data pribadi pelanggan sudah dihapus.')));
+      AppToast.of(context).showSnackBar(const SnackBar(content: Text('Data pribadi pelanggan sudah dihapus.')));
       Navigator.pop(context, true);
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) AppToast.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 

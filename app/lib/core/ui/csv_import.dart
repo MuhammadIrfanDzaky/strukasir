@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../api_client.dart';
 import '../theme/tokens.dart';
 import 'components.dart';
+import 'toast.dart';
 
 /// Isi alur import CSV: teks penjelasan format, cara memanggil server, dan ringkasan hasilnya.
 class CsvImportSpec {
@@ -86,7 +87,7 @@ String _decode(List<int> bytes) {
 }
 
 void _snack(BuildContext context, String message) =>
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    AppToast.of(context).showSnackBar(SnackBar(content: Text(message)));
 
 /// Jalankan [task] sambil menampilkan dialog "Memeriksa…"; error API → snackbar & null.
 Future<Map<String, dynamic>?> _withProgress(BuildContext context, Future<Map<String, dynamic>> Function() task) async {

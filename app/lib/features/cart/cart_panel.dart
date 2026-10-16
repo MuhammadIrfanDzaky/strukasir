@@ -17,6 +17,7 @@ import 'cart_controller.dart';
 import 'checkout_flow.dart';
 import 'dialogs.dart';
 import 'order_api.dart';
+import '../../core/ui/toast.dart';
 
 /// Letak panel keranjang: samping katalog (tablet landscape), bawah katalog (tablet portrait),
 /// atau halaman penuh (HP).
@@ -89,7 +90,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
     ref.read(cartProvider.notifier).setCustomer(CartCustomer(
       id: c.id, code: c.code, name: c.name, phone: c.phone, visits: c.visits, note: c.note,
       balance: c.balance, tier: c.tier, creditBalance: left, creditLimit: c.creditLimit));
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pelunasan kasbon dicatat. Sisa ${rp(left)}.')));
+    AppToast.of(context).showSnackBar(SnackBar(content: Text('Pelunasan kasbon dicatat. Sisa ${rp(left)}.')));
   }
 
   /// Tukar hadiah dengan saldo member.

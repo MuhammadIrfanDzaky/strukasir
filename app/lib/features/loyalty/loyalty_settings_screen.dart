@@ -11,6 +11,7 @@ import '../menu/menu_controller.dart';
 import '../menu/menu_models.dart';
 import '../session/session_controller.dart';
 import 'loyalty_models.dart';
+import '../../core/ui/toast.dart';
 
 /// Hadiah yang sedang disunting (id null = baru).
 class _RewardDraft {
@@ -171,7 +172,7 @@ class _LoyaltySettingsScreenState extends ConsumerState<LoyaltySettingsScreen> {
       _apply(res['data'] as Map<String, dynamic>);
       await ref.read(menuProvider.notifier).refresh();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Program loyalitas disimpan. Semua tablet ikut berubah.')));
+      AppToast.of(context).showSnackBar(const SnackBar(content: Text('Program loyalitas disimpan. Semua tablet ikut berubah.')));
       Navigator.of(context).maybePop();
     } on ApiException catch (e) {
       setState(() {

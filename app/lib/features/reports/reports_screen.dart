@@ -16,6 +16,7 @@ import '../outlets/outlets_screen.dart';
 import '../session/session_controller.dart';
 import '../subscription/locked_feature.dart';
 import 'dashboard_charts.dart';
+import '../../core/ui/toast.dart';
 
 String _isoDate(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -87,7 +88,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       ),
     );
     if (type == null || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
+    final messenger = AppToast.of(context);
     try {
       final res = await ref
           .read(sessionProvider.notifier)

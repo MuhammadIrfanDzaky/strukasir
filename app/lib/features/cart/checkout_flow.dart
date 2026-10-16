@@ -16,6 +16,7 @@ import 'cart_controller.dart';
 import 'dialogs.dart';
 import 'order_api.dart';
 import 'payment_dialog.dart';
+import '../../core/ui/toast.dart';
 
 /// Alur kasir: simpan → (bayar) → cetak. Prinsip:
 /// - Uang tidak pernah "hilang": ID order & pembayaran dibuat tablet, kirim ulang aman.
@@ -228,7 +229,7 @@ class CheckoutFlow {
           );
     } on PrintException catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      AppToast.of(context).showSnackBar(SnackBar(
         duration: const Duration(seconds: 10),
         content: Text('Transaksi tersimpan, tapi struk gagal dicetak: ${e.message}'),
         action: SnackBarAction(label: 'Cetak ulang', onPressed: () => _print(order)),
@@ -272,6 +273,6 @@ class CheckoutFlow {
       );
 
   void _snack(String message) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    if (context.mounted) AppToast.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 }

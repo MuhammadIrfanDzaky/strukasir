@@ -11,6 +11,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
 import '../../core/ui/responsive.dart';
 import '../session/session_controller.dart';
+import '../../core/ui/toast.dart';
 
 /// Satu paket dari server (GET /signup/options → `plans`, GET /subscription → `plans`).
 class PlanInfo {
@@ -568,14 +569,14 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
       );
       ref.invalidate(subscriptionProvider);
       if (paid == true && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pembayaran diterima. Paket ${plan.name} aktif.')));
+        AppToast.of(context).showSnackBar(SnackBar(content: Text('Pembayaran diterima. Paket ${plan.name} aktif.')));
       }
     } on ApiException catch (e) {
       if (!mounted) return;
       if (e.status == 503) {
         await _request(plan, discount);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        AppToast.of(context).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -601,7 +602,7 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
         ),
       );
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) AppToast.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -853,7 +854,7 @@ class _ReferralCard extends StatelessWidget {
               OutlinedButton(
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: info.code));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kode referral disalin')));
+                  AppToast.of(context).showSnackBar(const SnackBar(content: Text('Kode referral disalin')));
                 },
                 child: const Text('Salin kode'),
               ),

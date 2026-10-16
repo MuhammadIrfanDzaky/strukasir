@@ -13,6 +13,7 @@ import '../printing/printer_service.dart';
 import '../printing/receipt_format.dart';
 import '../session/session_controller.dart';
 import 'customer_api.dart';
+import '../../core/ui/toast.dart';
 
 /// Catat pelunasan kasbon (kasir/owner, di shift terbuka) lalu cetak bukti. Mengembalikan sisa kasbon,
 /// atau null bila dibatalkan.
@@ -81,7 +82,7 @@ class _RepayDialogState extends ConsumerState<_RepayDialog> {
               logoBase64: ref.read(menuProvider).value?.menu.receipt.logoBase64,
             );
       } on PrintException catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pelunasan tercatat, bukti gagal dicetak: ${e.message}')));
+        if (mounted) AppToast.of(context).showSnackBar(SnackBar(content: Text('Pelunasan tercatat, bukti gagal dicetak: ${e.message}')));
       }
       if (mounted) Navigator.pop(context, res['balance'] as int);
     } on ApiException catch (e) {
