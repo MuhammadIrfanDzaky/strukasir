@@ -5,6 +5,7 @@ import '../../core/api_client.dart';
 import '../../core/money.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/ui/components.dart';
+import '../printing/receipt_format.dart' show orderLabel;
 import '../session/login_screen.dart';
 import '../session/session_controller.dart';
 import 'order_api.dart';
@@ -174,7 +175,7 @@ class OpenBillsDialog extends ConsumerWidget {
               itemBuilder: (_, i) {
                 final o = orders[i];
                 return ListTile(
-                  title: Text('${o['number']}  ·  ${(o['customer_label'] as String?) ?? '-'}'),
+                  title: Text('${o['number']}  ·  ${orderLabel(o) ?? '-'}'),
                   subtitle: Text((o['items'] as List)
                       .cast<Map<String, dynamic>>()
                       .map((it) => '${it['qty']}x ${it['name']}')

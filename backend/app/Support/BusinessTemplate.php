@@ -7,6 +7,7 @@ use App\Enums\BusinessSector;
 use App\Enums\Feature;
 use App\Enums\SalesMode;
 use App\Models\Category;
+use App\Models\TenantSetting;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -23,6 +24,9 @@ final readonly class BusinessTemplate
     public function __construct(
         public array $features,
         public array $categories,
+        // Pilihan Takeaway | Dine-in di kasir & jenis awalnya (bisa diubah di Pengaturan → Fitur).
+        public bool $orderTypes = false,
+        public string $defaultOrderType = 'takeaway',
     ) {}
 
     public static function for(BusinessSector $sector, ?SalesMode $mode): self
@@ -52,6 +56,8 @@ final readonly class BusinessTemplate
                 Feature::SplitPayment->value => true,
             ],
             categories: self::categories($sector),
+            orderTypes: $sector->servesDineIn() && $mode !== SalesMode::Takeaway,
+            defaultOrderType: $sector === BusinessSector::Restaurant || $mode === SalesMode::DineIn ? 'dine_in' : 'takeaway',
         );
     }
 
@@ -107,11 +113,20 @@ final readonly class BusinessTemplate
         foreach ($this->categories as $i => $name) {
             (new Category(['name' => $name, 'sort' => $i + 1]))->save();
         }
+
+        TenantSetting::query()->update([
+            'order_types_enabled' => $this->orderTypes,
+            'default_order_type' => $this->defaultOrderType,
+        ]);
     }
 
     /** Label kolom nama di kasir: "meja" hanya untuk usaha makanan yang melayani makan di tempat. */
-    public static function customerLabelHint(?BusinessSector $sector, ?SalesMode $mode): string
+    public static function customerLabelHint(?BusinessSector $sector, ?SalesMode $mode, bool $orderTypes = false): string
     {
+        // Jenis pesanan aktif: meja punya kolom sendiri (Dine-in), kolom ini cukup nama.
+        if ($orderTypes) {
+            return 'Nama pelanggan';
+        }
         // Kedai lama (tanpa profil) = kedai makan seperti BerryBrew.
         if ($sector === null) {
             return 'Nama pelanggan / meja';

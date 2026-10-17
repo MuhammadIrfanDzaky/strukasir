@@ -78,6 +78,24 @@ class PrintLine {
 List<PrintLine> _plain(Iterable<String> lines) => [for (final l in lines) PrintLine(l)];
 List<PrintLine> _bold(Iterable<String> lines) => [for (final l in lines) PrintLine(l, bold: true)];
 
+/// "DINE-IN · Meja 5" / "TAKEAWAY" (null = order tanpa jenis pesanan).
+String? orderTypeLine(Map<String, dynamic> order) {
+  final table = (order['table_label'] as String?)?.trim() ?? '';
+  return switch (order['order_type']) {
+    'dine_in' => table.isEmpty ? 'DINE-IN' : 'DINE-IN · Meja $table',
+    'takeaway' => 'TAKEAWAY',
+    _ => null,
+  };
+}
+
+/// Label order di daftar (open bill, riwayat): "Meja 5 · Budi", "Budi", atau null.
+String? orderLabel(Map<String, dynamic> order) {
+  final table = (order['table_label'] as String?)?.trim() ?? '';
+  final name = (order['customer_label'] as String?)?.trim() ?? '';
+  final parts = [if (table.isNotEmpty) 'Meja $table', if (name.isNotEmpty) name];
+  return parts.isEmpty ? null : parts.join(' · ');
+}
+
 /// Struk pelanggan, mengikuti format struk BerryBrew: identitas kedai, Date/Cashier/Customer/
 /// Transaction No, item (nama tebal + pilihan), ringkasan, pembayaran, lalu pesan penutup.
 /// Logo (bila ada) dicetak printer di atas baris pertama. `paid=false` → bill "BELUM DIBAYAR".
@@ -95,6 +113,7 @@ List<PrintLine> customerReceipt(Map<String, dynamic> order) {
     if (header.isNotEmpty)
       for (final l in header.split('\n')) ..._plain(wrap(l).map(center)),
     PrintLine(divider()),
+    if (orderTypeLine(order) case final String type) PrintLine(center(type), bold: true),
     PrintLine('Date: ${_time((order['paid_at'] ?? order['created_at']) as String)}'),
     if (order['cashier'] != null) ..._plain(wrap('Cashier: ${order['cashier']}')),
     if ((order['customer_label'] as String?)?.isNotEmpty ?? false) ..._plain(wrap('Customer: ${order['customer_label']}')),

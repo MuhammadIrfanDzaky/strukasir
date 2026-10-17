@@ -208,6 +208,8 @@ class Menu {
     this.promotions = const [],
     this.utcOffset,
     this.lockedFeatures = const [],
+    this.orderTypesOn = false,
+    this.defaultOrderType = 'takeaway',
     required this.categories,
     required this.products,
     required this.modifierGroups,
@@ -227,6 +229,8 @@ class Menu {
         memberTiers: ((j['member_tiers'] as List?) ?? const []).cast<Map<String, dynamic>>().map(MemberTier.fromJson).toList(),
         promotions: ((j['promotions'] as List?) ?? const []).cast<Map<String, dynamic>>().map(Promotion.fromJson).toList(),
         utcOffset: (j['clock'] as Map<String, dynamic>?)?['utc_offset'] as int?,
+        orderTypesOn: (j['order_types'] as Map<String, dynamic>?)?['enabled'] as bool? ?? false,
+        defaultOrderType: (j['order_types'] as Map<String, dynamic>?)?['default'] as String? ?? 'takeaway',
         lockedFeatures: ((j['locked_features'] as List?) ?? const []).cast<Map<String, dynamic>>().map(LockedFeature.fromJson).toList(),
         categories: (j['categories'] as List)
             .cast<Map<String, dynamic>>()
@@ -273,6 +277,10 @@ class Menu {
 
   /// Selisih zona waktu kedai dari UTC (menit); jadwal promo dinilai dengan jam kedai (ShopClock).
   final int? utcOffset;
+
+  /// Pilihan Takeaway | Dine-in di kasir (service charge hanya untuk dine-in) & jenis awal order baru.
+  final bool orderTypesOn;
+  final String defaultOrderType;
 
   /// Fitur di luar paket + paket pembukanya (tampil terkunci ke owner).
   final List<LockedFeature> lockedFeatures;

@@ -44,7 +44,8 @@ class SignupRequest extends FormRequest
             // "Lainnya" → wajib sebutkan (bahan template baru).
             'sector_other' => ['nullable', 'required_if:sector,other', 'string', 'max:60'],
             // Hanya usaha makanan & minuman yang ditanya cara berjualan; selain itu diabaikan.
-            'sales_mode' => [Rule::requiredIf(fn () => $this->sector()?->asksSalesMode() ?? false), 'nullable', Rule::enum(SalesMode::class)],
+            // Aplikasi lama masih mengirim cara berjualan; kini opsional (jenis pesanan diatur di Pengaturan → Fitur).
+            'sales_mode' => ['nullable', Rule::enum(SalesMode::class)],
             'province_code' => ['required', 'string', function (string $attribute, mixed $value, Closure $fail) {
                 if (! is_string($value) || ! Regions::provinceExists($value)) {
                     $fail('Pilih provinsi dari daftar.');

@@ -112,6 +112,7 @@ List<PrintLine> kitchenTicket({
   required DateTime at,
   bool addition = false,
   bool reprint = false,
+  String? orderType,
 }) {
   final time = '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
   return [
@@ -120,6 +121,8 @@ List<PrintLine> kitchenTicket({
     if (reprint) PrintLine(center('(cetak ulang)')),
     PrintLine(divider()),
     PrintLine(leftRight(number, time).first, bold: true),
+    // Bar/dapur perlu tahu: dibungkus atau diantar ke meja berapa.
+    if (orderType != null) ...wrap(orderType).map((l) => PrintLine(l, bold: true)),
     if (label != null && label.trim().isNotEmpty) ...wrap(label.trim()).map((l) => PrintLine(l, bold: true)),
     PrintLine(divider()),
     for (final i in items) ...[

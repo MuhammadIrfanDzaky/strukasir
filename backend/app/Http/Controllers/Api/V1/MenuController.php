@@ -63,7 +63,9 @@ class MenuController extends Controller
             // Fitur di luar paket (tampil terkunci + ajakan upgrade untuk owner); fitur yang dimatikan owner tidak termasuk.
             'locked_features' => PlanCatalog::lockedFeatures($tenant?->plan?->code),
             // Label kolom nama di kasir ("meja" hanya untuk usaha makan di tempat).
-            'customer_label_hint' => BusinessTemplate::customerLabelHint($tenant?->sector, $tenant?->sales_mode),
+            'customer_label_hint' => BusinessTemplate::customerLabelHint($tenant?->sector, $tenant?->sales_mode, (bool) $settings->order_types_enabled),
+            // Pilihan Takeaway | Dine-in di kasir; service charge hanya untuk dine-in bila aktif.
+            'order_types' => ['enabled' => (bool) $settings->order_types_enabled, 'default' => $settings->default_order_type],
             // Form "Pelanggan baru" di kasir: no HP wajib atau boleh kosong (Pengaturan → Fitur).
             'customer_phone_required' => $settings->customer_phone_required,
             // Program loyalitas + hadiah aktif (null bila tidak berjalan): kasir menukar hadiah & melihat

@@ -101,6 +101,12 @@ enum BusinessSector: string
         };
     }
 
+    /** Usaha yang lazim melayani makan di tempat: pilihan Takeaway | Dine-in aktif sejak daftar. */
+    public function servesDineIn(): bool
+    {
+        return in_array($this, [self::CoffeeShop, self::Restaurant, self::StreetFood, self::Bakery, self::Beverage], true);
+    }
+
     /** Hanya usaha makanan & minuman yang ditanya cara berjualan (bawa pulang / makan di tempat). */
     public function asksSalesMode(): bool
     {

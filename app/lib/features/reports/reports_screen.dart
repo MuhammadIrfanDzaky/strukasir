@@ -331,6 +331,22 @@ class _Dashboard extends StatelessWidget {
       ],
     );
 
+    // Takeaway vs dine-in (hanya bila jenis pesanan pernah aktif di periode ini).
+    final byType = (r['by_order_type'] as Map?)?.cast<String, dynamic>();
+    int typeVal(String t, String k) => ((byType?[t] as Map?)?[k] as int?) ?? 0;
+    final typeCard = byType == null
+        ? null
+        : DashPanel(
+            title: 'Takeaway vs Dine-in',
+            subtitle: '${typeVal('takeaway', 'orders')} takeaway · ${typeVal('dine_in', 'orders')} dine-in',
+            children: [
+              ShareBar(parts: [
+                ('Takeaway', typeVal('takeaway', 'sales'), ChartColors.cash),
+                ('Dine-in', typeVal('dine_in', 'sales'), ChartColors.debit),
+              ]),
+            ],
+          );
+
     // ── laba-rugi ──
     final expenses = (r['expenses'] as Map?)?.cast<String, dynamic>() ?? const {};
     final expenseTotal = expenses['total'] as int? ?? 0;
@@ -541,7 +557,7 @@ class _Dashboard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpace.s3),
         ],
-        DashGrid(columns: cols, children: [hourCard, ?dayCard]),
+        DashGrid(columns: cols, children: [hourCard, ?dayCard, ?typeCard]),
         const DashSection('Produk & tim'),
         DashGrid(columns: cols, children: [productCard, categoryCard, cashierCard, ?outletCard, ?promoCard]),
         if (customersOn) ...[

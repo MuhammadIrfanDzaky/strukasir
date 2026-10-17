@@ -16,10 +16,11 @@ final readonly class PricingSettings
     ) {}
 
     /** Service/pajak hanya berlaku bila fitur tax_service aktif DAN dinyalakan di pengaturan kedai. */
-    public static function fromTenant(TenantSetting $s, bool $taxServiceFeature): self
+    public static function fromTenant(TenantSetting $s, bool $taxServiceFeature, bool $service = true): self
     {
         return new self(
-            serviceBp: $taxServiceFeature && $s->service_enabled ? $s->service_rate_bp : 0,
+            // $service false = pesanan takeaway (service charge hanya untuk dine-in).
+            serviceBp: $service && $taxServiceFeature && $s->service_enabled ? $s->service_rate_bp : 0,
             taxBp: $taxServiceFeature && $s->tax_enabled ? $s->tax_rate_bp : 0,
             roundingUnit: $s->rounding_unit,
             serviceInclusive: (bool) $s->service_inclusive,

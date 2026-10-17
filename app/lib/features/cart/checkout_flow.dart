@@ -126,6 +126,7 @@ class CheckoutFlow {
             station: s.name,
             number: order['number'] as String,
             label: order['customer_label'] as String?,
+            orderType: orderTypeLine(order),
             items: items,
             at: DateTime.now(),
             addition: addition,

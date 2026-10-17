@@ -90,7 +90,18 @@ class CartState {
     this.ticketed = const {},
     this.voucher,
     this.createdAt,
+    this.orderType,
+    this.tableLabel = '',
   });
+
+  /// takeaway | dine_in; null = jenis awal kedai (Menu.defaultOrderType). Dipakai bila fitur aktif.
+  final String? orderType;
+
+  /// Nomor meja (dine-in).
+  final String tableLabel;
+
+  /// Jenis pesanan yang berlaku (null = fitur jenis pesanan mati).
+  String? typeIn(Menu menu) => menu.orderTypesOn ? (orderType ?? menu.defaultOrderType) : null;
 
   /// Jam open bill dibuat di server (UTC); null = order baru. Jadwal promo dinilai pada jam ini.
   final DateTime? createdAt;
@@ -135,6 +146,8 @@ class CartState {
     Map<String, int>? ticketed,
     VoucherTerms? voucher,
     bool clearVoucher = false,
+    String? orderType,
+    String? tableLabel,
   }) =>
       CartState(
         orderId: orderId,
@@ -148,10 +161,14 @@ class CartState {
         ticketed: ticketed ?? this.ticketed,
         voucher: clearVoucher ? null : (voucher ?? this.voucher),
         createdAt: createdAt,
+        orderType: orderType ?? this.orderType,
+        tableLabel: tableLabel ?? this.tableLabel,
       );
 
   Map<String, dynamic> toJson(int expectedTotal) => {
         'customer_label': customerLabel.trim().isEmpty ? null : customerLabel.trim(),
+        'order_type': ?orderType,
+        if (tableLabel.trim().isNotEmpty) 'table_label': tableLabel.trim(),
         'customer_id': customer?.id,
         if (customer != null) 'tier_id': customer!.tier?.id,
         if (reward != null) 'reward': {'id': reward!.id, 'item_id': rewardItemId},
@@ -195,6 +212,8 @@ final cartTotalsProvider = Provider<PricingResult>((ref) {
 PricingResult priceCart(CartState cart, Menu menu, {DateTime? at}) {
   final reward = cart.reward;
   final benefits = lineBenefits(cart, menu, at ?? promoTime(cart, menu));
+  // Service charge hanya untuk dine-in bila jenis pesanan aktif (sama dengan OrderService).
+  final pricing = cart.typeIn(menu) == 'takeaway' ? menu.pricing.withoutService() : menu.pricing;
   final lines = [
     for (final (i, l) in cart.lines.indexed)
       PricingLine(
@@ -210,14 +229,14 @@ PricingResult priceCart(CartState cart, Menu menu, {DateTime? at}) {
     if (reward.type == 'percent') {
       orderDiscount = Discount.percent(reward.value);
     } else {
-      final subtotal = calculatePrice(lines, null, menu.pricing).subtotal;
+      final subtotal = calculatePrice(lines, null, pricing).subtotal;
       orderDiscount = Discount.amount(reward.value < subtotal ? reward.value : subtotal);
     }
   } else if (cart.voucher != null && orderDiscount == null) {
-    final d = cart.voucher!.discountFor(calculatePrice(lines, null, menu.pricing).subtotal);
+    final d = cart.voucher!.discountFor(calculatePrice(lines, null, pricing).subtotal);
     if (d > 0) orderDiscount = Discount.amount(d);
   }
-  return calculatePrice(lines, orderDiscount, menu.pricing);
+  return calculatePrice(lines, orderDiscount, pricing);
 }
 
 /// Diskon otomatis satu baris; lihat [lineBenefits].
@@ -344,6 +363,10 @@ class CartController extends Notifier<CartState> {
 
   void setCustomerLabel(String label) => state = state.copyWith(customerLabel: label);
 
+  void setOrderType(String type) => state = state.copyWith(orderType: type);
+
+  void setTableLabel(String label) => state = state.copyWith(tableLabel: label);
+
   /// Tautkan member. Kolom nama yang masih kosong diisi nama member (tetap bisa diganti, mis. "Meja 5").
   void setCustomer(CartCustomer customer) => state = state.copyWith(
         customer: customer,
@@ -443,6 +466,8 @@ class CartController extends Notifier<CartState> {
     state = CartState(
       orderId: order['id'] as String,
       createdAt: DateTime.tryParse(order['created_at'] as String? ?? '')?.toUtc(),
+      orderType: order['order_type'] as String?,
+      tableLabel: order['table_label'] as String? ?? '',
       lines: lines,
       customerLabel: order['customer_label'] as String? ?? '',
       customer: customer == null

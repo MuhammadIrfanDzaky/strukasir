@@ -42,6 +42,10 @@ class PricingSettings {
   final int taxBp;
   final int roundingUnit;
 
+  /// Pesanan takeaway: tanpa service charge (sama dengan server).
+  PricingSettings withoutService() => PricingSettings(
+      taxBp: taxBp, roundingUnit: roundingUnit, serviceInclusive: serviceInclusive, taxInclusive: taxInclusive);
+
   /// Harga di menu sudah termasuk service / pajak.
   final bool serviceInclusive;
   final bool taxInclusive;

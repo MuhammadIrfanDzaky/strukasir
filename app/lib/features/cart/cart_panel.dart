@@ -60,9 +60,18 @@ class _CartPanelState extends ConsumerState<CartPanel> {
   /// Nama pelanggan / meja wajib sebelum Cek pesanan, Open Bill, atau Bayar.
   /// Fitur "Nama pelanggan / meja" dimatikan → kolom disembunyikan dan tidak wajib.
   bool _requireLabel() {
-    if (!(ref.read(menuProvider).value?.menu.customerNameOn ?? true)) return true;
-    if (ref.read(cartProvider).customerLabel.trim().isNotEmpty) return true;
-    final hint = ref.read(menuProvider).value?.menu.customerLabelHint ?? 'Nama pelanggan / meja';
+    final menu = ref.read(menuProvider).value?.menu;
+    final cart = ref.read(cartProvider);
+    // Dine-in: nomor meja selalu wajib (bar/dapur perlu tahu diantar ke mana).
+    if (menu != null && cart.typeIn(menu) == 'dine_in') {
+      if (cart.tableLabel.trim().isNotEmpty) return true;
+      setState(() => _labelError = 'Isi nomor meja dulu');
+      _labelFocus.requestFocus();
+      return false;
+    }
+    if (!(menu?.customerNameOn ?? true)) return true;
+    if (cart.customerLabel.trim().isNotEmpty) return true;
+    final hint = menu?.customerLabelHint ?? 'Nama pelanggan / meja';
     setState(() => _labelError = 'Isi ${hint.toLowerCase()} dulu');
     _labelFocus.requestFocus();
     return false;
@@ -117,6 +126,12 @@ class _CartPanelState extends ConsumerState<CartPanel> {
       final count = cart.lines.fold<int>(0, (n, l) => n + l.qty);
       final pricing = ref.read(menuProvider).value?.menu.pricing;
       final pricingMenu = ref.read(menuProvider).value?.menu;
+      final dineIn = pricingMenu != null && cart.typeIn(pricingMenu) == 'dine_in';
+      final who = [
+        if (pricingMenu != null && cart.typeIn(pricingMenu) == 'takeaway') 'Takeaway',
+        if (dineIn) cart.tableLabel.trim().isEmpty ? 'Dine-in' : 'Dine-in · Meja ${cart.tableLabel.trim()}',
+        if (cart.customerLabel.trim().isNotEmpty) cart.customerLabel.trim(),
+      ];
       return AlertDialog(
         scrollable: true,
         title: Text(cart.isSaved ? 'Cek pesanan · ${cart.number}' : 'Cek pesanan'),
@@ -131,8 +146,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                   const Icon(Icons.person_outline_rounded, size: 20, color: AppColors.inkMuted),
                   const SizedBox(width: AppSpace.s2),
                   Expanded(
-                    child: Text(cart.customerLabel.trim().isEmpty ? 'Pesanan' : cart.customerLabel.trim(),
-                        style: AppType.title),
+                    child: Text(who.isEmpty ? 'Pesanan' : who.join(' · '), style: AppType.title),
                   ),
                   AppBadge('$count item'),
                 ],
@@ -240,14 +254,18 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         (menu?.feature('discounts') ?? false) &&
         ((user?.can('discount.within_limit') ?? false) || (user?.can('discount.over_limit') ?? false));
     final openBill = menu?.feature('open_bill') ?? false;
-    final askLabel = menu?.customerNameOn ?? true;
+    // Jenis pesanan (bila aktif): Dine-in → kolom berganti jadi nomor meja (wajib).
+    final type = menu == null ? null : cart.typeIn(menu);
+    final dineIn = type == 'dine_in';
+    final askLabel = (menu?.customerNameOn ?? true) || dineIn;
     final memberOn = (menu?.customersOn ?? false) && (user?.can('customers.view') ?? false);
     final program = memberOn ? menu?.loyalty : null;
     final earn = menu == null ? 0 : loyaltyEarnPreview(cart, menu, totals);
     final reward = cart.reward;
     final canAct = !_busy && !cart.isEmpty;
 
-    if (_label.text != cart.customerLabel) _label.text = cart.customerLabel;
+    final labelValue = dineIn ? cart.tableLabel : cart.customerLabel;
+    if (_label.text != labelValue) _label.text = labelValue;
 
     return LayoutBuilder(
       builder: (context, box) {
@@ -296,9 +314,13 @@ class _CartPanelState extends ConsumerState<CartPanel> {
             key: _labelKey,
             controller: _label,
             focusNode: _labelFocus,
-            textCapitalization: TextCapitalization.words,
+            textCapitalization: dineIn ? TextCapitalization.characters : TextCapitalization.words,
             textInputAction: TextInputAction.done,
-            decoration: InputDecoration(labelText: '${menu?.customerLabelHint ?? 'Nama pelanggan / meja'} *', isDense: true, errorText: _labelError, suffixIcon: memberOn && cart.customer == null
+            maxLength: dineIn ? 20 : null,
+            decoration: InputDecoration(
+                labelText: dineIn ? 'Nomor meja *' : '${menu?.customerLabelHint ?? 'Nama pelanggan / meja'} *',
+                counterText: '',
+                isDense: true, errorText: _labelError, suffixIcon: memberOn && cart.customer == null
                   ? IconButton(
                       tooltip: 'Pilih member',
                       onPressed: _busy ? null : _pickMember,
@@ -306,11 +328,32 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                     )
                   : null, ),
             onChanged: (v) {
-              notifier.setCustomerLabel(v);
+              dineIn ? notifier.setTableLabel(v) : notifier.setCustomerLabel(v);
               if (_labelError != null && v.trim().isNotEmpty) setState(() => _labelError = null);
             },
           ),
         );
+
+        // Takeaway | Dine-in: bukan layar penghalang, cukup pilihan di atas keranjang (jenis awal sudah terpilih).
+        final typeSelector = menu == null || !menu.orderTypesOn
+            ? null
+            : Padding(
+                padding: EdgeInsets.fromLTRB(gutter, AppSpace.s3, gutter, 0),
+                child: SegmentedButton<String>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(value: 'takeaway', label: Text('Takeaway')),
+                    ButtonSegment(value: 'dine_in', label: Text('Dine-in')),
+                  ],
+                  selected: {type!},
+                  onSelectionChanged: _busy
+                      ? null
+                      : (v) {
+                          notifier.setOrderType(v.first);
+                          if (_labelError != null) setState(() => _labelError = null);
+                        },
+                ),
+              );
 
         // Member tertaut: nama · kode (+ catatan) dengan tombol lepas. Tanpa kolom nama (fitur dimatikan),
         // tombol "Tambah member" tampil sendiri.
@@ -613,6 +656,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 padding: EdgeInsets.zero,
                 children: [
                   header,
+                  ?typeSelector,
                   if (askLabel) labelField,
                   memberRow,
                   if (cart.isEmpty)
@@ -629,6 +673,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   header,
+                  ?typeSelector,
                   if (askLabel) labelField,
                   memberRow,
                   Expanded(

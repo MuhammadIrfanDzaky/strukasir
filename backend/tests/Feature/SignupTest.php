@@ -243,6 +243,7 @@ class SignupTest extends TestCase
         $this->assertSame(['Makanan', 'Minuman'], array_column($menu->json('categories'), 'name'));
         $this->assertSame([], $menu->json('products'), 'kategori awal kosong, tanpa produk contoh');
         $menu->assertJsonPath('customer_label_hint', 'Nama pelanggan');
+        $menu->assertJsonPath('order_types', ['enabled' => false, 'default' => 'takeaway']);
     }
 
     public function test_coffee_shop_dine_in_gets_table_service_template(): void
@@ -254,7 +255,18 @@ class SignupTest extends TestCase
         $this->assertTrue($menu->json('features.modifiers'));
         $this->assertFalse($menu->json('features.tax_service'), 'pajak menunggu owner mengisi persen');
         $this->assertSame(['Kopi', 'Non Kopi', 'Makanan'], array_column($menu->json('categories'), 'name'));
-        $menu->assertJsonPath('customer_label_hint', 'Nama pelanggan / meja');
+        // Meja punya kolom sendiri (Dine-in) → kolom nama cukup "Nama pelanggan".
+        $menu->assertJsonPath('customer_label_hint', 'Nama pelanggan');
+        $menu->assertJsonPath('order_types', ['enabled' => true, 'default' => 'dine_in']);
+    }
+
+    public function test_food_signup_without_sales_mode_gets_order_types(): void
+    {
+        // Aplikasi baru tidak lagi menanyakan cara berjualan.
+        $this->menuAfterSignup(['sector' => 'coffee_shop', 'sales_mode' => null])
+            ->assertJsonPath('order_types', ['enabled' => true, 'default' => 'takeaway']);
+        $this->menuAfterSignup(['sector' => 'restaurant', 'sales_mode' => null, 'email' => 'resto@contoh.id', 'device_id' => (string) Str::uuid()])
+            ->assertJsonPath('order_types', ['enabled' => true, 'default' => 'dine_in']);
     }
 
     public function test_retail_has_no_variants_and_template_never_exceeds_plan(): void
@@ -307,7 +319,7 @@ class SignupTest extends TestCase
 
     public function test_sales_mode_only_for_food_businesses(): void
     {
-        $this->signup(['sector' => 'restaurant', 'sales_mode' => null])->assertJsonValidationErrors('sales_mode');
+        $this->signup(['sector' => 'restaurant', 'sales_mode' => 'drive_thru'])->assertJsonValidationErrors('sales_mode');
 
         // Laundry: cara jualan diabaikan walau terkirim.
         $res = $this->signup(['sector' => 'laundry', 'sales_mode' => 'dine_in'])->assertCreated();

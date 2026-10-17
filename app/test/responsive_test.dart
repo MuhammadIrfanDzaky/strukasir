@@ -89,6 +89,7 @@ final bigMenu = Menu.fromJson({
   ...menuJson,
   'features': <String, dynamic>{...menuJson['features'] as Map<String, dynamic>, 'customers': true, 'loyalty': true, 'member_tiers': true, 'customer_credit': true, 'customer_messaging': true, 'promotions': true, 'inventory': true},
   'promotions': promotionsJson,
+  'order_types': {'enabled': true, 'default': 'takeaway'},
   'outlet': {'id': 'o1', 'code': 'O1', 'name': 'BerryBrew Sudirman', 'address': 'Jl. Sudirman 1'},
   'member_tiers': tiersJson,
   'loyalty': loyaltyJson,
@@ -568,20 +569,6 @@ final scenarios = <Scenario>[
     },
   ),
   (
-    name: 'daftar-cara-jualan',
-    session: const NeedsSetup(),
-    home: (_) => const SetupScreen(),
-    fillCart: false,
-    act: (t) async {
-      await t.tap(find.text('Daftar usaha baru'));
-      await settle(t);
-      await pick(t, 'Jenis usaha', 'Warung & gerobak makanan');
-      await t.ensureVisible(find.text('Keduanya'));
-      await t.tap(find.text('Keduanya'));
-      await settle(t);
-    },
-  ),
-  (
     name: 'daftar-akun',
     session: const NeedsSetup(),
     home: (_) => const SetupScreen(),
@@ -592,8 +579,6 @@ final scenarios = <Scenario>[
       await t.enterText(find.widgetWithText(TextFormField, 'Alamat server (development)'), 'http://test');
       await t.enterText(find.widgetWithText(TextFormField, 'Nama usaha'), 'Kopi Senja');
       await pick(t, 'Jenis usaha', 'Warung & gerobak makanan');
-      await t.ensureVisible(find.text('Keduanya'));
-      await t.tap(find.text('Keduanya'));
       await pick(t, 'Provinsi', 'Sumatera Utara');
       await pick(t, 'Kota / kabupaten', 'Kota Medan');
       await t.ensureVisible(find.text('Lanjut'));
@@ -772,6 +757,29 @@ final scenarios = <Scenario>[
   ),
   (name: 'kasir-kosong', session: loggedIn, home: home, fillCart: false, act: null),
   (name: 'kasir-isi', session: loggedIn, home: home, fillCart: true, act: null),
+  (
+    name: 'kasir-dine-in',
+    session: loggedIn,
+    home: home,
+    fillCart: true,
+    act: (t) async {
+      final open = find.text('Lihat pesanan');
+      if (open.evaluate().isNotEmpty) {
+        await t.tap(open);
+        await settle(t);
+      }
+      await t.ensureVisible(find.text('Dine-in').first);
+      await t.tap(find.text('Dine-in').first);
+      await settle(t);
+      // Kolom berganti jadi nomor meja; Bayar tanpa meja → pesan wajib isi.
+      expect(find.text('Nomor meja *'), findsOneWidget);
+      final pay = find.textContaining('Bayar Rp');
+      await t.ensureVisible(pay.first);
+      await t.tap(pay.first);
+      await settle(t);
+      expect(find.text('Isi nomor meja dulu'), findsOneWidget);
+    },
+  ),
   (
     name: 'kasir-halaman-pesanan',
     session: loggedIn,
@@ -1239,7 +1247,9 @@ final scenarios = <Scenario>[
         await t.tap(open);
         await settle(t);
       }
-      await t.ensureVisible(find.byTooltip('Pilih member').last);
+      // Layar pendek: total & tombol menempel di bawah → gulir kolom ke atas supaya tidak tertutup.
+      await t.runAsync(() => Scrollable.ensureVisible(t.element(find.byTooltip('Pilih member').last), alignment: 0));
+      await settle(t);
       await t.tap(find.byTooltip('Pilih member').last);
       await settle(t);
       expect(find.text('Pelanggan baru'), findsOneWidget);

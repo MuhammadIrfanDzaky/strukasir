@@ -173,7 +173,7 @@ class _OrderTile extends StatelessWidget {
               child: Text(time, style: AppType.bodyStrong.copyWith(color: AppColors.inkMuted)),
             ),
       title: Text(
-        [if (compact) time, order['number'] as String, (order['customer_label'] as String?) ?? '']
+        [if (compact) time, order['number'] as String, orderLabel(order) ?? '']
             .where((p) => p.isNotEmpty)
             .join(compact ? ' · ' : '  '),
         maxLines: 1,
@@ -241,6 +241,7 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
                 station: s.name,
                 number: o['number'] as String,
                 label: o['customer_label'] as String?,
+                orderType: orderTypeLine(o),
                 items: mine,
                 at: DateTime.now(),
                 reprint: true,

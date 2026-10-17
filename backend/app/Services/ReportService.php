@@ -52,6 +52,10 @@ class ReportService
         $costs = $paidItems()->selectRaw('coalesce(sum(order_items.unit_cost * order_items.qty),0) as cost,
             count(*) filter (where order_items.unit_cost is null) as missing')->first();
 
+        // Takeaway vs dine-in (hanya order setelah jenis pesanan aktif).
+        $byType = $paid()->whereNotNull('order_type')->groupBy('order_type')
+            ->selectRaw('order_type, count(*) as orders, sum(grand_total) as sales')->get()->keyBy('order_type');
+
         $byCashier = $paid()
             ->join('users', 'users.id', '=', 'orders.cashier_id')
             ->groupBy('users.name')
@@ -191,6 +195,9 @@ class ReportService
                 'id' => $x->id, 'name' => $x->name,
                 'orders' => (int) ($byOutlet[$x->id]->orders ?? 0), 'sales' => (int) ($byOutlet[$x->id]->sales ?? 0),
             ])->values(),
+            'by_order_type' => $byType->isEmpty() ? null : collect(['takeaway', 'dine_in'])->mapWithKeys(fn ($t) => [
+                $t => ['orders' => (int) ($byType[$t]->orders ?? 0), 'sales' => (int) ($byType[$t]->sales ?? 0)],
+            ]),
             'by_method' => collect(['cash', 'debit', 'qris', 'credit'])->mapWithKeys(fn ($m) => [
                 $m => (int) ($byMethod->firstWhere('method', $m)->total ?? 0),
             ]),

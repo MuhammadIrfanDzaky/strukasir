@@ -34,6 +34,8 @@ class OrderResource extends JsonResource
             'status' => $this->status,
             'business_date' => $this->business_date->toDateString(),
             'customer_label' => $this->customer_label,
+            'order_type' => $this->order_type,
+            'table_label' => $this->table_label,
             'customer' => $this->customer
                 ? ['id' => $this->customer->id, 'code' => $this->customer->code, 'name' => $this->customer->name,
                     'anonymized' => $this->customer->isAnonymized()]

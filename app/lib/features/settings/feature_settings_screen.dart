@@ -65,6 +65,8 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
 
   /// Form pelanggan baru: no HP wajib.
   bool _phoneRequired = true;
+  bool _orderTypes = false;
+  String _defaultOrderType = 'takeaway';
 
   /// Batas kasbon default (kosong = tanpa batas).
   final _creditLimit = TextEditingController();
@@ -108,6 +110,8 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
       _taxInclusive = data['tax_inclusive'] as bool? ?? false;
       _serviceInclusive = data['service_inclusive'] as bool? ?? false;
       _phoneRequired = data['customer_phone_required'] as bool? ?? true;
+      _orderTypes = data['order_types_enabled'] as bool? ?? false;
+      _defaultOrderType = data['default_order_type'] as String? ?? 'takeaway';
       final limit = data['credit_default_limit'] as int?;
       _creditLimit.text = limit == null ? '' : rupiah(limit);
       _reportEmail = data['report_email'] as bool? ?? true;
@@ -181,6 +185,8 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
           data: {
             'features': _on,
             if (_on['customers'] ?? false) 'customer_phone_required': _phoneRequired,
+            'order_types_enabled': _orderTypes,
+            'default_order_type': _defaultOrderType,
             if (_on['customer_credit'] ?? false) 'credit_default_limit': parseRupiah(_creditLimit.text),
             'report_email': _reportEmail,
             'report_whatsapp': _reportWhatsApp.text.trim(),
@@ -263,6 +269,36 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
                             ],
                           ),
                         ),
+                        const SizedBox(height: AppSpace.s4),
+                        AppSectionCard(title: 'Jenis pesanan', children: [
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: _orderTypes,
+                            onChanged: _busy ? null : (v) => setState(() => _orderTypes = v),
+                            title: Text('Takeaway & Dine-in', style: AppType.bodyStrong),
+                            subtitle: Text(
+                              _orderTypes
+                                  ? 'Kasir memilih Takeaway atau Dine-in di setiap pesanan. Dine-in meminta nomor meja; '
+                                      'service charge hanya untuk Dine-in. Tercetak di struk & tiket dapur.'
+                                  : 'Mati: semua pesanan tanpa jenis (cocok untuk toko & jasa). Service charge berlaku untuk semua.',
+                              style: AppType.caption.copyWith(color: AppColors.inkMuted),
+                            ),
+                          ),
+                          if (_orderTypes) ...[
+                            const SizedBox(height: AppSpace.s2),
+                            Text('Pilihan awal setiap pesanan baru', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+                            const SizedBox(height: AppSpace.s1),
+                            SegmentedButton<String>(
+                              showSelectedIcon: false,
+                              segments: const [
+                                ButtonSegment(value: 'takeaway', label: Text('Takeaway')),
+                                ButtonSegment(value: 'dine_in', label: Text('Dine-in')),
+                              ],
+                              selected: {_defaultOrderType},
+                              onSelectionChanged: _busy ? null : (v) => setState(() => _defaultOrderType = v.first),
+                            ),
+                          ],
+                        ]),
                         const SizedBox(height: AppSpace.s4),
                         AppSectionCard(title: 'Laporan tutup shift ke owner', children: [
                           SwitchListTile(
@@ -392,7 +428,8 @@ class _FeatureSettingsScreenState extends ConsumerState<FeatureSettingsScreen> {
     final service = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       TextField(
         controller: _service,
-        decoration: deco('Service', 'service_percent'),
+        decoration: deco('Service', 'service_percent').copyWith(
+            helperText: _orderTypes ? '0 = tidak dipungut · hanya untuk Dine-in' : '0 = tidak dipungut'),
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         inputFormatters: formatters,
         onChanged: (_) => setState(() {}),

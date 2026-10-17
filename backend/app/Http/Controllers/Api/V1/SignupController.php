@@ -69,7 +69,7 @@ class SignupController extends Controller
                     'sector' => $data['sector'],
                     'sector_other' => $data['sector'] === 'other' ? trim($data['sector_other']) : null,
                     // Usaha non makanan tidak ditanya cara jualan.
-                    'sales_mode' => $request->sector()->asksSalesMode() ? $data['sales_mode'] : null,
+                    'sales_mode' => $request->sector()->asksSalesMode() ? ($data['sales_mode'] ?? null) : null,
                     'province_code' => $data['province_code'],
                     'regency_code' => $data['regency_code'],
                     'phone' => isset($data['phone']) ? preg_replace('/[ \-]/', '', $data['phone']) : null,

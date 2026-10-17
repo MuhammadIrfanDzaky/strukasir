@@ -14,6 +14,9 @@ class UpsertOrderRequest extends FormRequest
     {
         return [
             'customer_label' => ['nullable', 'string', 'max:60'],
+            // Takeaway / Dine-in (bila aktif di Pengaturan → Fitur; kosong = jenis awal kedai) + nomor meja.
+            'order_type' => ['nullable', 'in:takeaway,dine_in'],
+            'table_label' => ['nullable', 'string', 'max:20'],
             // Pelanggan / member (fitur `customers`); keberadaan & status dicek di OrderService.
             'customer_id' => ['nullable', 'uuid'],
             // Tukar hadiah loyalitas (satu per order); potongannya dihitung server dari data hadiah.

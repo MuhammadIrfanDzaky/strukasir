@@ -71,7 +71,9 @@ class OrderService
         [$lines, $orderDiscount, $reward] = $this->applyReward($data, $customer, $lines, $existing);
         [$lines, $tier] = $this->applyLineBenefits($data, $customer, $lines, $existing);
         [$orderDiscount, $voucher] = $this->applyVoucher($data, $lines, $orderDiscount, $reward, $existing);
-        $result = $this->price($lines, $orderDiscount);
+        [$orderType, $tableLabel] = self::orderType($data);
+        // Service charge hanya untuk makan di tempat (jenis pesanan aktif); fitur mati = seperti biasa.
+        $result = $this->price($lines, $orderDiscount, service: $orderType !== 'takeaway');
         $this->guardExpectedTotal($result, (int) $data['expected_total']);
         $rewardDiscount = $reward === null ? 0
             : ($reward['line_index'] !== null ? $result->lineDiscounts[$reward['line_index']] : $result->orderDiscount);
@@ -83,7 +85,7 @@ class OrderService
         // Potongan hadiah sudah "dibayar" dengan stempel/poin, jadi tidak ikut batas diskon kasir.
         $approver = $this->authorizeDiscount($result, $lines, $cashier, $data['approval'] ?? null, $rewardDiscount + $tierDiscount + $promoDiscount + $voucherDiscount);
 
-        $order = DB::transaction(function () use ($orderId, $data, $cashier, $device, $tenant, $lines, $result, $customer, $reward, $rewardDiscount, $tier, $tierDiscount, $promoDiscount, $voucher, $voucherDiscount) {
+        $order = DB::transaction(function () use ($orderId, $data, $cashier, $device, $tenant, $lines, $result, $customer, $reward, $rewardDiscount, $tier, $tierDiscount, $promoDiscount, $voucher, $voucherDiscount, $orderType, $tableLabel) {
             $order = Order::query()->lockForUpdate()->find($orderId);
 
             if ($order === null) {
@@ -105,6 +107,8 @@ class OrderService
             $order->forceFill([
                 // Member tanpa label → nama member (tampil di struk, open bill & riwayat).
                 'customer_label' => ($data['customer_label'] ?? null) ?: $customer?->name,
+                'order_type' => $orderType,
+                'table_label' => $tableLabel,
                 'customer_id' => $customer?->id,
                 // Salinan hadiah: nama & harga stempel saat ditukar, baris yang digratiskan, besar potongan.
                 'reward_id' => $reward['reward']->id ?? null,
@@ -440,7 +444,24 @@ class OrderService
 
     // ───────────────────────────── harga & diskon ─────────────────────────────
 
-    private function price(array $lines, ?array $orderDiscount): PricingResult
+    /**
+     * Jenis pesanan & nomor meja. Fitur mati → null (service berlaku seperti biasa). Takeaway tidak punya meja.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    private static function orderType(array $data): array
+    {
+        $settings = TenantSetting::query()->firstOrFail();
+        if (! $settings->order_types_enabled) {
+            return [null, null];
+        }
+        $type = $data['order_type'] ?? $settings->default_order_type;
+        $table = trim((string) ($data['table_label'] ?? ''));
+
+        return [$type, $type === 'dine_in' && $table !== '' ? $table : null];
+    }
+
+    private function price(array $lines, ?array $orderDiscount, bool $service = true): PricingResult
     {
         $settings = TenantSetting::query()->firstOrFail();
 
@@ -452,7 +473,7 @@ class OrderService
                     'discount' => $l['discount'],
                 ], $lines),
                 $orderDiscount,
-                PricingSettings::fromTenant($settings, $this->features->enabled(Feature::TaxService)),
+                PricingSettings::fromTenant($settings, $this->features->enabled(Feature::TaxService), service: $service),
             );
         } catch (InvalidArgumentException $e) {
             throw ValidationException::withMessages(['discount' => $e->getMessage()]);

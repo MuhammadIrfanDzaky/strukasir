@@ -5,19 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api_client.dart';
 import '../../core/config.dart';
 import '../../core/theme/tokens.dart';
-import '../../core/ui/components.dart';
 import '../legal/legal_screen.dart';
 import '../subscription/subscription.dart';
 import 'session_controller.dart';
 import 'setup_screen.dart';
 import 'signup_options.dart';
-
-/// Keterangan cara berjualan (kode = enum `SalesMode` di server; judul dari server).
-const _salesModeHints = {
-  'takeaway': 'Pembeli pesan lalu dibawa pulang. Tanpa nomor meja.',
-  'dine_in': 'Ada meja. Pesanan bisa disimpan & dibayar nanti.',
-  'mixed': 'Sebagian dibawa pulang, sebagian makan di tempat.',
-};
 
 /// Field server yang ada di langkah 1 (usaha); sisanya di langkah 2 (akun owner).
 const _businessFields = {
@@ -68,7 +60,6 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   String _plan = 'gratis';
   String _period = 'month';
   String? _sector;
-  String? _salesMode;
   String? _province;
   String? _regency;
 
@@ -95,7 +86,6 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   String get _serverUrl => ServerUrlField.needed ? _server.text.trim() : kApiUrl;
 
   SectorOption? get _sectorOption => _options?.sector(_sector);
-  bool get _asksSalesMode => _sectorOption?.asksSalesMode ?? false;
 
   @override
   void initState() {
@@ -175,7 +165,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   void _next() {
     setState(() => _submitted = true);
     final ok = _businessForm.currentState!.validate();
-    if (!ok || _sector == null || (_asksSalesMode && _salesMode == null) || _province == null || _regency == null) {
+    if (!ok || _sector == null || _province == null || _regency == null) {
       return;
     }
     setState(() {
@@ -241,7 +231,6 @@ class _SignupFormState extends ConsumerState<SignupForm> {
               businessName: _businessName.text,
               sector: _sector!,
               sectorOther: _sector == 'other' ? _sectorOther.text : null,
-              salesMode: _asksSalesMode ? _salesMode : null,
               provinceCode: _province!,
               regencyCode: _regency!,
               phone: _phone.text,
@@ -291,11 +280,6 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   Widget _choiceError(String text) => Padding(
         padding: const EdgeInsets.only(top: AppSpace.s1),
         child: Text(text, style: AppType.caption.copyWith(color: AppColors.danger)),
-      );
-
-  Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: AppSpace.s2),
-        child: Text(text, style: AppType.bodyStrong),
       );
 
   Widget _businessStep() {
@@ -372,20 +356,10 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           if (ServerUrlField.needed) ...[ServerUrlField(controller: _server), const SizedBox(height: AppSpace.s5)],
           FormSection(
             title: 'Identitas usaha',
+            // Takeaway / Dine-in tidak ditanya lagi: aktif otomatis untuk usaha makan & minum, diatur di Pengaturan → Fitur.
             caption: 'Fitur & kategori awal disiapkan sesuai jenis usaha. Bisa diubah kapan saja di Pengaturan → Fitur.',
             children: [
               FieldGrid(children: [nameField, sectorField, if (_sector == 'other') otherField]),
-              if (_asksSalesMode) ...[
-                const SizedBox(height: AppSpace.s4),
-                _label('Cara berjualan'),
-                ChoiceTiles<String>(
-                  options: [for (final (code, label) in _options!.salesModes) (code, label, _salesModeHints[code] ?? '')],
-                  selected: _salesMode,
-                  onSelected: (code) => setState(() => _salesMode = code),
-                ),
-                if (_submitted && _salesMode == null) _choiceError('Pilih cara berjualan'),
-                if (_serverError('sales_mode') != null) _choiceError(_serverError('sales_mode')!),
-              ],
             ],
           ),
           const FormSectionDivider(),
