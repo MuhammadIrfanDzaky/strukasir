@@ -339,7 +339,10 @@ class _ProductFormState extends ConsumerState<ProductForm> {
   /// makanan → level pedas). Urut sesuai urutan grup.
   List<MenuModifierGroup> _relevantGroups(String? categoryId) {
     final used = {for (final p in _siblings(categoryId)) ...p.modifierGroupIds};
-    return [for (final g in widget.menu.modifierGroups) if (used.contains(g.id)) g];
+    return [
+      for (final g in widget.menu.modifierGroups)
+        if (g.categoryIds.isEmpty ? used.contains(g.id) : g.categoryIds.contains(categoryId)) g,
+    ];
   }
 
   /// Produk baru: centang otomatis pilihan yang dipakai sebagian besar produk di kategorinya.
@@ -350,7 +353,11 @@ class _ProductFormState extends ConsumerState<ProductForm> {
       ..clear()
       ..addAll([
         for (final g in widget.menu.modifierGroups)
-          if (siblings.isNotEmpty && siblings.where((p) => p.modifierGroupIds.contains(g.id)).length * 2 > siblings.length) g.id,
+          if (g.categoryIds.isNotEmpty
+              ? g.categoryIds.contains(_categoryId)
+              // Grup lama yang belum diatur kategorinya: ikuti mayoritas produk di kategori ini.
+              : siblings.isNotEmpty && siblings.where((p) => p.modifierGroupIds.contains(g.id)).length * 2 > siblings.length)
+            g.id,
       ]);
   }
 
@@ -620,9 +627,11 @@ class _GroupsTab extends ConsumerWidget {
                 ListTile(
                   tileColor: AppColors.surface,
                   title: Text('${g.name}  ·  ${g.rule}'),
-                  subtitle: Text(g.activeModifiers
-                      .map((m) => m.priceDelta > 0 ? '${m.name} (+${rupiah(m.priceDelta)})' : m.name)
-                      .join(', ')),
+                  subtitle: Text([
+                    g.activeModifiers.map((m) => m.priceDelta > 0 ? '${m.name} (+${rupiah(m.priceDelta)})' : m.name).join(', '),
+                    if (g.categoryIds.isNotEmpty)
+                      'Muncul di: ${[for (final id in g.categoryIds) ?menu.category(id)?.name].join(', ')}',
+                  ].join('\n')),
                   trailing: const Icon(Icons.edit_rounded),
                   onTap: () => _open(context, g),
                 ),
@@ -661,6 +670,9 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
   /// Satu pilihan boleh lebih dari sekali (mis. Extra shot x2), maks. [_maxQty] per pilihan.
   late bool _allowQty = widget.group?.allowQuantity ?? false;
   late int _maxQty = (widget.group?.maxQuantity ?? 1) < 2 ? 3 : widget.group!.maxQuantity;
+  /// Kategori tempat grup ini muncul + pasang ke produk yang sudah ada di kategori itu.
+  late final Set<String> _categoryIds = {...?widget.group?.categoryIds};
+  late bool _applyExisting = widget.group == null;
   late final List<_OptionRow> _rows = widget.group == null
       ? [_OptionRow()]
       : [for (final m in widget.group!.activeModifiers) _OptionRow(id: m.id, name: m.name, price: m.priceDelta)];
@@ -689,6 +701,8 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
         maxSelect: _max,
         allowQuantity: _allowQty,
         maxQuantity: _maxQty,
+        categoryIds: _categoryIds.toList(),
+        applyToExisting: _applyExisting && _missingProducts() > 0,
         modifiers: [
           for (final r in _rows)
             {if (r.id != null) 'id': r.id, 'name': r.name.text.trim(), 'price_delta': parseRupiah(r.price.text) ?? 0},
@@ -698,6 +712,46 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (ok) Navigator.pop(context);
+  }
+
+  /// Produk aktif di kategori terpilih yang belum memakai grup ini.
+  int _missingProducts() {
+    final menu = ref.read(menuProvider).value?.menu;
+    if (menu == null) return 0;
+    return menu.products
+        .where((p) => p.active && _categoryIds.contains(p.categoryId) && !p.modifierGroupIds.contains(widget.group?.id))
+        .length;
+  }
+
+  Widget _assignSection() {
+    final categories = ref.watch(menuProvider).value?.menu.activeCategories ?? const <MenuCategory>[];
+    final missing = _missingProducts();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const SizedBox(height: AppSpace.s2),
+      Text('Muncul di kategori', style: AppType.bodyStrong),
+      Text('Produk baru di kategori ini langsung memakai pilihan ini. Kategori lain tidak ditawari '
+          '(mis. kopi tidak ditawari level pedas).', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+      const SizedBox(height: AppSpace.s2),
+      Wrap(spacing: AppSpace.s2, runSpacing: AppSpace.s2, children: [
+        for (final c in categories)
+          FilterChip(
+            label: Text(c.name),
+            selected: _categoryIds.contains(c.id),
+            onSelected: (v) => setState(() => v ? _categoryIds.add(c.id) : _categoryIds.remove(c.id)),
+          ),
+      ]),
+      if (missing > 0)
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
+          value: _applyExisting,
+          onChanged: (v) => setState(() => _applyExisting = v ?? false),
+          title: Text('Pasang juga ke $missing produk yang sudah ada'),
+          subtitle: Text('Produk di kategori terpilih yang belum memakai pilihan ini.',
+              style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+        ),
+      const Divider(),
+    ]);
   }
 
   Future<void> _delete() async {
@@ -754,6 +808,7 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
                 NumberStepper(value: _max, max: _allowQty ? 20 : _rows.length, onChanged: (v) => setState(() => _max = v)),
               ]),
               const Divider(),
+              _assignSection(),
               const SizedBox(height: AppSpace.s3),
               for (final (i, r) in _rows.indexed)
                 Padding(

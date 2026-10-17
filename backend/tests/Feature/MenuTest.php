@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuditLog;
+use App\Models\Category;
 use Tests\TestCase;
 
 class MenuTest extends TestCase
@@ -174,5 +175,36 @@ class MenuTest extends TestCase
         $groups = collect($this->api('GET', '/api/v1/menu', $this->ownerToken)->json('modifier_groups'))->keyBy('name');
         $this->assertSame([true, 3], [$groups['Tambahan']['allow_quantity'], $groups['Tambahan']['max_quantity']]);
         $this->assertSame([false, 1], [$groups['Gula']['allow_quantity'], $groups['Gula']['max_quantity']], 'grup biasa: maks 1');
+    }
+
+    public function test_group_assigned_to_categories_and_existing_products(): void
+    {
+        ['category' => $kopi, 'group' => $suhu, 'product' => $americano] = $this->seedMenu();
+        $makanan = $this->api('POST', '/api/v1/categories', $this->ownerToken, ['name' => 'Makanan'])->json('id');
+        $roti = $this->api('POST', '/api/v1/products', $this->ownerToken, ['category_id' => $makanan, 'name' => 'Roti', 'price' => 10000])->json('id');
+        $other = $this->makeShop('Lain');
+        $otherCategory = $this->tenancy()->run($other->tenant->id, fn () => Category::create(['name' => 'Kopi'])->id);
+
+        $payload = ['name' => 'Level pedas', 'min_select' => 1, 'max_select' => 1, 'modifiers' => [['name' => 'Pedas', 'price_delta' => 0]]];
+        $this->api('POST', '/api/v1/modifier-groups', $this->ownerToken, [...$payload, 'category_ids' => [$otherCategory]])
+            ->assertJsonValidationErrors('category_ids.0'); // kategori usaha lain
+        $pedas = $this->api('POST', '/api/v1/modifier-groups', $this->ownerToken, [...$payload, 'category_ids' => [$makanan], 'apply_to_existing' => true])
+            ->assertCreated()->json('id');
+
+        $menu = $this->api('GET', '/api/v1/menu', $this->ownerToken);
+        $groups = collect($menu->json('modifier_groups'))->keyBy('id');
+        $products = collect($menu->json('products'))->keyBy('id');
+        $this->assertSame([$makanan], $groups[$pedas]['category_ids']);
+        $this->assertSame([], $groups[$suhu]['category_ids'], 'belum diatur');
+        $this->assertSame([$pedas], $products[$roti]['modifier_group_ids'], 'produk lama di kategori ikut dipasang');
+        $this->assertSame([$suhu], $products[$americano]['modifier_group_ids'], 'kategori lain tidak tersentuh');
+
+        // Ubah tanpa pasang ke produk lama: hanya penanda kategori.
+        $this->api('PUT', "/api/v1/modifier-groups/{$suhu}", $this->ownerToken, [
+            'name' => 'Suhu', 'min_select' => 1, 'max_select' => 1, 'category_ids' => [$kopi, $makanan],
+            'modifiers' => [['name' => 'Hot', 'price_delta' => 0]],
+        ])->assertOk();
+        $products = collect($this->api('GET', '/api/v1/menu', $this->ownerToken)->json('products'))->keyBy('id');
+        $this->assertSame([$pedas], $products[$roti]['modifier_group_ids']);
     }
 }

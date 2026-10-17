@@ -53,6 +53,7 @@ class MenuModifierGroup {
     required this.modifiers,
     this.allowQuantity = false,
     this.maxQuantity = 1,
+    this.categoryIds = const [],
   });
 
   factory MenuModifierGroup.fromJson(Map<String, dynamic> j) => MenuModifierGroup(
@@ -62,6 +63,7 @@ class MenuModifierGroup {
         maxSelect: j['max_select'] as int,
         allowQuantity: j['allow_quantity'] as bool? ?? false,
         maxQuantity: j['max_quantity'] as int? ?? 1,
+        categoryIds: ((j['category_ids'] as List?) ?? const []).cast<String>(),
         modifiers: (j['modifiers'] as List)
             .cast<Map<String, dynamic>>()
             .map(MenuModifier.fromJson)
@@ -73,6 +75,9 @@ class MenuModifierGroup {
   final int minSelect;
   final int maxSelect;
   final List<MenuModifier> modifiers;
+
+  /// Kategori tempat grup ini muncul (produk baru di kategori itu langsung memakainya); kosong = belum diatur.
+  final List<String> categoryIds;
 
   /// Satu opsi boleh dipilih lebih dari sekali (mis. Extra shot x2), maks. [maxQuantity] per opsi.
   /// Untuk grup ini [maxSelect] = batas total jumlah di grup.

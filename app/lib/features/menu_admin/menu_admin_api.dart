@@ -60,9 +60,13 @@ class MenuAdminApi {
     required List<Map<String, dynamic>> modifiers,
     bool allowQuantity = false,
     int maxQuantity = 1,
+    List<String> categoryIds = const [],
+    bool applyToExisting = false,
   }) =>
       _write((api, token) {
         final data = {
+          'category_ids': categoryIds,
+          'apply_to_existing': applyToExisting,
           'name': name.trim(),
           'min_select': minSelect,
           'max_select': maxSelect,

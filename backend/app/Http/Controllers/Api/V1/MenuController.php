@@ -105,6 +105,7 @@ class MenuController extends Controller
             'modifier_groups' => $groups->map(fn (ModifierGroup $g) => [
                 'id' => $g->id,
                 'name' => $g->name,
+                'category_ids' => $g->category_ids ?? [],
                 'min_select' => $g->min_select,
                 'max_select' => $g->max_select,
                 'allow_quantity' => $g->allow_quantity,
