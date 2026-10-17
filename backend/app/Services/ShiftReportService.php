@@ -45,6 +45,11 @@ class ShiftReportService
             ->selectRaw('count(*) as n, coalesce(sum(grand_total), 0) as total');
         $day = $dayQuery()->first();
         $dayOutlet = $outlets > 1 ? $dayQuery()->where('outlet_id', $shift->outlet_id)->first() : null;
+        // QRIS statis dikonfirmasi kasir: jumlah transaksi & referensi untuk dicocokkan dengan mutasi merchant.
+        $qris = DB::table('payments')->join('orders', 'orders.id', '=', 'payments.order_id')
+            ->where('payments.shift_id', $shift->id)->where('payments.kind', 'payment')->where('payments.method', 'qris')
+            ->where('orders.status', 'paid')->orderBy('payments.confirmed_at')
+            ->get(['payments.amount', 'payments.reference']);
         $low = app(InventoryService::class)->enabled() ? app(InventoryService::class)->lowStock($shift->outlet_id) : collect();
 
         return [
@@ -62,6 +67,12 @@ class ShiftReportService
             'methods' => collect(['cash' => 'Tunai', 'qris' => 'QRIS', 'debit' => 'Debit', 'credit' => 'Kasbon'])
                 ->filter(fn ($label, $key) => ($m[$key] ?? 0) !== 0)
                 ->map(fn ($label, $key) => ['label' => $label, 'amount' => (int) $m[$key]])->values()->all(),
+            'qris' => $qris->isEmpty() ? null : [
+                'count' => $qris->count(),
+                'total' => (int) $qris->sum('amount'),
+                'without_reference' => $qris->filter(fn ($p) => trim((string) $p->reference) === '')->count(),
+                'references' => $qris->pluck('reference')->filter(fn ($r) => trim((string) $r) !== '')->take(20)->values()->all(),
+            ],
             'cash_out' => (int) $summary['cash_out'],
             'cash_in' => (int) $summary['cash_extra_in'],
             'credit_repaid_cash' => (int) ($summary['credit_repaid_cash'] ?? 0),
@@ -100,6 +111,12 @@ class ShiftReportService
         ];
         if ($methods !== '') {
             $lines[] = $methods;
+        }
+        if (($d['qris'] ?? null) !== null) {
+            $q = $d['qris'];
+            $lines[] = "Cocokkan QRIS: {$q['count']} transaksi ".self::rp($q['total']).' dengan mutasi aplikasi merchant'
+                .($q['references'] !== [] ? ' (ref '.implode(', ', $q['references']).')' : '')
+                .($q['without_reference'] > 0 ? " · {$q['without_reference']} tanpa ref" : '');
         }
         if ($d['cash_out'] > 0 || $d['cash_in'] > 0) {
             $lines[] = 'Kas keluar '.self::rp($d['cash_out']).' · kas masuk '.self::rp($d['cash_in']);

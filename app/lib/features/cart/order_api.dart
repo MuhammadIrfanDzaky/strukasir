@@ -7,7 +7,7 @@ import 'cart_controller.dart';
 final orderApiProvider = Provider((ref) => OrderApi(ref));
 
 class PaymentDraft {
-  PaymentDraft({required this.method, required this.amount, this.tendered}) : id = const Uuid().v4();
+  PaymentDraft({required this.method, required this.amount, this.tendered, this.reference}) : id = const Uuid().v4();
 
   /// UUID dibuat sekali per draf → tombol "Bayar" ditekan ulang tidak membuat pembayaran dobel.
   final String id;
@@ -15,11 +15,15 @@ class PaymentDraft {
   final int amount;
   final int? tendered;
 
+  /// QRIS/debit: nomor referensi dari aplikasi merchant / EDC (untuk dicocokkan dengan mutasi).
+  final String? reference;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'method': method,
         'amount': amount,
         if (method == 'cash') 'tendered': tendered ?? amount,
+        if (reference != null && reference!.trim().isNotEmpty) 'reference': reference!.trim(),
       };
 }
 

@@ -15,6 +15,7 @@ import '../printing/printer_service.dart';
 import '../printing/printer_settings_screen.dart';
 import '../printing/receipt_settings_screen.dart';
 import '../printing/stations_screen.dart';
+import '../printing/qris_settings_screen.dart';
 import '../promotions/promotions_screen.dart';
 import '../subscription/locked_feature.dart';
 import '../session/session_controller.dart';
@@ -148,6 +149,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: 'Tambah kasir, ganti PIN, nonaktifkan',
             keywords: 'kasir staf karyawan pin akses user',
             onTap: () => _open(const StaffScreen()),
+          ),
+          _Item(
+            title: 'Pembayaran QRIS',
+            subtitle: menu?.qrisImage == null ? 'Unggah QRIS statis untuk ditunjukkan ke pembeli' : 'QRIS terpasang · tampil saat bayar',
+            badge: menu?.qrisImage == null ? const AppBadge('Belum diatur', tone: AppTone.warning) : null,
+            keywords: 'qr bayar scan merchant',
+            onTap: () => _open(const QrisSettingsScreen()),
           ),
           _Item(
             title: 'Struk & logo',

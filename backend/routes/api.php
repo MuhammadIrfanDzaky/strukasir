@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductImportController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PromotionController;
+use App\Http\Controllers\Api\V1\QrisSettingsController;
 use App\Http\Controllers\Api\V1\ReceiptSettingsController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\ReportExportController;
@@ -146,6 +147,7 @@ Route::prefix('v1')->group(function () {
             Route::get('settings/messages', [MessageController::class, 'templates']);
             Route::put('settings/messages', [MessageController::class, 'saveTemplates']);
             Route::post('devices/current/unregister', DeviceUnregisterController::class);
+            Route::put('settings/qris', [QrisSettingsController::class, 'update']);
             // Outlet (fitur `multi_outlet` untuk outlet kedua dst.).
             Route::get('outlets', [OutletController::class, 'index']);
             Route::post('outlets', [OutletController::class, 'save']);

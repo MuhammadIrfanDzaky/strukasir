@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../core/money.dart';
@@ -18,11 +20,16 @@ List<int> suggestedCash(int total) {
 class _Row {
   _Row(this.method, int amount)
       : amount = TextEditingController(text: rupiah(amount)),
-        tendered = TextEditingController();
+        tendered = TextEditingController(),
+        reference = TextEditingController();
 
   String method;
   final TextEditingController amount;
   final TextEditingController tendered;
+
+  /// QRIS: no. referensi dari aplikasi merchant (opsional) & centang "dana sudah masuk" (wajib).
+  final TextEditingController reference;
+  bool received = false;
 
   int get amountValue => parseRupiah(amount.text) ?? 0;
   int? get tenderedValue => parseRupiah(tendered.text);
@@ -30,7 +37,19 @@ class _Row {
 
 /// Pilih metode bayar. Mengembalikan daftar pembayaran yang jumlahnya tepat = total.
 class PaymentDialog extends StatefulWidget {
-  const PaymentDialog({super.key, required this.total, required this.splitEnabled, required this.number, this.creditCustomer});
+  const PaymentDialog({
+    super.key,
+    required this.total,
+    required this.splitEnabled,
+    required this.number,
+    this.creditCustomer,
+    this.qrisImage,
+    this.shopName = '',
+  });
+
+  /// QRIS statis kedai (PNG base64) untuk ditunjukkan ke pembeli; null = belum diunggah owner.
+  final String? qrisImage;
+  final String shopName;
 
   final int total;
   final bool splitEnabled;
@@ -55,6 +74,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
     for (final r in _rows) {
       if (r.amountValue <= 0) return 'Nominal harus lebih dari 0';
       if (r.method == 'cash' && (r.tenderedValue ?? r.amountValue) < r.amountValue) return 'Uang diterima kurang';
+      if (r.method == 'qris' && !r.received) return 'Centang dulu bahwa dana QRIS sudah masuk';
     }
     return null;
   }
@@ -64,9 +84,45 @@ class _PaymentDialogState extends State<PaymentDialog> {
     for (final r in _rows) {
       r.amount.dispose();
       r.tendered.dispose();
+      r.reference.dispose();
     }
     super.dispose();
   }
+
+  /// QRIS statis: tunjukkan kode ke pembeli, lalu kasir wajib memastikan dana masuk di aplikasi merchant.
+  List<Widget> _qrisFields(_Row r) => [
+        if (widget.qrisImage != null) ...[
+          OutlinedButton.icon(
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (_) => QrisDisplayDialog(image: widget.qrisImage!, amount: r.amountValue, shopName: widget.shopName),
+            ),
+            icon: const Icon(Icons.qr_code_2_rounded),
+            label: const Text('Tampilkan QRIS ke pembeli'),
+          ),
+          const SizedBox(height: AppSpace.s2),
+        ],
+        const _Note('Cek notifikasi dana masuk di aplikasi merchant QRIS (nominal harus sama), bukan dari layar HP pembeli. '
+            'Nama Anda tercatat sebagai pengonfirmasi.'),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
+          value: r.received,
+          onChanged: (v) => setState(() => r.received = v ?? false),
+          title: Text('Dana ${rp(r.amountValue)} sudah masuk di aplikasi merchant', style: AppType.bodyStrong),
+        ),
+        TextField(
+          controller: r.reference,
+          maxLength: 30,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(
+            labelText: 'No. referensi (opsional)',
+            hintText: 'mis. 4 digit terakhir',
+            helperText: 'Memudahkan mencocokkan dengan mutasi saat tutup shift.',
+            counterText: '',
+          ),
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -157,9 +213,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
                       emphasis: true, valueColor: AppColors.success),
                 ),
             ],
-            if (r.method == 'qris')
-              const _Note('Pastikan notifikasi dana masuk muncul di aplikasi merchant QRIS sebelum konfirmasi. '
-                  'Nama Anda tercatat sebagai pengonfirmasi.'),
+            if (r.method == 'qris') ..._qrisFields(r),
             if (r.method == 'debit') const _Note('Konfirmasi setelah transaksi di mesin EDC berhasil.'),
             if (r.method == 'credit') _creditNote(r.amountValue),
           ],
@@ -168,8 +222,11 @@ class _PaymentDialogState extends State<PaymentDialog> {
                 final rest = widget.total - _sum;
                 _rows.add(_Row('qris', rest > 0 ? rest : 0));
               }), child: const Text('Bagi ke metode lain'), ),
-          if (problem != null && _rows.length > 1)
-            Text(problem, style: AppType.caption.copyWith(color: AppColors.danger)),
+          if (problem != null && (_rows.length > 1 || _rows.any((r) => r.method == 'qris')))
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpace.s2),
+              child: Text(problem, style: AppType.caption.copyWith(color: AppColors.danger)),
+            ),
         ]),
       ),
       actions: [
@@ -183,6 +240,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
                         method: r.method,
                         amount: r.amountValue,
                         tendered: r.method == 'cash' ? (r.tenderedValue ?? r.amountValue) : null,
+                        reference: r.method == 'qris' ? r.reference.text : null,
                       ),
                   ]),
           child: Text(_rows.length == 1 && _rows.first.method == 'credit'
@@ -195,6 +253,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
 }
 
 extension on _PaymentDialogState {
+
   /// Sisa kasbon sebelum & sesudah, dan peringatan bila melewati batas (owner diminta PIN).
   Widget _creditNote(int amount) {
     final c = widget.creditCustomer!;
@@ -235,4 +294,46 @@ class _Note extends StatelessWidget {
           Expanded(child: Text(text, style: AppType.body)),
         ]),
       );
+}
+
+/// QRIS kedai layar penuh untuk dipindai pembeli: kode besar (tanpa penghalusan supaya tajam) + nominal.
+class QrisDisplayDialog extends StatelessWidget {
+  const QrisDisplayDialog({super.key, required this.image, required this.amount, this.shopName = ''});
+
+  final String image;
+  final int amount;
+  final String shopName;
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = base64Decode(image);
+    final size = MediaQuery.sizeOf(context);
+    final side = (size.shortestSide * 0.62).clamp(220.0, 520.0);
+    return Dialog(
+      backgroundColor: AppColors.surface,
+      insetPadding: const EdgeInsets.all(AppSpace.s4),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpace.s5),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (shopName.isNotEmpty) Text(shopName, style: AppType.title, textAlign: TextAlign.center),
+          const SizedBox(height: AppSpace.s1),
+          Text('Scan untuk membayar', style: AppType.body.copyWith(color: AppColors.inkMuted)),
+          const SizedBox(height: AppSpace.s4),
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.all(AppSpace.s3),
+            child: SizedBox.square(
+              dimension: side,
+              child: Image.memory(bytes, fit: BoxFit.contain, filterQuality: FilterQuality.none, gaplessPlayback: true),
+            ),
+          ),
+          const SizedBox(height: AppSpace.s4),
+          Text(rp(amount), style: AppType.display.copyWith(color: AppColors.ink)),
+          Text('Masukkan nominal persis seperti di atas', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+          const SizedBox(height: AppSpace.s4),
+          FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Selesai, kembali')),
+        ]),
+      ),
+    );
+  }
 }

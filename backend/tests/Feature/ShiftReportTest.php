@@ -72,6 +72,7 @@ class ShiftReportTest extends TestCase
         $res = $this->api('GET', "/api/v1/shifts/{$shiftId}/report", $this->cashier)->assertOk();
         $text = $res->json('data.text');
         foreach (['*Laporan shift BerryBrew*', '*Penjualan: Rp60.000* (2 transaksi)', 'Tunai Rp40.000 · QRIS Rp20.000',
+            'Cocokkan QRIS: 1 transaksi Rp20.000 dengan mutasi aplikasi merchant · 1 tanpa ref',
             'Kas keluar Rp10.000', 'KURANG Rp5.000', 'Terlaris: Kopi Susu Aren 3×', 'Catatan: Hujan deras',
             'Total hari ini (semua tablet): Rp60.000 · 2 transaksi'] as $part) {
             $this->assertStringContainsString($part, $text);

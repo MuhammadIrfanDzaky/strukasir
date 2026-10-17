@@ -259,9 +259,12 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
 
   Future<void> _reprint() async {
     try {
+      final menu = ref.read(menuProvider).value?.menu;
+      final qris = widget.order['status'] != 'paid' && (menu?.qrisOnBill ?? false) ? menu?.qrisImage : null;
       await ref.read(printerProvider.notifier).printDocument(
-            customerReceipt(widget.order),
-            logoBase64: ref.read(menuProvider).value?.menu.receipt.logoBase64,
+            [...customerReceipt(widget.order), if (qris != null) ...qrisBillLines(widget.order)],
+            logoBase64: menu?.receipt.logoBase64,
+            footerImageBase64: qris,
           );
     } on PrintException catch (e) {
       _snack(e.message);

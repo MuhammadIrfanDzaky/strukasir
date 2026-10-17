@@ -18,29 +18,47 @@ final class ReceiptLogo
 
     public const MAX_HEIGHT = 400;
 
+    /** Gambar QRIS statis (sudah hitam-putih & diperkecil di tablet): cukup tajam untuk dipindai & dicetak. */
+    public const QRIS_MAX_BYTES = 98304;
+
+    public const QRIS_MAX_BASE64 = 131072;
+
+    public const QRIS_MAX_HEIGHT = 640;
+
     private const PNG_MAGIC = "\x89PNG\r\n\x1a\n";
 
     /** Pesan error, atau null bila valid. */
     public static function validate(string $base64): ?string
     {
+        return self::png($base64, 'Logo', self::MAX_BYTES, '64 KB', 16, self::MAX_WIDTH, self::MAX_HEIGHT);
+    }
+
+    /** Gambar QRIS: PNG, lebar ≤ 384 (kertas 58 mm), tidak terlalu kecil supaya tetap bisa dipindai. */
+    public static function validateQris(string $base64): ?string
+    {
+        return self::png($base64, 'Gambar QRIS', self::QRIS_MAX_BYTES, '96 KB', 120, self::MAX_WIDTH, self::QRIS_MAX_HEIGHT);
+    }
+
+    private static function png(string $base64, string $label, int $maxBytes, string $maxLabel, int $min, int $maxW, int $maxH): ?string
+    {
         $bytes = base64_decode($base64, true);
         if ($bytes === false || $bytes === '') {
-            return 'Logo tidak valid.';
+            return "{$label} tidak valid.";
         }
-        if (strlen($bytes) > self::MAX_BYTES) {
-            return 'Logo terlalu besar (maks. 64 KB).';
+        if (strlen($bytes) > $maxBytes) {
+            return "{$label} terlalu besar (maks. {$maxLabel}).";
         }
         if (! str_starts_with($bytes, self::PNG_MAGIC)) {
-            return 'Logo harus berupa gambar PNG.';
+            return "{$label} harus berupa gambar PNG.";
         }
 
         $info = @getimagesizefromstring($bytes);
         if ($info === false || $info[2] !== IMAGETYPE_PNG) {
-            return 'Logo harus berupa gambar PNG.';
+            return "{$label} harus berupa gambar PNG.";
         }
         [$width, $height] = $info;
-        if ($width < 16 || $width > self::MAX_WIDTH || $height < 16 || $height > self::MAX_HEIGHT) {
-            return 'Ukuran logo harus 16–'.self::MAX_WIDTH.' × 16–'.self::MAX_HEIGHT.' piksel.';
+        if ($width < $min || $width > $maxW || $height < $min || $height > $maxH) {
+            return "Ukuran {$label} harus {$min}–{$maxW} × {$min}–{$maxH} piksel.";
         }
 
         return null;

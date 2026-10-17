@@ -215,6 +215,8 @@ class Menu {
     this.lockedFeatures = const [],
     this.orderTypesOn = false,
     this.defaultOrderType = 'takeaway',
+    this.qrisImage,
+    this.qrisOnBill = false,
     required this.categories,
     required this.products,
     required this.modifierGroups,
@@ -234,6 +236,8 @@ class Menu {
         memberTiers: ((j['member_tiers'] as List?) ?? const []).cast<Map<String, dynamic>>().map(MemberTier.fromJson).toList(),
         promotions: ((j['promotions'] as List?) ?? const []).cast<Map<String, dynamic>>().map(Promotion.fromJson).toList(),
         utcOffset: (j['clock'] as Map<String, dynamic>?)?['utc_offset'] as int?,
+        qrisImage: (j['qris'] as Map<String, dynamic>?)?['image'] as String?,
+        qrisOnBill: (j['qris'] as Map<String, dynamic>?)?['print_on_bill'] as bool? ?? false,
         orderTypesOn: (j['order_types'] as Map<String, dynamic>?)?['enabled'] as bool? ?? false,
         defaultOrderType: (j['order_types'] as Map<String, dynamic>?)?['default'] as String? ?? 'takeaway',
         lockedFeatures: ((j['locked_features'] as List?) ?? const []).cast<Map<String, dynamic>>().map(LockedFeature.fromJson).toList(),
@@ -286,6 +290,12 @@ class Menu {
   /// Pilihan Takeaway | Dine-in di kasir (service charge hanya untuk dine-in) & jenis awal order baru.
   final bool orderTypesOn;
   final String defaultOrderType;
+
+  /// QRIS statis kedai (PNG base64) untuk ditunjukkan ke pembeli; null = belum diunggah owner.
+  final String? qrisImage;
+
+  /// Cetak QRIS di bill belum dibayar.
+  final bool qrisOnBill;
 
   /// Fitur di luar paket + paket pembukanya (tampil terkunci ke owner).
   final List<LockedFeature> lockedFeatures;

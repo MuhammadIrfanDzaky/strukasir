@@ -104,6 +104,8 @@ class OrderResource extends JsonResource
                 'amount' => $p->amount,
                 'tendered' => $p->tendered,
                 'change' => $p->change,
+                // QRIS/debit: nomor referensi dari aplikasi merchant / EDC (untuk dicocokkan dengan mutasi).
+                'reference' => $p->reference,
                 'confirmed_at' => $p->confirmed_at->toIso8601String(),
             ]),
             'created_at' => $this->created_at->toIso8601String(),

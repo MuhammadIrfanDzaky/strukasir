@@ -88,6 +88,13 @@ String? orderTypeLine(Map<String, dynamic> order) {
   };
 }
 
+/// Baris di atas QRIS pada bill belum dibayar (gambar QR dicetak printer sesudahnya).
+List<PrintLine> qrisBillLines(Map<String, dynamic> order) => [
+      PrintLine(divider()),
+      PrintLine(center('Bayar dengan QRIS'), bold: true),
+      PrintLine(center('Rp ${rupiah(order['grand_total'] as int)}'), bold: true),
+    ];
+
 /// Label order di daftar (open bill, riwayat): "Meja 5 · Budi", "Budi", atau null.
 String? orderLabel(Map<String, dynamic> order) {
   final table = (order['table_label'] as String?)?.trim() ?? '';

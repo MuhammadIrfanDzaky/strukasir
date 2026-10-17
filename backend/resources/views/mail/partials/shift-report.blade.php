@@ -49,6 +49,12 @@
 </table>
 @endif
 
+@if (! empty($d['qris']))
+<p style="margin:-12px 0 24px;padding:10px 12px;background:#F1F5F9;border-radius:8px;font-size:13px;line-height:1.6;color:#334155;">
+  <strong>Cocokkan QRIS:</strong> {{ $d['qris']['count'] }} transaksi {{ $rp($d['qris']['total']) }} dengan mutasi di aplikasi merchant QRIS.@if ($d['qris']['references']) Ref: {{ implode(', ', $d['qris']['references']) }}.@endif @if ($d['qris']['without_reference'] > 0){{ $d['qris']['without_reference'] }} tanpa ref.@endif
+</p>
+@endif
+
 {{-- Kas laci --}}
 @if ($d['cash'] || $d['cash_out'] || $d['cash_in'] || $d['credit_repaid_cash'])
 <div style="{{ $label }}margin-bottom:4px;">Kas laci</div>

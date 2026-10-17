@@ -111,7 +111,7 @@ class PrinterService extends AsyncNotifier<SavedPrinter?> {
 
   /// Cetak dokumen: logo kedai (PNG base64, opsional) di atas, lalu baris teks (sebagian tebal).
   /// Menyambung ulang otomatis bila terputus. Logo rusak dilewati; struk tetap tercetak.
-  Future<void> printDocument(List<PrintLine> lines, {String? logoBase64, int copies = 1}) async {
+  Future<void> printDocument(List<PrintLine> lines, {String? logoBase64, String? footerImageBase64, int copies = 1}) async {
     final printer = state.value;
     if (printer == null) throw PrintException('Printer belum dipilih. Buka menu Printer.');
 
@@ -119,6 +119,7 @@ class PrinterService extends AsyncNotifier<SavedPrinter?> {
 
     final gen = Generator(PaperSize.mm58, await CapabilityProfile.load());
     final logo = decodeLogo(logoBase64);
+    final footerImage = decodeLogo(footerImageBase64);
     final bytes = <int>[...gen.reset()];
     for (var c = 0; c < copies; c++) {
       if (logo != null) {
@@ -128,6 +129,11 @@ class PrinterService extends AsyncNotifier<SavedPrinter?> {
       }
       for (final line in lines) {
         bytes.addAll(gen.text(line.text, styles: PosStyles(bold: line.bold)));
+      }
+      if (footerImage != null) {
+        bytes
+          ..addAll(gen.setStyles(const PosStyles(align: PosAlign.center)))
+          ..addAll(rasterImage(footerImage));
       }
       // Dorong kertas secukupnya sampai baris terakhir lewat gerigi sobek (tanpa baris kosong ekstra).
       bytes.addAll(feedMm(kTailMm));

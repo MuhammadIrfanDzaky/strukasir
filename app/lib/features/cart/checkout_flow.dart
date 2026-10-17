@@ -63,6 +63,8 @@ class CheckoutFlow {
           number: saved['number'] as String,
           // Kasbon hanya untuk member, bila fitur aktif.
           creditCustomer: (menu?.feature('customer_credit') ?? false) ? ref.read(cartProvider).customer : null,
+          qrisImage: menu?.qrisImage,
+          shopName: menu?.receipt.name ?? '',
         ),
       );
       if (chosen == null) return; // dibatalkan; order tetap terbuka & keranjang utuh
@@ -224,9 +226,12 @@ class CheckoutFlow {
   /// Cetak struk pelanggan + logo kedai (dari cache menu, jadi tetap ada saat offline).
   Future<void> _print(OrderJson order) async {
     try {
+      final menu = ref.read(menuProvider).value?.menu;
+      final qris = order['status'] != 'paid' && (menu?.qrisOnBill ?? false) ? menu?.qrisImage : null;
       await ref.read(printerProvider.notifier).printDocument(
-            customerReceipt(order),
-            logoBase64: ref.read(menuProvider).value?.menu.receipt.logoBase64,
+            [...customerReceipt(order), if (qris != null) ...qrisBillLines(order)],
+            logoBase64: menu?.receipt.logoBase64,
+            footerImageBase64: qris,
           );
     } on PrintException catch (e) {
       if (!context.mounted) return;

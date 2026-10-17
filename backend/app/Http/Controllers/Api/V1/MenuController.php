@@ -82,6 +82,8 @@ class MenuController extends Controller
                 ? app(TierService::class)->tiers()->map(fn ($t) => TierService::present($t))->values() : [],
             // Nama, alamat, penutup & logo struk; disimpan tablet bersama cache menu (struk tetap lengkap saat offline).
             'receipt' => ReceiptSettingsController::present($settings),
+            // QRIS statis kedai (ditampilkan ke pembeli saat bayar QRIS); null = belum diunggah.
+            'qris' => QrisSettingsController::present($settings),
             // Outlet tablet ini (nama & alamat di struk); `outlets` = jumlah outlet aktif (nama outlet tampil bila > 1).
             'outlet' => $outlet?->present(),
             'outlet_count' => Outlet::query()->where('active', true)->count(),

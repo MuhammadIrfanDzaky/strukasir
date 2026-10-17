@@ -19,7 +19,7 @@ class TenantSetting extends Model
         'receipt_name', 'receipt_header', 'receipt_footer',
         'tax_enabled', 'tax_rate_bp', 'service_enabled', 'service_rate_bp',
         'rounding_unit', 'cashier_discount_limit_bp', 'tax_inclusive', 'service_inclusive', 'customer_phone_required', 'credit_default_limit', 'report_email', 'report_whatsapp',
-        'order_types_enabled', 'default_order_type',
+        'order_types_enabled', 'default_order_type', 'qris_image', 'qris_on_bill',
     ];
 
     protected function casts(): array
@@ -32,6 +32,7 @@ class TenantSetting extends Model
             'customer_phone_required' => 'boolean',
             'report_email' => 'boolean',
             'order_types_enabled' => 'boolean',
+            'qris_on_bill' => 'boolean',
             'tax_rate_bp' => 'integer',
             'service_rate_bp' => 'integer',
             'rounding_unit' => 'integer',

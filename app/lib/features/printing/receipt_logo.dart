@@ -37,7 +37,7 @@ class ProcessedLogo {
 /// Null bila file bukan gambar yang bisa dibaca.
 ProcessedLogo? processLogo((Uint8List, LogoOptions) input) {
   final (bytes, options) = input;
-  final decoded = img.decodeImage(bytes);
+  final decoded = _decode(bytes);
   if (decoded == null) return null;
 
   // Latar transparan → putih.
@@ -68,6 +68,40 @@ ProcessedLogo? processLogo((Uint8List, LogoOptions) input) {
   }
   return ProcessedLogo(img.encodePng(out, level: 9),
       inverted: invert, threshold: threshold, width: out.width, height: out.height);
+}
+
+const int kQrisMaxWidth = 384;
+const int kQrisMaxHeight = 640;
+
+/// Gambar QRIS statis (foto/screenshot/PNG dari aplikasi merchant) → PNG hitam-putih untuk ditampilkan
+/// ke pembeli & dicetak di bill: tepi putih dibuang, lebar ≤ 384, modul QR tetap tajam (tanpa
+/// penghalusan saat diperbesar). Null bila bukan gambar atau terlalu kecil untuk dipindai.
+ProcessedLogo? processQris(Uint8List bytes) {
+  final decoded = _decode(bytes);
+  if (decoded == null) return null;
+  var image = img.Image(width: decoded.width, height: decoded.height, numChannels: 3);
+  img.fill(image, color: img.ColorRgb8(255, 255, 255));
+  image = img.compositeImage(image, decoded);
+  image = img.grayscale(image);
+
+  final trimmed = img.trim(image, mode: img.TrimMode.topLeftColor);
+  if (trimmed.width >= 60 && trimmed.height >= 60) image = trimmed;
+  if (image.width > kQrisMaxWidth) image = img.copyResize(image, width: kQrisMaxWidth, interpolation: img.Interpolation.average);
+  if (image.height > kQrisMaxHeight) image = img.copyResize(image, height: kQrisMaxHeight, interpolation: img.Interpolation.average);
+  if (image.width < 120 || image.height < 120) {
+    // Gambar kecil diperbesar tanpa penghalusan supaya modul QR tetap kotak.
+    final scale = (240 / (image.width < image.height ? image.width : image.height)).ceil();
+    if (image.width * scale > kQrisMaxWidth || image.height * scale > kQrisMaxHeight) return null;
+    image = img.copyResize(image, width: image.width * scale, height: image.height * scale, interpolation: img.Interpolation.nearest);
+  }
+
+  final threshold = _otsu(image);
+  final out = img.Image(width: image.width, height: image.height, numChannels: 1);
+  for (final p in image) {
+    final v = p.luminance < threshold ? 0 : 255;
+    out.setPixelRgb(p.x, p.y, v, v, v);
+  }
+  return ProcessedLogo(img.encodePng(out, level: 9), inverted: false, threshold: threshold, width: out.width, height: out.height);
 }
 
 /// Latar dianggap gelap bila rata-rata kecerahan piksel di tepi gambar < 50%.
@@ -117,4 +151,13 @@ int _otsu(img.Image image) {
     }
   }
   return threshold.clamp(64, 224);
+}
+
+/// Pustaka gambar bisa melempar error untuk file rusak / bukan gambar → anggap tidak terbaca.
+img.Image? _decode(Uint8List bytes) {
+  try {
+    return img.decodeImage(bytes);
+  } catch (_) {
+    return null;
+  }
 }
