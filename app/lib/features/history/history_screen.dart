@@ -360,7 +360,7 @@ class _OrderDetailDialogState extends ConsumerState<OrderDetailDialog> {
       actions: [
         if (o['status'] != 'void')
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger, backgroundColor: AppColors.dangerSoft),
             onPressed: _busy ? null : _void,
             child: const Text('Void'),
           ),

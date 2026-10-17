@@ -373,12 +373,22 @@ class _ProductTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        product.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppType.title.copyWith(color: soldOut ? AppColors.inkMuted : AppColors.ink),
-                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        // Kode produk (bisa dicari & diketik di kotak cari kasir).
+                        if (product.code != null && product.code!.trim().isNotEmpty)
+                          Text(product.code!.trim(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppType.caption.copyWith(color: AppColors.inkMuted, letterSpacing: 0.5)),
+                        Flexible(
+                          child: Text(
+                            product.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppType.title.copyWith(color: soldOut ? AppColors.inkMuted : AppColors.ink),
+                          ),
+                        ),
+                      ]),
                     ),
                     if (product.favorite)
                       Padding(

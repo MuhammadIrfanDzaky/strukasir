@@ -33,7 +33,7 @@ class LoginScreen extends ConsumerWidget {
     ]);
 
     // Kembali ke layar awal (Daftar / Masuk) — mis. tablet dipakai usaha lain. Butuh PIN owner.
-    final leave = TextButton(style: TextButton.styleFrom(foregroundColor: AppColors.onInkMuted, padding: EdgeInsets.zero), onPressed: () => _leave(context, ref, staff.value ?? const []), child: const Text('Ganti usaha / keluarkan tablet'), );
+    final leave = TextButton(style: TextButton.styleFrom(foregroundColor: AppColors.onInkMuted, backgroundColor: AppColors.onInk.withValues(alpha: 0.08), padding: const EdgeInsets.symmetric(horizontal: AppSpace.s3)), onPressed: () => _leave(context, ref, staff.value ?? const []), child: const Text('Ganti usaha / keluarkan tablet'), );
 
     final brand = stacked
         ? Container(

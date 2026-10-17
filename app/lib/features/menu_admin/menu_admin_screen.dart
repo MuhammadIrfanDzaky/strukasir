@@ -319,6 +319,91 @@ class _ProductFormState extends ConsumerState<ProductForm> {
   late final List<String> _groupIds = [...?widget.product?.modifierGroupIds];
   bool _busy = false;
 
+  /// Owner sudah mencentang/menghapus pilihan sendiri → ganti kategori tidak menimpa pilihannya.
+  bool _groupsTouched = false;
+  bool _showAllGroups = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.product == null) _suggestGroups();
+  }
+
+  /// Produk lain (aktif) di kategori ini.
+  List<MenuProduct> _siblings(String? categoryId) => [
+        for (final p in widget.menu.products)
+          if (p.categoryId == categoryId && p.id != widget.product?.id && p.active) p,
+      ];
+
+  /// Pilihan yang lazim di kategori ini = dipakai produk lain di kategori yang sama (kopi → suhu, gula;
+  /// makanan → level pedas). Urut sesuai urutan grup.
+  List<MenuModifierGroup> _relevantGroups(String? categoryId) {
+    final used = {for (final p in _siblings(categoryId)) ...p.modifierGroupIds};
+    return [for (final g in widget.menu.modifierGroups) if (used.contains(g.id)) g];
+  }
+
+  /// Produk baru: centang otomatis pilihan yang dipakai sebagian besar produk di kategorinya.
+  void _suggestGroups() {
+    if (_groupsTouched) return;
+    final siblings = _siblings(_categoryId);
+    _groupIds
+      ..clear()
+      ..addAll([
+        for (final g in widget.menu.modifierGroups)
+          if (siblings.isNotEmpty && siblings.where((p) => p.modifierGroupIds.contains(g.id)).length * 2 > siblings.length) g.id,
+      ]);
+  }
+
+  /// Pilihan yang lazim di kategori ini (+ yang sudah dicentang) tampil langsung; sisanya disembunyikan
+  /// di "Pilihan lain" supaya kopi tidak ditawari level pedas.
+  List<Widget> _groupTiles() {
+    final all = widget.menu.modifierGroups;
+    if (all.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpace.s2),
+          child: Text('Belum ada grup pilihan. Buat di tab Pilihan.', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+        ),
+      ];
+    }
+    final relevant = _relevantGroups(_categoryId).map((g) => g.id).toSet();
+    final shown = [for (final g in all) if (relevant.contains(g.id) || _groupIds.contains(g.id)) g];
+    final others = [for (final g in all) if (!shown.contains(g)) g];
+    final category = widget.menu.categories.where((c) => c.id == _categoryId).firstOrNull?.name ?? 'ini';
+    Widget tile(MenuModifierGroup g) => CheckboxListTile(
+          title: Text(g.name),
+          subtitle: Text('${g.rule} · ${g.activeModifiers.map((m) => m.name).join(', ')}'),
+          value: _groupIds.contains(g.id),
+          onChanged: (v) => setState(() {
+            _groupsTouched = true;
+            v! ? _groupIds.add(g.id) : _groupIds.remove(g.id);
+          }),
+        );
+    return [
+      if (shown.isEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpace.s2),
+          child: Text('Belum ada pilihan yang dipakai di kategori $category.', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+        )
+      else
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpace.s1),
+          child: Text('Pilihan yang biasa dipakai di kategori $category.', style: AppType.caption.copyWith(color: AppColors.inkMuted)),
+        ),
+      for (final g in shown) tile(g),
+      if (others.isNotEmpty) ...[
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: () => setState(() => _showAllGroups = !_showAllGroups),
+            child: Text(_showAllGroups ? 'Sembunyikan pilihan lain' : 'Pilihan lain (${others.length})'),
+          ),
+        ),
+        if (_showAllGroups) for (final g in others) tile(g),
+      ],
+    ];
+  }
+
   @override
   void dispose() {
     _name.dispose();
@@ -380,7 +465,7 @@ class _ProductFormState extends ConsumerState<ProductForm> {
               TextFormField(
                 controller: _code,
                 textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(labelText: 'Kode produk (opsional)', hintText: 'mis. BB03'),
+                decoration: const InputDecoration(labelText: 'Kode produk (opsional)', hintText: 'mis. BB03', helperText: 'Tampil di kartu kasir & bisa diketik di kotak cari.'),
                 validator: (v) => (v ?? '').trim().isEmpty || RegExp(r'^[A-Za-z0-9._-]{1,30}$').hasMatch(v!.trim())
                     ? null
                     : 'Huruf, angka, titik, minus, atau garis bawah (maks. 30)',
@@ -433,7 +518,10 @@ class _ProductFormState extends ConsumerState<ProductForm> {
                 items: [
                   for (final c in widget.menu.categories) DropdownMenuItem(value: c.id, child: Text(c.name)),
                 ],
-                onChanged: (v) => setState(() => _categoryId = v),
+                onChanged: (v) => setState(() {
+                  _categoryId = v;
+                  if (widget.product == null) _suggestGroups();
+                }),
                 validator: (v) => v == null ? 'Pilih kategori' : null,
               ),
               SwitchListTile(
@@ -454,13 +542,7 @@ class _ProductFormState extends ConsumerState<ProductForm> {
               ),
               const Padding(padding: EdgeInsets.symmetric(vertical: AppSpace.s2), child: Divider()),
               const AppOverline('Pilihan untuk produk ini (urutan = urutan tampil)'),
-              for (final g in widget.menu.modifierGroups)
-                CheckboxListTile(
-                  title: Text(g.name),
-                  subtitle: Text('${g.rule} · ${g.activeModifiers.map((m) => m.name).join(', ')}'),
-                  value: _groupIds.contains(g.id),
-                  onChanged: (v) => setState(() => v! ? _groupIds.add(g.id) : _groupIds.remove(g.id)),
-                ),
+              ..._groupTiles(),
             ],
           ),
         ),
@@ -659,25 +741,17 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
                 }),
               ),
               if (_allowQty)
-                Row(children: [
-                  const Expanded(child: Text('Maksimal per pilihan')),
-                  IconButton(
-                      onPressed: _maxQty > 2 ? () => setState(() => _maxQty--) : null,
-                      icon: const Icon(Icons.remove_rounded)),
-                  Text('$_maxQty', style: AppType.title),
-                  IconButton(
-                      onPressed: _maxQty < 20 ? () => setState(() => _maxQty++) : null,
-                      icon: const Icon(Icons.add_rounded)),
-                ]),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpace.s2),
+                  child: Row(children: [
+                    const Expanded(child: Text('Maksimal per pilihan')),
+                    NumberStepper(value: _maxQty, min: 2, max: 20, onChanged: (v) => setState(() => _maxQty = v)),
+                  ]),
+                ),
               Row(children: [
                 // Grup berjumlah: batas total jumlah di grup (mis. maks. 3 tambahan per minuman).
                 Expanded(child: Text(_allowQty ? 'Maksimal total jumlah' : 'Maksimal dipilih')),
-                IconButton(
-                    onPressed: _max > 1 ? () => setState(() => _max--) : null, icon: const Icon(Icons.remove_rounded)),
-                Text('$_max', style: AppType.title),
-                IconButton(
-                    onPressed: _max < (_allowQty ? 20 : _rows.length) ? () => setState(() => _max++) : null,
-                    icon: const Icon(Icons.add_rounded)),
+                NumberStepper(value: _max, max: _allowQty ? 20 : _rows.length, onChanged: (v) => setState(() => _max = v)),
               ]),
               const Divider(),
               const SizedBox(height: AppSpace.s3),
@@ -728,7 +802,7 @@ class _ModifierGroupFormState extends ConsumerState<ModifierGroupForm> {
       actions: [
         if (widget.group != null)
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger, backgroundColor: AppColors.dangerSoft),
             onPressed: _busy ? null : _delete,
             child: const Text('Hapus grup'),
           ),

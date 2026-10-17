@@ -177,7 +177,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
                         _process();
                       }, child: const Text('Balik warna'), ),
             if (_logo != null)
-              TextButton(style: TextButton.styleFrom(foregroundColor: AppColors.danger), onPressed: _processing || _saving
+              TextButton(style: TextButton.styleFrom(foregroundColor: AppColors.danger, backgroundColor: AppColors.dangerSoft), onPressed: _processing || _saving
                     ? null
                     : () => setState(() {
                           _logo = null;

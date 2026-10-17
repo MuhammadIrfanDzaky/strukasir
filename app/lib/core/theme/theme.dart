@@ -110,6 +110,8 @@ ThemeData buildAppTheme() {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: AppColors.primary,
+        backgroundColor: AppColors.surfaceSunken,
+        disabledBackgroundColor: AppColors.surfaceSunken,
         minimumSize: buttonSize,
         padding: const EdgeInsets.symmetric(horizontal: AppSpace.s4),
         shape: mdShape,

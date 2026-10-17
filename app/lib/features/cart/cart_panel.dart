@@ -439,7 +439,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                                   Align(
                                     alignment: Alignment.centerLeft,
                                     child: TextButton(style: TextButton.styleFrom(
-                                        padding: EdgeInsets.zero,
+                                        padding: const EdgeInsets.symmetric(horizontal: AppSpace.s3),
                                         minimumSize: const Size(0, 36),
                                         visualDensity: VisualDensity.compact,
                                       ), onPressed: _busy ? null : _pickReward, child: const Text('Tukar hadiah'), ),
@@ -742,7 +742,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         ),
         actions: [
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger, backgroundColor: AppColors.dangerSoft),
             onPressed: () {
               notifier.setQty(line.id, 0);
               Navigator.pop(context);

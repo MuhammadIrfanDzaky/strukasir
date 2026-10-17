@@ -111,7 +111,7 @@ class _ToastState extends State<_Toast> with SingleTickerProviderStateMixin {
                   ),
                   if (action != null)
                     TextButton(
-                      style: TextButton.styleFrom(foregroundColor: AppColors.primaryOnDark),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.primaryOnDark, backgroundColor: AppColors.onInk.withValues(alpha: 0.1)),
                       onPressed: () {
                         widget.onClose();
                         action.onPressed();

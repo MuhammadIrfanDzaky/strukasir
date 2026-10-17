@@ -49,7 +49,7 @@ Future<(bool, Discount?)> showDiscountDialog(BuildContext context, {Discount? cu
         actions: [
           if (current != null)
             TextButton(
-              style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+              style: TextButton.styleFrom(foregroundColor: AppColors.danger, backgroundColor: AppColors.dangerSoft),
               onPressed: () => Navigator.pop(context, (true, null)),
               child: const Text('Hapus diskon'),
             ),
